@@ -1,0 +1,190 @@
+import Image from "next/image";
+// import { NewsletterForm } from "./newsletter-form";
+
+export default function Footer() {
+  return (
+    <footer className="mt-16 w-full bg-[var(--color-cream)]">
+      {/* Top prompt row */}
+      <div className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8">
+        <div className="flex items-center justify-between py-10 text-sm text-[var(--color-navy)]">
+          <p>
+            Speak to our expert at{" "}
+            <a
+              className="font-semibold text-[var(--color-brand)]"
+              href="tel:18004536744"
+            >
+              1-800-453-6744
+            </a>
+          </p>
+        </div>
+      </div>
+
+      <hr className="border-black/10" />
+
+      {/* Columns */}
+      <div className="mx-auto max-w-6xl px-4 pb-10 pt-8 md:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
+          {/* Contact */}
+          <div>
+            <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
+              Contact
+            </h4>
+            <p className="text-sm text-[var(--color-navy)]/70">
+              HITEC City, Hyderabad, Telangana 500081, India
+            </p>
+            <p className="mt-2 text-sm text-[var(--color-navy)]/70">
+              travelwithvelosta@gmail.com
+            </p>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
+              Company
+            </h4>
+            <ul className="space-y-2 text-sm text-[var(--color-navy)]/70">
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  About Us
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Tourz Reviews
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Contact Us
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Travel Guides
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Data Policy
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Cookie Policy
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Legal
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Sitemap
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Support */}
+          <div>
+            <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
+              Support
+            </h4>
+            <ul className="space-y-2 text-sm text-[var(--color-navy)]/70">
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Get in Touch
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Help center
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  Live chat
+                </a>
+              </li>
+              <li>
+                <a href="#" className="hover:text-[var(--color-navy)]">
+                  How it works
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Newsletter + Apps */}
+          <div>
+            <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
+              Newsletter
+            </h4>
+            <p className="mb-3 text-sm text-[var(--color-navy)]/70">
+              Subscribe to the free newsletter and stay up to date
+            </p>
+            {/* <NewsletterForm /> */}
+
+            <div className="mt-6">
+              <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
+                Mobile Apps
+              </h4>
+              <ul className="space-y-2 text-sm text-[var(--color-navy)]/70">
+                <li>
+                  <a href="#" className="hover:text-[var(--color-navy)]">
+                    iOS App
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-[var(--color-navy)]">
+                    Android App
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom row */}
+        <div className="mt-10 flex items-center justify-between border-t border-black/10 pt-6">
+          <p className="text-xs text-[var(--color-navy)]/60">
+            © Copyright Velosta 2024
+          </p>
+          <div>
+            <div>
+              <p className="text-xs text-[var(--color-navy)]/60 mb-2">
+                Follow Us
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Image
+                src={"/icons/instagram.png"}
+                alt="Instagram"
+                width={40}
+                height={16}
+              />
+              <Image
+                src={"/icons/twitter.png"}
+                alt="Twitter"
+                width={40}
+                height={16}
+              />
+              <Image
+                src={"/icons/youtube.png"}
+                alt="Youtube"
+                width={40}
+                height={16}
+              />
+              <Image
+                src={"/icons/linkedin.png"}
+                alt="Linkedin"
+                width={40}
+                height={16}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}

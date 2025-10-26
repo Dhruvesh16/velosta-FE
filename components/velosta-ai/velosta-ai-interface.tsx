@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import { Menu, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "../navbar";
+import Footer from "../footer";
 
 type ChatMeta = {
   id: string;

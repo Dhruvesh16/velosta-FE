@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
+import authorAvatar from "../../public/icons/people.png";
 type BlogPost = {
   id: string;
   title: string;
@@ -73,10 +73,7 @@ export function BlogCard({
         <div className="mt-4 flex items-center justify-between text-sm">
           <div className="flex items-center gap-3">
             <img
-              src={
-                post.authorAvatar ||
-                "/placeholder.svg?height=32&width=32&query=user%20avatar"
-              }
+              src={post.authorAvatar || authorAvatar.src}
               alt=""
               className="h-8 w-8 rounded-full object-cover"
               loading="lazy"
@@ -90,11 +87,14 @@ export function BlogCard({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-muted px-3 py-1 text-xs">
+            {/* <div className="rounded-full bg-muted px-3 py-1 text-xs">
               {post.likes} helpful
-            </div>
-            <Link href={`/travel-blogs#${post.id}`}>
-              <Button variant="ghost" className="hover:bg-muted">
+            </div> */}
+            <Link href={`/travel-blogs/${post.id}`}>
+              <Button
+                variant="ghost"
+                className="hover:bg-[#DA880F] hover:text-white"
+              >
                 Read
               </Button>
             </Link>

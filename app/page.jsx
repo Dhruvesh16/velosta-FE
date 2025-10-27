@@ -18,6 +18,7 @@ function Page() {
   const { user, setUser, setAccessToken, loading } = useUser();
 
   useEffect(() => {
+    console.log("useEffect");
     if (loading || user) return;
 
     const script = document.createElement("script");

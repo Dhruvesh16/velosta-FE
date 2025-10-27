@@ -3,13 +3,17 @@
 import { AuthCard } from "@/components/auth/auth-card";
 import { AuthForm } from "@/components/auth/auth-form";
 import Navbar from "@/components/navbar";
+import GoogleOneTapLogin from "../(components-auth)/google-auth";
 
 export default function SignUpPage() {
   const handleSubmit = (data: Record<string, string>) => {
     console.log("Sign up attempt:", data);
     // Backend logic would go here
   };
-
+  const handleLogin = (data: any) => {
+    // Save JWT in localStorage or app state
+    localStorage.setItem("accessToken", data.accessToken);
+  };
   return (
     <div>
       <Navbar />
@@ -20,6 +24,7 @@ export default function SignUpPage() {
         >
           <AuthForm type="signup" onSubmit={handleSubmit} />
         </AuthCard>
+        {/* <GoogleOneTapLogin onLogin={handleLogin} /> */}
       </div>
     </div>
   );

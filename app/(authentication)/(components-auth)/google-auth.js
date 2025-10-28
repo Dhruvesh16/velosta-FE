@@ -27,7 +27,7 @@ export default function GoogleOneTapLogin({ onLogin }) {
 
   const handleCredentialResponse = async (response) => {
     // response.credential is the ID token
-    const res = await fetch("http://localhost:3001/api/auth/google", {
+    const res = await fetch("process.env.NEXT_PUBLIC_URL/api/auth/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ credential: response.credential }),

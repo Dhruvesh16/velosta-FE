@@ -13,6 +13,7 @@ import TravelArticles from "@/components/travel-articles";
 import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
 import { useUser } from "./utils/context";
+import BlogList from "@/components/blog/blog-list";
 
 function Page() {
   const { user, setUser, setAccessToken, loading } = useUser();
@@ -47,11 +48,14 @@ function Page() {
 
   const handleCredentialResponse = async (response) => {
     try {
-      const res = await fetch("http://localhost:3001/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential: response.credential }),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_URL}/api/auth/google`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential: response.credential }),
+        }
+      );
 
       const data = await res.json();
 
@@ -76,7 +80,7 @@ function Page() {
         <DealBanner />
         <TopAttractions />
         <CustomerReviews />
-        <PopularTours />
+        {/* <PopularTours /> */}
         <AppPromoBanner />
         <TravelArticles />
         <Footer />

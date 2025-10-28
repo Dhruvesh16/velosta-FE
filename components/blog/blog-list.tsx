@@ -30,7 +30,7 @@ export default function BlogList() {
       try {
         const token = localStorage.getItem("accessToken"); // optional auth
         const res = await fetch(
-          "http://localhost:3001/api/travel-blog/all-blogs",
+          `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/all-blogs`,
           {
             headers: token
               ? {
@@ -87,7 +87,7 @@ export default function BlogList() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border bg-muted/30 p-8 text-center text-muted-foreground">
-          No posts found. Try a different search.
+          No posts yet — be the first to share one!
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

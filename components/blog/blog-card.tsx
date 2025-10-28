@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import authorAvatar from "../../public/icons/people.png";
+
 type BlogPost = {
   id: string;
   title: string;
@@ -28,77 +30,66 @@ export function BlogCard({
   return (
     <article
       className={cn(
-        "rounded-2xl border bg-background shadow-sm transition hover:shadow-md",
+        "group rounded-xl border bg-white shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-[2px]",
         className
       )}
       aria-labelledby={`post-${post.id}-title`}
     >
-      {post.coverImage ? (
-        <img
-          src={post.coverImage || "/placeholder.svg"}
-          alt=""
-          className="h-48 w-full rounded-t-2xl object-cover"
-          loading="lazy"
+      <div className="relative overflow-hidden">
+        <Image
+          src={post.coverImage || "/travel-blog-image.jpg"}
+          alt={post.title}
+          width={640}
+          height={360}
+          className="h-[220px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
         />
-      ) : (
-        <img
-          src="/travel-blog-image.jpg"
-          alt=""
-          className="h-48 w-full rounded-t-2xl object-cover"
-          loading="lazy"
-        />
-      )}
+        {post.tags[0] && (
+          <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[var(--color-navy)] shadow-sm backdrop-blur">
+            {post.tags[0]}
+          </span>
+        )}
+      </div>
 
-      <div className="p-5">
-        <div className="mb-3 flex flex-wrap gap-2">
-          {post.tags.slice(0, 4).map((t) => (
-            <Badge key={t} variant="secondary" className="rounded-full">
-              {t}
-            </Badge>
-          ))}
-        </div>
+      <div className="p-4">
+        <p className="text-xs text-[var(--color-navy)]/60">
+          {new Date(post.createdAt).toLocaleDateString()}{" "}
+          <span className="mx-2">|</span> By {post.authorName}
+        </p>
 
         <h3
           id={`post-${post.id}-title`}
-          className="text-balance text-xl font-semibold tracking-tight text-[color:var(--color-navy)]"
+          className="mt-1 text-[15px] font-semibold leading-6 text-[var(--color-navy)]"
         >
-          {post.title}
+          <Link href={`/travel-blogs/${post.id}`} className="hover:underline">
+            {post.title}
+          </Link>
         </h3>
-        {post.summary ? (
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+
+        {post.summary && (
+          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
             {post.summary}
           </p>
-        ) : null}
+        )}
 
-        <div className="mt-4 flex items-center justify-between text-sm">
+        <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
+            <Image
               src={post.authorAvatar || authorAvatar.src}
               alt=""
-              className="h-8 w-8 rounded-full object-cover"
-              loading="lazy"
+              width={28}
+              height={28}
+              className="rounded-full object-cover"
             />
-            <div className="leading-tight">
-              <div className="font-medium">{post.authorName}</div>
-              <div className="text-muted-foreground">
-                {new Date(post.createdAt).toLocaleDateString()}
-              </div>
-            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* <div className="rounded-full bg-muted px-3 py-1 text-xs">
-              {post.likes} helpful
-            </div> */}
-            <Link href={`/travel-blogs/${post.id}`}>
-              <Button
-                variant="ghost"
-                className="hover:bg-[#DA880F] hover:text-white"
-              >
-                Read
-              </Button>
-            </Link>
-          </div>
+          <Link href={`/travel-blogs/${post.id}`}>
+            <Button
+              variant="ghost"
+              className="text-[13px] px-3 py-1 hover:bg-[#DA880F] hover:text-white transition-colors"
+            >
+              Read
+            </Button>
+          </Link>
         </div>
       </div>
     </article>

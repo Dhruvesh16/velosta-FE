@@ -214,7 +214,7 @@ export default function BlogEditor() {
       if (!token) throw new Error("You must be logged in to publish");
 
       const res = await fetch(
-        "http://localhost:3001/api/travel-blog/create-blog",
+        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/create-blog`,
         {
           method: "POST",
           headers: {

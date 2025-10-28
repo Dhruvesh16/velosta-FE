@@ -10,13 +10,11 @@ export const metadata = {
 export default function TravelBlogsPage() {
   return (
     <main>
-      <ProtectedRoute>
-        <Navbar />
-        <div className="mt-32">
-          <BlogList />
-        </div>
-        <Footer />
-      </ProtectedRoute>
+      <Navbar />
+      <div className="mt-32">
+        <BlogList />
+      </div>
+      <Footer />
     </main>
   );
 }

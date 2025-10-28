@@ -111,7 +111,7 @@ export function ChatWindow() {
     // Free chat
     try {
       const res = await fetch(
-        "http://localhost:3001/api/velosta-ai/ai-planner",
+        `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
         {
           method: "POST",
           headers: {
@@ -150,7 +150,7 @@ export function ChatWindow() {
   async function generateItinerary(finalData: any) {
     try {
       const res = await fetch(
-        "http://localhost:3001/api/velosta-ai/ai-planner",
+        `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
         {
           method: "POST",
           headers: {

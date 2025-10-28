@@ -83,7 +83,7 @@ export function BlogDetail({ blog }: BlogDetailProps) {
       const token = localStorage.getItem("accessToken");
 
       const res = await fetch(
-        `http://localhost:3001/api/travel-blog/delete-blog/${blog.id}`,
+        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/delete-blog/${blog.id}`,
         {
           method: "DELETE",
           headers: {

@@ -15,7 +15,7 @@ export default async function BlogPage({ params }: Props) {
   const { id } = await params;
 
   const res = await fetch(
-    `http://localhost:3001/api/travel-blog/view-blog/${id}`
+    `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/view-blog/${id}`
   );
   if (!res.ok) return notFound();
 
@@ -39,15 +39,13 @@ export default async function BlogPage({ params }: Props) {
   }
   return (
     <main>
-      <ProtectedRoute>
-        <Navbar />
+      <Navbar />
 
-        <BlogDetail blog={blog} />
-        {/* <BlogComments blogId={blog.id} /> */}
-        {/* <RelatedPosts currentBlogId={blog.id} /> */}
+      <BlogDetail blog={blog} />
+      {/* <BlogComments blogId={blog.id} /> */}
+      {/* <RelatedPosts currentBlogId={blog.id} /> */}
 
-        <Footer />
-      </ProtectedRoute>
+      <Footer />
     </main>
   );
 }

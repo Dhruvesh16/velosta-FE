@@ -83,8 +83,8 @@ export function AuthForm({ type }: AuthFormProps) {
     try {
       const endpoint =
         type === "signup"
-          ? "http://localhost:3001/api/auth/signup"
-          : "http://localhost:3001/api/auth/signin";
+          ? `${process.env.NEXT_PUBLIC_URL}/api/auth/signup`
+          : `${process.env.NEXT_PUBLIC_URL}/api/auth/signin`;
 
       const payload =
         type === "signup"

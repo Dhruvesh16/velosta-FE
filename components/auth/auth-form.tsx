@@ -123,7 +123,6 @@ export function AuthForm({ type }: AuthFormProps) {
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
       const token = credentialResponse.credential;
-      console.log(token, "tokeninfe");
       // return;
       if (!token) throw new Error("No Google token found");
 

@@ -210,7 +210,6 @@ export default function BlogEditor() {
     try {
       // Get JWT token from localStorage or context
       const token = localStorage.getItem("accessToken"); // adjust based on your auth
-      console.log(token, "hola");
       if (!token) throw new Error("You must be logged in to publish");
 
       const res = await fetch(

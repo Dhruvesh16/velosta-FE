@@ -120,7 +120,7 @@ export function FeaturedTrips() {
           style={{ scrollPaddingLeft: "1.5rem" }}
         >
           {cards.map((c) => (
-            <Link href={c.redirect}>
+            <Link href={c.redirect} key={c.id}>
               <article
                 key={c.id}
                 className="group relative h-[400px] w-[320px] shrink-0 snap-start overflow-hidden rounded-3xl bg-card shadow-sm"

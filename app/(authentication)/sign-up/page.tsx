@@ -6,14 +6,6 @@ import Navbar from "@/components/navbar";
 import GoogleOneTapLogin from "../(components-auth)/google-auth";
 
 export default function SignUpPage() {
-  const handleSubmit = (data: Record<string, string>) => {
-    console.log("Sign up attempt:", data);
-    // Backend logic would go here
-  };
-  const handleLogin = (data: any) => {
-    // Save JWT in localStorage or app state
-    localStorage.setItem("accessToken", data.accessToken);
-  };
   return (
     <div>
       <Navbar />
@@ -22,7 +14,7 @@ export default function SignUpPage() {
           title="Join Velosta"
           subtitle="Create your account to start planning trips"
         >
-          <AuthForm type="signup" onSubmit={handleSubmit} />
+          <AuthForm type="signup" />
         </AuthCard>
         {/* <GoogleOneTapLogin onLogin={handleLogin} /> */}
       </div>

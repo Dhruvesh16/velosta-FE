@@ -12,32 +12,32 @@ type Review = {
 
 const REVIEWS: Review[] = [
   {
-    name: "John Smith",
-    role: "Traveler",
-    text: "I had an amazing experience with this company. The service was top‑notch, and the staff was incredibly friendly. I highly recommend them!",
+    name: "Riya Patel",
+    role: "Solo Traveler",
+    text: "Velosta AI completely changed the way I plan my trips. It built a perfect 3-day itinerary for Jibhi with cafés, hidden waterfalls, and stays that matched my vibe. I just packed and went!",
     avatar: "/images/avatars/user-1.jpg",
-    alt: "Smiling traveler portrait",
+    alt: "Traveler smiling with backpack",
   },
   {
-    name: "Ava Johnson",
-    role: "Backpacker",
-    text: "The itinerary was well planned and the guides were fantastic. Great attention to detail from start to finish.",
+    name: "Daniel Cruz",
+    role: "Travel Blogger",
+    text: "As a blogger, Velosta’s detailed trip plans save me hours of research. Plus, the ‘How Not to Travel’ community gives me hilarious, honest travel fails that inspire my next stories.",
     avatar: "/images/avatars/user-2.jpg",
-    alt: "Traveler with glasses smiling",
-  },
-  {
-    name: "Liam Chen",
-    role: "Explorer",
-    text: "Seamless booking and unforgettable sights. Will definitely book again for my next trip.",
-    avatar: "/images/avatars/user-3.jpg",
-    alt: "Traveler outdoors with hat",
-  },
-  {
-    name: "Sofia Martínez",
-    role: "Photographer",
-    text: "Loved every moment. The team was responsive and the accommodations exceeded expectations.",
-    avatar: "/images/avatars/user-4.jpg",
     alt: "Traveler with camera laughing",
+  },
+  {
+    name: "Amelia Green",
+    role: "Couple Explorer",
+    text: "We used Velosta AI for our Bali trip — it recommended spots we’d never find on Instagram. The itinerary even synced with our budget and food preferences. Pure magic!",
+    avatar: "/images/avatars/user-3.jpg",
+    alt: "Traveler couple enjoying beach",
+  },
+  {
+    name: "Karan Mehta",
+    role: "Backpacker & Community Member",
+    text: "The ‘How Not to Travel’ section is gold — learning from other travelers’ real mistakes is more useful than any guidebook. Velosta feels like a smart friend who knows what you’d actually enjoy.",
+    avatar: "/images/avatars/user-4.jpg",
+    alt: "Man with travel bag smiling outdoors",
   },
 ];
 
@@ -115,7 +115,7 @@ export default function CustomerReviews() {
         id="customer-reviews-heading"
         className="text-(--color-navy) text-xl md:text-2xl font-semibold mb-8"
       >
-        Customer Reviews
+        What Travelers Say About Velosta AI
       </h2>
 
       <div className="relative mx-auto max-w-xl">
@@ -137,7 +137,7 @@ export default function CustomerReviews() {
         </div>
 
         <p className="text-(--color-brand) text-xs font-medium tracking-wide uppercase mb-2">
-          Excellent Service!
+          Real Travelers. Real Stories.
         </p>
 
         <blockquote className="text-(--color-navy)/85 leading-relaxed mx-auto text-balance">

@@ -1,18 +1,20 @@
+"use client";
+
+import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
 import VelostaBotInterface from "@/components/velosta-ai/velosta-ai-interface";
-import dynamic from "next/dynamic";
+import ProtectedRoute from "../utils/protected-routes";
 
-// const VelostaBotInterface = dynamic(
-//   () => import("@/components/velosta/velosta-interface"),
-//   {
-//     ssr: false,
-//   }
-// );
-
-export default function PlanPage() {
+function PlanPage() {
   return (
-    <main className="h-screen w-full">
-      <VelostaBotInterface />
-    </main>
+    <ProtectedRoute>
+      <Navbar className={"ml-64"} />
+
+      <main className="min-h-screen w-full">
+        <VelostaBotInterface />
+      </main>
+    </ProtectedRoute>
   );
 }
+
+export default PlanPage;

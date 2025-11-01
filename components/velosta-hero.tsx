@@ -2,6 +2,7 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { DestinationsModal } from "./destinations-modal";
 
 export function VelostaHero() {
   return (
@@ -40,8 +41,9 @@ export function VelostaHero() {
               href="/velosta-ai"
               aria-label="Plan your trip with Velosta AI"
               className={cn(
-                "group inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-semibold text-(--color-brand-contrast) shadow-sm",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-brand) focus-visible:ring-offset-2"
+                "group inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-semibold text-[color:var(--color-brand-contrast)] shadow-sm",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-brand)] focus-visible:ring-offset-2",
+                "transition-transform duration-150 ease-in-out active:scale-95 active:shadow-md"
               )}
               style={{
                 backgroundImage:

@@ -6,6 +6,7 @@ type Attraction = {
   image: string;
   alt: string;
 };
+
 const ATTRACTIONS: Attraction[] = [
   {
     name: "Colosseum",

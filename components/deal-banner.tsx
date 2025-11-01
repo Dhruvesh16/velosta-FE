@@ -25,24 +25,24 @@ export function DealBanner({ className }: { className?: string }) {
             id="deal-heading"
             className="text-pretty text-[22px] font-semibold leading-tight text-[var(--color-navy)] md:text-[28px]"
           >
-            Grab up to{" "}
-            <span className="text-[var(--color-brand)]">35% off</span>
+            Plan your perfect trip with{" "}
+            <span className="text-[var(--color-brand)]">Velosta AI</span>
             <br />
-            on your favorite <br className="hidden md:block" /> Destination
+            Your personal <br className="hidden md:block" /> travel companion
           </h3>
           <p className="text-sm text-[var(--color-navy)]/70">
-            Limited time offer, don’t miss the opportunity
+            Discover personalized itineraries powered by AI in seconds
           </p>
           <div>
             <a
-              href="#"
+              href="/velosta-ai"
               className="inline-flex items-center justify-center rounded-lg px-5 py-3 text-sm font-medium text-[var(--color-brand-contrast)]"
               style={{
                 background:
                   "linear-gradient(135deg, var(--color-brand) 0%, var(--color-brand-start) 100%)",
               }}
             >
-              Book Now
+              Try Velosta-AI Now
             </a>
           </div>
         </div>

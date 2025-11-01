@@ -77,7 +77,7 @@ function Page() {
         <FeaturedTrips />
         <TrendingDestinations />
         <DealBanner />
-        <TopAttractions />
+        {/* <TopAttractions /> */}
         <CustomerReviews />
         {/* <PopularTours /> */}
         <AppPromoBanner />

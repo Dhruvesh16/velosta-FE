@@ -94,7 +94,7 @@ export default function AppPromoBanner() {
                 className="h-11 px-6 w-1/2 mt-4 rounded-lg bg-white text-[var(--color-brand)] font-semibold hover:bg-white/95 transition disabled:opacity-70"
                 aria-live="polite"
               >
-                Download
+                Comming Soon....
               </button>
             </div>
 

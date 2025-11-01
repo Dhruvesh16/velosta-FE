@@ -57,11 +57,12 @@ export function ChatSidebar({
     <aside className="hidden md:flex md:w-72 lg:w-80 flex-col gap-3 border-r bg-secondary/40 px-3 py-4">
       <div className="flex items-center gap-2">
         <Button
-          onClick={onCreate}
-          className="rounded-full bg-(--color-navy) text-white hover:opacity-90"
+          onClick={() => console.log("hola")}
+          className="rounded-full bg-[var(--color-navy)] text-white hover:opacity-90 transition-opacity"
         >
           New chat
         </Button>
+
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}

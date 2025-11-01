@@ -40,7 +40,7 @@ function BrandMark() {
 const navLinks = [
   { href: "/velosta-ai", label: "Velosta AI" },
   { href: "/travel-blogs", label: "HowNotToTravel" },
-  { href: "/", label: "App Download" },
+  // { href: "/", label: "App Download" },
 ];
 export default function Navbar({ className }) {
   const [destinationsOpen, setDestinationsOpen] = useState(false);
@@ -104,12 +104,12 @@ export default function Navbar({ className }) {
             <UserProfileMenu />
           ) : (
             <div className="flex items-center gap-2">
-              <Link
+              {/* <Link
                 href="sign-up"
                 className="hidden sm:inline text-sm font-medium text-neutral-700 hover:text-neutral-900 px-3 py-1.5"
               >
                 Sign up
-              </Link>
+              </Link> */}
 
               <Button
                 asChild
@@ -119,7 +119,7 @@ export default function Navbar({ className }) {
                     "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",
                 }}
               >
-                <Link href="sign-in">Sign in</Link>
+                <Link href="sign-in">Get Started</Link>
               </Button>
 
               <div className="md:hidden">
@@ -186,12 +186,12 @@ export default function Navbar({ className }) {
                           </Link>
                         ))}
                         <div className="mt-2 flex items-center gap-2">
-                          <Link
+                          {/* <Link
                             href="sign-up"
                             className="text-sm font-medium text-neutral-700 hover:text-neutral-900 px-3 py-1.5"
                           >
                             Sign up
-                          </Link>
+                          </Link> */}
                           <Button
                             asChild
                             className="h-9 rounded-full px-4 text-sm font-semibold text-[color:var(--color-brand-contrast)]"
@@ -200,7 +200,7 @@ export default function Navbar({ className }) {
                                 "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",
                             }}
                           >
-                            <Link href="#login">Log in</Link>
+                            <Link href="/sign-in">Get Started</Link>
                           </Button>
                         </div>
                       </nav>

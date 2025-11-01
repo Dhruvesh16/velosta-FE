@@ -43,7 +43,7 @@ type BlogDetailProps = {
   };
 };
 
-export function BlogDetail({ blog }: BlogDetailProps) {
+export function BlogFetauredTrips({ blog }: BlogDetailProps) {
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(blog.likes);
@@ -75,48 +75,6 @@ export function BlogDetail({ blog }: BlogDetailProps) {
     }
   };
 
-  const handleBlogDeletion = async () => {
-    try {
-      setLoading(true);
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("accessToken")
-          : null;
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/delete-blog/${blog.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        }
-      );
-
-      if (!res.ok) throw new Error("Failed to delete blog");
-
-      toast.success("Blog deleted successfully!", {
-        position: "bottom-right",
-        autoClose: 2000,
-      });
-      setDeleteDialogOpen(false);
-
-      // small delay so toast is visible
-      setTimeout(() => {
-        router.push("/travel-blogs");
-      }, 500);
-    } catch (err) {
-      console.error("delete error:", err);
-      toast.error("Something went wrong while deleting the blog", {
-        position: "bottom-right",
-        autoClose: 2500,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     // TooltipProvider can be global (preferred). If you already have it in your layout/_app, remove this wrapper.
     <TooltipProvider>
@@ -135,7 +93,7 @@ export function BlogDetail({ blog }: BlogDetailProps) {
         <div className="relative h-96 w-full overflow-hidden bg-gradient-to-b from-black/40 to-transparent md:h-[500px]">
           <img
             src={
-              blog.coverImage ||
+              blog.coverImage?.src ||
               "/placeholder.svg?height=500&width=1200&query=travel%20destination"
             }
             alt={blog.title}
@@ -205,55 +163,6 @@ export function BlogDetail({ blog }: BlogDetailProps) {
                 <Button variant="ghost" size="sm">
                   <Bookmark className="h-5 w-5" />
                 </Button>
-
-                {user?.id === blog.authorId && (
-                  // AlertDialog wraps the dialog pieces. Tooltip wraps the trigger (the actual Button DOM node).
-                  <AlertDialog
-                    open={deleteDialogOpen}
-                    onOpenChange={setDeleteDialogOpen}
-                  >
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={loading}
-                          >
-                            <Trash2 className="h-5 w-5" />
-                            Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                      </TooltipTrigger>
-
-                      <TooltipContent side="top">
-                        <p className="text-xs">Only you can delete this blog</p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <AlertDialogContent className="sm:max-w-md">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. The blog will be
-                          permanently deleted.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={loading}>
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleBlogDeletion}
-                          disabled={loading}
-                          className="bg-red-600 hover:bg-red-700"
-                        >
-                          {loading ? "Deleting..." : "Yes, delete"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
               </div>
             </div>
           </div>

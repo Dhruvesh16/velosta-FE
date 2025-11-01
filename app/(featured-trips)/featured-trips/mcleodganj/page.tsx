@@ -1,7 +1,8 @@
 "use client";
-import { BlogDetail } from "@/components/blog/blog-detail";
+import { BlogFetauredTrips } from "@/components/blog/featured-trips";
 import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
+import mcloadganjImg from "@/public/images/mcleodganj.jpg";
 
 export default function McLeodGanjCoupleBlog() {
   const blog = {
@@ -9,7 +10,7 @@ export default function McLeodGanjCoupleBlog() {
     title: "McLeod Ganj: Love, Culture & Calm",
     summary:
       "Monasteries, tea gardens, sunset points — a 3-day journey for two through the heart of Little Lhasa.",
-    coverImage: "images/mcleodganj.jpg",
+    coverImage: mcloadganjImg,
     tags: ["Couple", "Culture", "Himachal"],
     authorName: "Trippy Explorer",
     createdAt: new Date().toISOString(),
@@ -38,7 +39,7 @@ export default function McLeodGanjCoupleBlog() {
   return (
     <div>
       <Navbar />
-      <BlogDetail blog={blog} />
+      <BlogFetauredTrips blog={blog} />
       <Footer />
     </div>
   );

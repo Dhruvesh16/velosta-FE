@@ -1,7 +1,8 @@
 "use client";
-import { BlogDetail } from "@/components/blog/blog-detail";
+import { BlogFetauredTrips } from "@/components/blog/featured-trips";
 import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
+import landourImg from "@/public/images/landour.avif";
 
 export default function LandourCoupleBlog() {
   const blog = {
@@ -9,7 +10,7 @@ export default function LandourCoupleBlog() {
     title: "A Romantic Escape to Landour",
     summary:
       "Colonial lanes, cinnamon waffles, pine forests, and quiet sunsets — a slow 3-day getaway for two in the misty hills of Uttarakhand.",
-    coverImage: "images/landour.avif",
+    coverImage: landourImg,
     tags: ["Couple", "Romantic", "Uttarakhand"],
     authorName: "Trippy Explorer",
     createdAt: new Date().toISOString(),
@@ -40,7 +41,7 @@ export default function LandourCoupleBlog() {
   return (
     <div>
       <Navbar />
-      <BlogDetail blog={blog} />
+      <BlogFetauredTrips blog={blog} />
       <Footer />
     </div>
   );

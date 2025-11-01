@@ -1,7 +1,8 @@
 "use client";
-import { BlogDetail } from "@/components/blog/blog-detail";
+import { BlogFetauredTrips } from "@/components/blog/featured-trips";
 import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
+import chakrataImg from "@/public/images/chakrata.webp";
 
 export default function ChakrataFriendsBlog() {
   const blog = {
@@ -9,7 +10,7 @@ export default function ChakrataFriendsBlog() {
     title: "Chakrata Adventures on a Budget",
     summary:
       "Hidden trails, waterfalls, laughter, and bonfires — a 3-day budget trip with friends in the offbeat hills of Uttarakhand.",
-    coverImage: "/images/chakrata.webp",
+    coverImage: chakrataImg,
     tags: ["Friends", "Adventure", "Budget", "Uttarakhand"],
     authorName: "Trippy Explorer",
     createdAt: new Date().toISOString(),
@@ -40,7 +41,7 @@ export default function ChakrataFriendsBlog() {
   return (
     <div>
       <Navbar />
-      <BlogDetail blog={blog} />
+      <BlogFetauredTrips blog={blog} />
       <Footer />
     </div>
   );

@@ -1,8 +1,9 @@
 "use client";
 
-import { BlogDetail } from "@/components/blog/blog-detail";
+import { BlogFetauredTrips } from "@/components/blog/featured-trips";
 import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
+import jibhi from "@/public/images/jibhi.jpeg";
 
 export default function JibhiShojaFamilyBlog() {
   const blog = {
@@ -10,8 +11,7 @@ export default function JibhiShojaFamilyBlog() {
     title: "Family Time in Jibhi & Shoja",
     summary:
       "Wooden cottages, gentle rivers, forest walks — the ideal family hideaway in the Tirthan Valley.",
-    coverImage:
-      "https://zoyotrip.in/wp-content/uploads/2024/12/tirthan-valley-2645570_1920.jpg.webp",
+    coverImage: jibhi,
     tags: ["Family", "Nature", "Himachal"],
     authorName: "Trippy Explorer",
     createdAt: new Date().toISOString(),
@@ -43,7 +43,7 @@ export default function JibhiShojaFamilyBlog() {
   return (
     <div>
       <Navbar />
-      <BlogDetail blog={blog} />
+      <BlogFetauredTrips blog={blog} />
       <Footer />
     </div>
   );

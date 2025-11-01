@@ -8,12 +8,12 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8">
         <div className="flex items-center justify-between py-10 text-sm text-[var(--color-navy)]">
           <p>
-            Speak to our expert at{" "}
+            Write to us at: {"   "}
             <a
               className="font-semibold text-[var(--color-brand)]"
               href="tel:18004536744"
             >
-              1-800-453-6744
+              travelwithvelosta@gmail.com
             </a>
           </p>
         </div>
@@ -44,50 +44,26 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-sm text-[var(--color-navy)]/70">
               <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  About Us
+                <a
+                  href="/velosta-ai"
+                  className="hover:text-[var(--color-navy)]"
+                >
+                  Velost-AI
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  Tourz Reviews
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  Contact Us
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  Travel Guides
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  Data Policy
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  Cookie Policy
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  Legal
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-[var(--color-navy)]">
-                  Sitemap
+                <a
+                  href="/travel-blogs"
+                  className="hover:text-[var(--color-navy)]"
+                >
+                  How Not To Travel
                 </a>
               </li>
             </ul>
           </div>
 
           {/* Support */}
-          <div>
+          {/* <div>
             <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
               Support
             </h4>
@@ -113,19 +89,19 @@ export default function Footer() {
                 </a>
               </li>
             </ul>
-          </div>
+          </div> */}
 
           {/* Newsletter + Apps */}
           <div>
-            <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
+            {/* <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
               Newsletter
             </h4>
             <p className="mb-3 text-sm text-[var(--color-navy)]/70">
               Subscribe to the free newsletter and stay up to date
-            </p>
+            </p> */}
             {/* <NewsletterForm /> */}
 
-            <div className="mt-6">
+            {/* <div className="mt-6">
               <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
                 Mobile Apps
               </h4>
@@ -141,14 +117,14 @@ export default function Footer() {
                   </a>
                 </li>
               </ul>
-            </div>
+            </div> */}
           </div>
         </div>
 
         {/* Bottom row */}
         <div className="mt-10 flex items-center justify-between border-t border-black/10 pt-6">
           <p className="text-xs text-[var(--color-navy)]/60">
-            © Copyright Velosta 2024
+            © Copyright Velosta 2025
           </p>
           <div>
             <div>
@@ -169,7 +145,7 @@ export default function Footer() {
                 width={40}
                 height={16}
               />
-              <Image
+              {/* <Image
                 src={"/icons/youtube.png"}
                 alt="Youtube"
                 width={40}
@@ -180,7 +156,7 @@ export default function Footer() {
                 alt="Linkedin"
                 width={40}
                 height={16}
-              />
+              /> */}
             </div>
           </div>
         </div>

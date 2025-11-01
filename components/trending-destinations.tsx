@@ -37,7 +37,7 @@ export function TrendingDestinations() {
           Trending Destinations
         </h2>
         <a
-          href="#"
+          href="/velosta-ai"
           className="text-sm font-medium text-[var(--color-navy)]/80 hover:text-[var(--color-navy)]"
         >
           See all
@@ -81,7 +81,7 @@ function TileCard({
 }: Tile & { className?: string }) {
   return (
     <a
-      href="#"
+      href="/velosta-ai"
       className={`relative isolate block overflow-hidden rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.06)] ${className}`}
       aria-label={title}
     >
@@ -114,7 +114,7 @@ function TallCard({
 }) {
   return (
     <a
-      href="#"
+      href="/velosta-ai"
       className="relative isolate block h-full min-h-[22rem] overflow-hidden rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
       aria-label={title}
     >

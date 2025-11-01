@@ -242,11 +242,29 @@ export default function BlogEditor() {
       // Redirect to the blog page
       router.push(`/travel-blogs`);
     } catch (e: any) {
-      toast({
-        title: "Error",
-        description: e.message || "Publish failed",
-        variant: "destructive",
-      });
+      console.log("Error Status:", e.status); // ✅ will log 401, 413, etc.
+      console.log("Error Message:", e.message);
+
+      if (e.status === 401) {
+        toast({
+          title: "Unauthorized",
+          description:
+            "Your session expired. Please log out and sign in again.",
+          variant: "destructive",
+        });
+      } else if (e.status === 413) {
+        toast({
+          title: "Image Too Large",
+          description: "Try uploading a smaller image.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: e.message || "Publish failed",
+          variant: "destructive",
+        });
+      }
     } finally {
       setSubmitting(false);
     }

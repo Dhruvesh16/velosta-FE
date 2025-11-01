@@ -3,7 +3,10 @@
 import Link from "next/link";
 import type React from "react";
 import { useRef } from "react";
-
+import chakrataImg from "../public/images/chakrata.webp";
+import landourImg from "../public/images/landour.avif";
+import mcloadganjImg from "../public/images/mcleodganj.jpg";
+import jibhiImg from "../public/images/jibhi.jpeg";
 function ArrowLeft(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
@@ -40,7 +43,7 @@ type Card = {
   place: string;
   days: string;
   price: string;
-  image: string;
+  // image: string;
   redirect: string;
 };
 
@@ -51,7 +54,7 @@ const cards: Card[] = [
     place: "Landour, Uttarakhand",
     days: "3 days",
     price: "Budget Trip",
-    image: "/images/landour.avif",
+    image: landourImg,
     redirect: "/featured-trips/landour",
   },
   {
@@ -60,7 +63,7 @@ const cards: Card[] = [
     place: "Chakrata, Uttarakhand",
     days: "4 days",
     price: "Friends Getaway",
-    image: "/images/chakrata.webp",
+    image: chakrataImg,
     redirect: "/featured-trips/chakrata",
   },
   {
@@ -69,7 +72,7 @@ const cards: Card[] = [
     place: "McLeod Ganj, Himachal Pradesh",
     days: "3 days",
     price: "Couple Escape",
-    image: "/images/mcleodganj.jpg",
+    image: mcloadganjImg,
     redirect: "/featured-trips/mcleodganj",
   },
   {
@@ -78,7 +81,7 @@ const cards: Card[] = [
     place: "Tirthan Valley, Himachal Pradesh",
     days: "5 days",
     price: "Family Trip",
-    image: "/images/shoja.jpeg",
+    image: jibhiImg,
     redirect: "/featured-trips/jibhi-sojha",
   },
 ];
@@ -127,7 +130,7 @@ export function FeaturedTrips() {
               >
                 <div className="relative h-[62%] w-full overflow-hidden">
                   <img
-                    src={c.image || "/placeholder.svg"}
+                    src={c.image.src || "/placeholder.svg"}
                     alt={c.title}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { VelostaHero } from "@/components/velosta-hero";
 import { FeaturedTrips } from "@/components/featured-trips";
 import { TrendingDestinations } from "@/components/trending-destinations";
@@ -17,6 +17,7 @@ import BlogList from "@/components/blog/blog-list";
 
 function Page() {
   const { user, setUser, setAccessToken, loading } = useUser();
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
     if (loading || user) return;
@@ -41,11 +42,14 @@ function Page() {
     };
 
     return () => {
-      document.body.removeChild(script);
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
     };
   }, [user, loading]);
 
   const handleCredentialResponse = async (response) => {
+    setIsSigningIn(true);
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_URL}/api/auth/google`,
@@ -66,25 +70,45 @@ function Page() {
       }
     } catch (error) {
       console.error("Google login failed:", error);
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
   return (
-    <main className="flex flex-col">
-      <Navbar />
-      <div className="space-y-14 md:space-y-20">
-        <VelostaHero />
-        <FeaturedTrips />
-        <TrendingDestinations />
-        <DealBanner />
-        {/* <TopAttractions /> */}
-        <CustomerReviews />
-        {/* <PopularTours /> */}
-        <AppPromoBanner />
-        <TravelArticles />
-        <Footer />
-      </div>
-    </main>
+    <>
+      {/* Full-Screen Loader Overlay */}
+      {isSigningIn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative">
+              {/* Spinner */}
+              <div className="w-12 h-12 border-4 border-teal-100 rounded-full animate-spin border-t-teal-500"></div>
+              <div className="absolute inset-0 w-12 h-12 border-4 border-coral-100 rounded-full animate-spin animation-delay-300 border-t-coral-500 opacity-70"></div>
+            </div>
+            <p className="text-sm font-medium text-gray-700 animate-pulse">
+              Signing you in...
+            </p>
+          </div>
+        </div>
+      )}
+
+      <main className="flex flex-col">
+        <Navbar />
+        <div className="space-y-14 md:space-y-20">
+          <VelostaHero />
+          <FeaturedTrips />
+          <TrendingDestinations />
+          <DealBanner />
+          {/* <TopAttractions /> */}
+          <CustomerReviews />
+          {/* <PopularTours /> */}
+          <AppPromoBanner />
+          <TravelArticles />
+          <Footer />
+        </div>
+      </main>
+    </>
   );
 }
 

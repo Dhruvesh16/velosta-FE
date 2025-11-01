@@ -23,12 +23,26 @@ export default function VelostaBotInterface() {
     return list[0]?.id || "";
   });
   const [chats, setChats] = useState<ChatMeta[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const list = chatStorage.load();
     setChats(list);
     if (!activeId && list[0]) setActiveId(list[0].id);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   function persist(next: ChatMeta[]) {
@@ -46,10 +60,16 @@ export default function VelostaBotInterface() {
     };
     persist([meta, ...chats]);
     setActiveId(id);
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
   }
 
   function handleSelect(id: string) {
     setActiveId(id);
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
   }
 
   function handleFirstUserMessage(first: string) {
@@ -67,11 +87,37 @@ export default function VelostaBotInterface() {
   }, [chats.length, activeId]);
 
   return (
-    <div className="flex h-screen w-full bg-background">
+    <div className="flex h-screen w-full bg-background relative">
+      {/* Mobile Toggle Button */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-background border rounded-md shadow-lg hover:bg-accent transition-colors"
+        aria-label="Toggle sidebar"
+      >
+        {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </button>
+
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
       <div
-        className={`transition-all duration-300 ${
-          sidebarOpen ? "w-64" : "w-0"
-        } border-r border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 overflow-hidden`}
+        className={`
+          fixed lg:relative
+          inset-y-0 left-0
+          z-40
+          transition-all duration-300 ease-in-out
+          ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }
+          ${sidebarOpen ? "w-64 sm:w-72 lg:w-64" : "lg:w-0"}
+          border-r border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 overflow-hidden
+        `}
       >
         <ChatSidebar
           activeId={activeId}
@@ -80,7 +126,8 @@ export default function VelostaBotInterface() {
         />
       </div>
 
-      <main className="flex flex-1 flex-col">
+      {/* Main Content */}
+      <main className="flex flex-1 flex-col w-full lg:w-auto min-w-0">
         {activeId ? (
           <div className="flex-1 overflow-hidden">
             <ChatWindow

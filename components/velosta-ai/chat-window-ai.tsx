@@ -4,7 +4,6 @@ import type React from "react";
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/app/utils/context";
 import { DateRangePicker } from "../../components/travel-planner/date-range-picker";
@@ -86,7 +85,7 @@ export function ChatWindow() {
         {
           id: "assistant-start",
           role: "assistant",
-          content: `Hey ${user.name} 👋! I'm Velosta AI. Let's plan your trip.\n\n${questions[0].text}`,
+          content: `Hey ${user.name}! I'm Velosta AI. Let's plan your trip.\n\n${questions[0].text}`,
         },
       ]);
     }
@@ -124,7 +123,6 @@ export function ChatWindow() {
     setInput("");
     setIsLoading(true);
 
-    // Add to conversation history
     setConversationHistory((prev) => [
       ...prev,
       { role: "user", content: text },
@@ -153,7 +151,7 @@ export function ChatWindow() {
             { role: "assistant", content: assistantMsg },
           ]);
           setIsLoading(false);
-        });
+        }, 300);
       } else {
         const generatingMsg = "Perfect! Generating your itinerary now...";
         setMessages((prev) => [
@@ -175,7 +173,7 @@ export function ChatWindow() {
       return;
     }
 
-    // Free-form chat with context
+    // Free-form chat
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
@@ -198,7 +196,6 @@ export function ChatWindow() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to process message");
 
-      // Handle text responses (questions/explanations)
       if (data.isTextResponse) {
         setMessages((prev) => [
           ...prev,
@@ -213,7 +210,6 @@ export function ChatWindow() {
           { role: "assistant", content: data.message },
         ]);
       } else {
-        // Update current itinerary if a new one is generated
         if (data.itineraryTable) {
           setCurrentItinerary(data);
         }
@@ -232,10 +228,9 @@ export function ChatWindow() {
           { role: "assistant", content: assistantResponse },
         ]);
 
-        // Show modifications applied if any
         if (data.modificationsApplied && data.modificationsApplied.length > 0) {
           setTimeout(() => {
-            const modsMsg = `✅ Applied changes:\n${data.modificationsApplied
+            const modsMsg = `Applied changes:\n${data.modificationsApplied
               .map((m: string) => `• ${m}`)
               .join("\n")}`;
             setMessages((prev) => [
@@ -291,7 +286,6 @@ export function ChatWindow() {
       if (!res.ok)
         throw new Error(data.error || "Failed to generate itinerary");
 
-      // Store the generated itinerary
       setCurrentItinerary(data);
 
       const itineraryResponse = JSON.stringify(data, null, 2);
@@ -325,6 +319,7 @@ export function ChatWindow() {
     }
   }
 
+  // === MOBILE-OPTIMIZED RENDER: EXPENSE SUMMARY ===
   function renderExpenseSummary(expenseSummary: any) {
     if (!expenseSummary || typeof expenseSummary !== "object") return null;
 
@@ -336,40 +331,37 @@ export function ChatWindow() {
     } = expenseSummary;
 
     return (
-      <div className="mt-8 border-2 border-[#DA880F] rounded-xl p-6 bg-gradient-to-br from-[#FFF6EE] to-white">
-        <h2 className="text-2xl font-bold text-[#DA880F] mb-6 flex items-center gap-2">
-          💰 Complete Expense Summary
+      <div className="mt-6 md:mt-8 border-2 border-[#DA880F] rounded-xl p-4 md:p-6 bg-gradient-to-br from-[#FFF6EE] to-white text-xs md:text-sm">
+        <h2 className="text-lg md:text-2xl font-bold text-[#DA880F] mb-4 md:mb-6 flex items-center gap-2">
+          Complete Expense Summary
         </h2>
 
-        {/* Per Person Breakdown */}
         {perPersonBreakdown && (
-          <div className="space-y-4 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+          <div className="space-y-3 mb-4 md:mb-6">
+            <h3 className="text-sm md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">
               Per Person Breakdown:
             </h3>
-
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               {Object.entries(perPersonBreakdown).map(
                 ([category, data]: any) => (
                   <div
                     key={category}
-                    className="bg-white border border-[#DA880F]/20 rounded-lg p-4 shadow-sm"
+                    className="bg-white border border-[#DA880F]/20 rounded-lg p-3 md:p-4 shadow-sm"
                   >
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-semibold text-[#DA880F] capitalize">
+                    <div className="flex justify-between items-center mb-1">
+                      <h4 className="font-semibold text-[#DA880F] capitalize text-xs md:text-sm">
                         {category === "miscellaneous"
                           ? "Misc. Expenses"
                           : category}
                       </h4>
-                      <span className="text-lg font-bold text-gray-800">
+                      <span className="font-bold text-gray-800 text-xs md:text-base">
                         {data.amount}
                       </span>
                     </div>
-
                     {Array.isArray(data.details) && data.details.length > 0 && (
-                      <ul className="text-sm text-gray-600 space-y-1 mt-2 pl-4">
+                      <ul className="text-xs text-gray-600 space-y-1 mt-2 pl-3">
                         {data.details.map((detail: string, i: number) => (
-                          <li key={i} className="list-disc">
+                          <li key={i} className="list-disc text-xs">
                             {detail}
                           </li>
                         ))}
@@ -382,35 +374,34 @@ export function ChatWindow() {
           </div>
         )}
 
-        {/* Total Cost Cards */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
           {totalPerPerson && (
-            <div className="bg-[#DA880F]/10 border-2 border-[#DA880F] rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">Total Per Person</p>
-              <p className="text-2xl font-bold text-[#DA880F]">
+            <div className="bg-[#DA880F]/10 border-2 border-[#DA880F] rounded-lg p-3 md:p-4 text-center">
+              <p className="text-xs text-gray-600 mb-1">Total Per Person</p>
+              <p className="text-lg md:text-2xl font-bold text-[#DA880F]">
                 {totalPerPerson}
               </p>
             </div>
           )}
-
           {totalForGroup && (
-            <div className="bg-[#DA880F] text-white rounded-lg p-4">
-              <p className="text-sm opacity-90 mb-1">Total for Entire Group</p>
-              <p className="text-2xl font-bold">{totalForGroup}</p>
+            <div className="bg-[#DA880F] text-white rounded-lg p-3 md:p-4 text-center">
+              <p className="text-xs opacity-90 mb-1">Total for Group</p>
+              <p className="text-lg md:text-2xl font-bold">{totalForGroup}</p>
             </div>
           )}
         </div>
 
-        {/* Cost Saving Tips */}
         {Array.isArray(costSavingTips) && costSavingTips.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h4 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
-              💡 Cost Saving Tips
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 md:p-4">
+            <h4 className="font-semibold text-green-800 mb-2 text-xs md:text-sm flex items-center gap-2">
+              Cost Saving Tips
             </h4>
-            <ul className="space-y-2 text-sm text-green-700">
+            <ul className="space-y-1.5 text-xs md:text-sm text-green-700">
               {costSavingTips.map((tip: string, i: number) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span className="text-green-600 mt-0.5 text-xs">
+                    Checkmark
+                  </span>
                   <span>{tip}</span>
                 </li>
               ))}
@@ -421,21 +412,22 @@ export function ChatWindow() {
     );
   }
 
+  // === MOBILE-OPTIMIZED RENDER: ITINERARY TABLE ===
   function renderItineraryTable(data: any) {
     if (!data || typeof data !== "object") {
       return <p className="text-gray-600">Invalid itinerary data</p>;
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 text-sm md:text-base">
         {data.summary && (
-          <p className="text-base leading-relaxed text-gray-800">
+          <p className="leading-relaxed text-gray-800">
             <span className="font-semibold text-[#DA880F]">Summary:</span>{" "}
             {data.summary}
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-700">
           {data.destination && (
             <p>
               <b className="text-[#DA880F]">Destination:</b> {data.destination}
@@ -448,13 +440,12 @@ export function ChatWindow() {
           )}
         </div>
 
-        {/* Budget Overview */}
         {data.budgetBreakdown && (
           <div className="bg-[#FFF6EE] border border-[#DA880F]/20 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-[#DA880F] mb-3">
+            <h3 className="text-base md:text-lg font-semibold text-[#DA880F] mb-3">
               Budget Overview:
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
               {Object.entries(data.budgetBreakdown).map(([key, value]) => (
                 <div key={key} className="flex justify-between">
                   <span className="text-gray-700 capitalize">{key}:</span>
@@ -465,7 +456,7 @@ export function ChatWindow() {
               ))}
             </div>
             {data.totalBudget && (
-              <div className="mt-3 pt-3 border-t border-[#DA880F]/20 flex justify-between font-bold">
+              <div className="mt-3 pt-3 border-t border-[#DA880F]/20 flex justify-between font-bold text-sm md:text-base">
                 <span className="text-gray-800">Total Budget:</span>
                 <span className="text-[#DA880F]">{data.totalBudget}</span>
               </div>
@@ -473,89 +464,134 @@ export function ChatWindow() {
           </div>
         )}
 
-        {/* Day-by-day itinerary */}
         {Array.isArray(data.itineraryTable) &&
           data.itineraryTable.length > 0 && (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {data.itineraryTable.map((day: any, index: number) => (
                 <div
                   key={day.day || index}
-                  className="border border-[#DA880F]/20 bg-[#FFF6EE] rounded-xl p-5"
+                  className="border border-[#DA880F]/20 bg-[#FFF6EE] rounded-xl p-4 md:p-5"
                 >
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-semibold text-[#DA880F] text-lg">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
+                    <h4 className="font-semibold text-[#DA880F] text-base md:text-lg">
                       Day {day.day || index + 1}
                       {day.theme ? `: ${day.theme}` : ""}
                     </h4>
                     {day.dailyCost && (
-                      <span className="bg-[#DA880F] text-white px-3 py-1 rounded-full text-sm font-semibold">
+                      <span className="bg-[#DA880F] text-white px-2.5 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">
                         {day.dailyCost}
                       </span>
                     )}
                   </div>
 
-                  {Array.isArray(day.rows) && day.rows.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm border-collapse">
-                        <thead className="bg-[#DA880F]/10 text-[#DA880F]">
+                  {/* Mobile: Stacked Cards */}
+                  <div className="block md:hidden">
+                    {Array.isArray(day.rows) &&
+                      day.rows.map((row: any, i: number) => (
+                        <div
+                          key={i}
+                          className="bg-white rounded-lg p-3 mb-2 border border-[#DA880F]/10"
+                        >
+                          {row.time && (
+                            <p className="text-xs font-medium text-[#DA880F]">
+                              {row.time}
+                            </p>
+                          )}
+                          {row.activity && (
+                            <p className="font-semibold text-gray-800 mt-1">
+                              {row.activity}
+                            </p>
+                          )}
+                          {row.description && (
+                            <p className="text-xs text-gray-600 mt-1">
+                              {row.description}
+                            </p>
+                          )}
+                          <div className="flex justify-between mt-2 text-xs">
+                            {row.distance && (
+                              <span className="text-gray-500">
+                                {row.distance}
+                              </span>
+                            )}
+                            {row.pricing && (
+                              <span className="font-semibold text-[#DA880F]">
+                                {row.pricing}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Desktop: Scrollable Table */}
+                  <div className="hidden md:block overflow-x-auto -mx-1">
+                    <div className="min-w-[640px] md:min-w-0">
+                      <table className="w-full text-xs md:text-sm border-collapse">
+                        <thead className="bg-[#DA880F]/10 text-[#DA880F] sticky top-0 z-10">
                           <tr>
-                            <th className="border px-3 py-2 text-left">Time</th>
-                            <th className="border px-3 py-2 text-left">
+                            <th className="border px-3 py-2 text-left font-medium">
+                              Time
+                            </th>
+                            <th className="border px-3 py-2 text-left font-medium">
                               Activity
                             </th>
-                            <th className="border px-3 py-2 text-left">
+                            <th className="border px-3 py-2 text-left font-medium">
                               Description
                             </th>
-                            <th className="border px-3 py-2 text-left">
+                            <th className="border px-3 py-2 text-left font-medium">
                               Distance
                             </th>
-                            <th className="border px-3 py-2 text-left">
+                            <th className="border px-3 py-2 text-left font-medium">
                               Pricing
                             </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {day.rows.map((row: any, i: number) => (
-                            <tr key={i} className="border-t">
-                              <td className="border px-3 py-2">
-                                {row.time || "-"}
-                              </td>
-                              <td className="border px-3 py-2 font-medium">
-                                {row.activity || "-"}
-                              </td>
-                              <td className="border px-3 py-2">
-                                {row.description || "-"}
-                              </td>
-                              <td className="border px-3 py-2">
-                                {row.distance || "-"}
-                              </td>
-                              <td className="border px-3 py-2 font-semibold text-[#DA880F]">
-                                {row.pricing || "-"}
-                              </td>
-                            </tr>
-                          ))}
+                          {Array.isArray(day.rows) &&
+                            day.rows.map((row: any, i: number) => (
+                              <tr
+                                key={i}
+                                className="border-t hover:bg-[#DA880F]/5"
+                              >
+                                <td className="border px-3 py-2 font-medium">
+                                  {row.time || "-"}
+                                </td>
+                                <td className="border px-3 py-2 font-medium">
+                                  {row.activity || "-"}
+                                </td>
+                                <td className="border px-3 py-2 text-gray-700">
+                                  {row.description || "-"}
+                                </td>
+                                <td className="border px-3 py-2 text-gray-600">
+                                  {row.distance || "-"}
+                                </td>
+                                <td className="border px-3 py-2 font-semibold text-[#DA880F]">
+                                  {row.pricing || "-"}
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </div>
 
                   {day.meals && (
-                    <div className="mt-4 text-sm space-y-1">
+                    <div className="mt-4 space-y-1 text-xs md:text-sm">
                       {day.meals.breakfast && (
                         <p>
-                          <b className="text-[#DA880F]">🍳 Breakfast:</b>{" "}
+                          <b className="text-[#DA880F]">Breakfast:</b>{" "}
                           {day.meals.breakfast}
                         </p>
                       )}
                       {day.meals.lunch && (
                         <p>
-                          <b className="text-[#DA880F]">🥗 Lunch:</b>{" "}
+                          <b className="text-[#DA880F]">Lunch:</b>{" "}
                           {day.meals.lunch}
                         </p>
                       )}
                       {day.meals.dinner && (
                         <p>
-                          <b className="text-[#DA880F]">🍲 Dinner:</b>{" "}
+                          <b className="text-[#DA880F]">Dinner:</b>{" "}
                           {day.meals.dinner}
                         </p>
                       )}
@@ -563,28 +599,24 @@ export function ChatWindow() {
                   )}
 
                   {day.accommodation && (
-                    <div className="mt-2 text-sm">
-                      <p>
-                        <b className="text-[#DA880F]">🏡 Stay:</b>{" "}
-                        {day.accommodation}
-                      </p>
-                    </div>
+                    <p className="mt-3 text-xs md:text-sm">
+                      <b className="text-[#DA880F]">Stay:</b>{" "}
+                      {day.accommodation}
+                    </p>
                   )}
                 </div>
               ))}
             </div>
           )}
 
-        {/* Expense Summary Section */}
         {data.expenseSummary && renderExpenseSummary(data.expenseSummary)}
 
-        {/* Local Tips */}
         {Array.isArray(data.localTips) && data.localTips.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-[#DA880F] mb-2">
+          <div className="text-xs md:text-sm">
+            <h3 className="text-base md:text-lg font-semibold text-[#DA880F] mb-2">
               Local Tips:
             </h3>
-            <ul className="list-disc pl-5 space-y-1 text-sm text-gray-700">
+            <ul className="list-disc pl-5 space-y-1 text-gray-700">
               {data.localTips.map((tip: string, i: number) => (
                 <li key={i}>{tip}</li>
               ))}
@@ -592,21 +624,25 @@ export function ChatWindow() {
           </div>
         )}
 
-        {/* Final Total */}
         {data.totalEstimatedCost && (
-          <div className="bg-gradient-to-r from-[#DA880F] to-[#c9770b] text-white rounded-xl p-6 text-center">
-            <p className="text-sm opacity-90 mb-1">Total Estimated Trip Cost</p>
-            <p className="text-3xl font-bold">{data.totalEstimatedCost}</p>
+          <div className="bg-gradient-to-r from-[#DA880F] to-[#c9770b] text-white rounded-xl p-5 md:p-6 text-center">
+            <p className="text-xs md:text-sm opacity-90 mb-1">
+              Total Estimated Trip Cost
+            </p>
+            <p className="text-xl md:text-3xl font-bold">
+              {data.totalEstimatedCost}
+            </p>
           </div>
         )}
-        <div className="flex justify-end">
+
+        <div className="flex justify-center mt-6">
           <ItineraryPDFExport itineraryData={data} tripData={tripData} />
         </div>
       </div>
     );
   }
 
-  // Render input components
+  // === RENDER QUESTION COMPONENTS ===
   function renderQuestionComponent() {
     const current = questions[questionIndex];
     if (!current || phase !== "guided") return null;
@@ -827,24 +863,24 @@ export function ChatWindow() {
     }
   }
 
-  // --- Render ---
+  // === MAIN RENDER ===
   return (
     <section className="flex h-screen flex-col bg-[#FFF9F3]">
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-6 py-6 space-y-4 mt-24"
+        className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 space-y-3 md:space-y-4 mt-16 md:mt-24 text-sm"
       >
         {messages.map((m) => (
           <div
             key={m.id}
             className={cn(
-              "flex mb-3",
+              "flex mb-3 mt-12 md:mt-0",
               m.role === "user" ? "justify-end" : "justify-start"
             )}
           >
             <div
               className={cn(
-                "max-w-3xl rounded-2xl px-5 py-4 text-sm shadow-sm whitespace-pre-wrap",
+                "max-w-3xl rounded-2xl px-4 md:px-5 py-3 md:py-4 text-xs md:text-sm shadow-sm whitespace-pre-wrap",
                 m.role === "user"
                   ? "bg-[#DA880F]/90 text-white"
                   : "bg-white border border-[#DA880F]/30 text-gray-900"
@@ -872,16 +908,16 @@ export function ChatWindow() {
         {phase === "guided" && renderQuestionComponent()}
       </div>
 
-      {/* Input field */}
+      {/* Input Field */}
       <form
         onSubmit={handleSubmit}
-        className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-[#FFF9F3] via-[#FFF9F3] to-transparent pt-2 pb-4 px-4 backdrop-blur-md"
+        className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-[#FFF9F3] via-[#FFF9F3] to-transparent pt-2 pb-4 px-2 md:px-4 backdrop-blur-md"
       >
         <p className="text-xs text-black text-center mb-2">
           Chat history is not saved — please export as PDF before leaving.
         </p>
 
-        <div className="mx-auto w-full max-w-2xl">
+        <div className="mx-auto w-full max-w-2xl px-2 md:px-0">
           <div className="rounded-full border border-[#DA880F]/30 bg-white flex items-center gap-2 px-3 py-1.5 shadow-sm">
             <input
               type="text"

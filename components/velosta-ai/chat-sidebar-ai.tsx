@@ -54,11 +54,11 @@ export function ChatSidebar({
   }, [items, q]);
 
   return (
-    <aside className="hidden md:flex md:w-72 lg:w-80 flex-col gap-3 border-r bg-secondary/40 px-3 py-4">
-      <div className="flex items-center gap-2">
+    <aside className="flex w-full md:w-72 lg:w-80 flex-col gap-3 border-r bg-secondary/40 px-3 py-4 h-screen">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <Button
           onClick={() => console.log("hola")}
-          className="rounded-full bg-[var(--color-navy)] text-white hover:opacity-90 transition-opacity"
+          className="rounded-full bg-[var(--color-navy)] text-white hover:opacity-90 transition-opacity w-full sm:w-auto whitespace-nowrap"
         >
           New chat
         </Button>
@@ -67,7 +67,7 @@ export function ChatSidebar({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search"
-          className="h-9"
+          className="h-9 w-full"
         />
       </div>
 
@@ -97,7 +97,7 @@ export function ChatSidebar({
         </ul>
       </nav>
 
-      <div className="text-[11px] text-muted-foreground px-1">
+      <div className="text-[11px] text-muted-foreground px-1 text-center sm:text-left">
         Velosta AI • Keep messages respectful
       </div>
     </aside>

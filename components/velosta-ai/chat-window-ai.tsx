@@ -865,22 +865,22 @@ export function ChatWindow() {
 
   // === MAIN RENDER ===
   return (
-    <section className="flex h-screen flex-col bg-[#FFF9F3]">
+    <section className="flex min-h-[100svh] flex-col bg-[#FFF9F3] pt-[calc(5rem+env(safe-area-inset-top,0px))]">
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 space-y-3 md:space-y-4 mt-16 md:mt-24 text-sm"
+  className="flex-1 overflow-y-auto px-3 md:px-6 pb-28 md:pb-32 pt-4 md:pt-6 space-y-3 md:space-y-4 text-sm"
       >
         {messages.map((m) => (
           <div
             key={m.id}
             className={cn(
-              "flex mb-3 mt-12 md:mt-0",
+              "flex mb-3",
               m.role === "user" ? "justify-end" : "justify-start"
             )}
           >
             <div
               className={cn(
-                "max-w-3xl rounded-2xl px-4 md:px-5 py-3 md:py-4 text-xs md:text-sm shadow-sm whitespace-pre-wrap",
+                "max-w-full sm:max-w-2xl lg:max-w-3xl rounded-2xl px-4 md:px-5 py-3 md:py-4 text-xs md:text-sm shadow-sm whitespace-pre-wrap",
                 m.role === "user"
                   ? "bg-[#DA880F]/90 text-white"
                   : "bg-white border border-[#DA880F]/30 text-gray-900"
@@ -911,7 +911,7 @@ export function ChatWindow() {
       {/* Input Field */}
       <form
         onSubmit={handleSubmit}
-        className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-[#FFF9F3] via-[#FFF9F3] to-transparent pt-2 pb-4 px-2 md:px-4 backdrop-blur-md"
+        className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-[#FFF9F3] via-[#FFF9F3] to-transparent pt-2 px-2 md:px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] backdrop-blur-md"
       >
         <p className="text-xs text-black text-center mb-2">
           Chat history is not saved — please export as PDF before leaving.

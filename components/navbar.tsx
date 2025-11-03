@@ -42,7 +42,11 @@ const navLinks = [
   { href: "/travel-blogs", label: "HowNotToTravel" },
   // { href: "/", label: "App Download" },
 ];
-export default function Navbar({ className }) {
+type NavbarProps = {
+  className?: string;
+};
+
+export default function Navbar({ className = "" }: NavbarProps) {
   const [destinationsOpen, setDestinationsOpen] = useState(false);
   const { user, setUser, setAccessToken, accessToken } = useUser();
 
@@ -59,7 +63,7 @@ export default function Navbar({ className }) {
           {/* left: brand */}
           <div className="flex items-center gap-4">
             <BrandMark />
-            <nav className="hidden md:flex items-center gap-6 pl-4">
+            <nav className="flex items-center gap-4 pl-2 text-sm md:gap-6 md:pl-4 overflow-x-auto whitespace-nowrap scrollbar-thin">
               {navLinks.map((l) => (
                 <Link
                   key={l.href}

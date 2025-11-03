@@ -123,7 +123,7 @@ export default function Navbar({ className = "" }: NavbarProps) {
                     "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",
                 }}
               >
-                <Link href="sign-in">Get Started</Link>
+                {/* <Link href="sign-in">Get Started</Link> */}
               </Button>
 
               <div className="md:hidden">
@@ -148,33 +148,14 @@ export default function Navbar({ className = "" }: NavbarProps) {
                       </svg>
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="right" className="w-[320px]">
+                  <SheetContent side="right" className="w-[320px] sm:w-[380px]">
                     <SheetHeader>
                       <SheetTitle className="flex items-center gap-2">
                         <BrandMark />
                       </SheetTitle>
                     </SheetHeader>
-                    <div className="mt-6 flex flex-col gap-4">
-                      <div className="relative">
-                        <Input
-                          placeholder="Search destinations or activities"
-                          className="h-10 rounded-full bg-white pr-10 text-sm"
-                          aria-label="Search destinations or activities"
-                        />
-                        <svg
-                          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          aria-hidden="true"
-                        >
-                          <circle cx="11" cy="11" r="7" />
-                          <path d="M21 21l-4.3-4.3" />
-                        </svg>
-                      </div>
-
-                      <nav className="flex flex-col gap-2 pt-4">
+                    <div className="mt-8 flex flex-col gap-6">
+                      <nav className="flex flex-col gap-1">
                         {navLinks.map((l) => (
                           <Link
                             key={l.href}
@@ -184,21 +165,17 @@ export default function Navbar({ className = "" }: NavbarProps) {
                                 : null
                             }
                             href={l.href}
-                            className="rounded-md px-2 py-2 text-[15px] font-medium text-neutral-800 hover:bg-neutral-100"
+                            className="group relative overflow-hidden rounded-lg px-4 py-3 text-[15px] font-medium text-neutral-700 transition-all duration-200 hover:bg-neutral-50 hover:text-neutral-900 active:scale-[0.98]"
                           >
-                            {l.label}
+                            <span className="relative z-10">{l.label}</span>
+                            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-neutral-100/50 to-transparent transition-transform duration-300 group-hover:translate-x-0" />
                           </Link>
                         ))}
-                        <div className="mt-2 flex items-center gap-2">
-                          {/* <Link
-                            href="sign-up"
-                            className="text-sm font-medium text-neutral-700 hover:text-neutral-900 px-3 py-1.5"
-                          >
-                            Sign up
-                          </Link> */}
+
+                        <div className="mt-6 flex flex-col gap-3 border-t border-neutral-100 pt-6">
                           <Button
                             asChild
-                            className="h-9 rounded-full px-4 text-sm font-semibold text-[color:var(--color-brand-contrast)]"
+                            className="h-11 rounded-full px-6 text-[15px] font-semibold text-[color:var(--color-brand-contrast)] shadow-lg shadow-[var(--color-brand)]/20 transition-all duration-200 hover:shadow-xl hover:shadow-[var(--color-brand)]/30 active:scale-[0.97]"
                             style={{
                               background:
                                 "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",

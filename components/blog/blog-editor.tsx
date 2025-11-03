@@ -301,14 +301,14 @@ export default function BlogEditor() {
             <Maximize2 className="size-4" />
             {fullscreen ? "Exit" : "Focus"}
           </Button>
-          <Button
+          {/* <Button
             variant="ghost"
             onClick={() => setPreview((p) => !p)}
             className="gap-2"
           >
             <Eye className="size-4" />
             {preview ? "Edit" : "Preview"}
-          </Button>
+          </Button> */}
           <Button
             disabled={!canSubmit || submitting}
             onClick={submit}

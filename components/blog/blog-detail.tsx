@@ -165,15 +165,15 @@ export function BlogDetail({ blog }: BlogDetailProps) {
 
             <div className="flex flex-col items-start justify-between gap-4 border-b border-border pb-6 sm:flex-row sm:items-center">
               <div className="flex items-center gap-4">
-                <img
+                {/* <img
                   src={blog.authorAvatar || authorAvatar.src}
                   alt={blog.authorName}
                   className="h-12 w-12 rounded-full object-cover"
-                />
+                /> */}
                 <div>
-                  <p className="font-semibold text-foreground">
+                  {/* <p className="font-semibold text-foreground">
                     {blog.authorName}
-                  </p>
+                  </p> */}
                   <p className="text-sm text-muted-foreground">
                     {new Date(blog.createdAt).toLocaleDateString("en-US", {
                       year: "numeric",

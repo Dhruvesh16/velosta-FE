@@ -8,7 +8,7 @@ import ProtectedRoute from "../utils/protected-routes";
 function PlanPage() {
   return (
     <ProtectedRoute>
-      <Navbar className={"md:ml-64 "} />
+      <Navbar className="" />
 
       <main className="min-h-screen w-full">
         <VelostaBotInterface />

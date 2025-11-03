@@ -16,9 +16,9 @@ export default function VelostaBotInterface() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-background">
+    <div className="flex min-h-[100svh] w-full flex-col bg-[#FFF9F3]">
       {/* Main Content - Full Width */}
-      <main className="flex flex-1 flex-col w-full">
+      <main className="flex flex-1 flex-col">
         <div className="flex-1 overflow-hidden">
           <ChatWindow
             chatId={activeId}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { VelostaHero } from "@/components/velosta-hero";
 import { FeaturedTrips } from "@/components/featured-trips";
-import { TrendingDestinations } from "@/components/trending-destinations";
+//import { TrendingDestinations } from "@/components/trending-destinations";
 import { DealBanner } from "@/components/deal-banner";
 import TopAttractions from "@/components/top-attractions";
 import CustomerReviews from "@/components/customer-reviews";
@@ -98,7 +98,7 @@ function Page() {
         <div className="space-y-14 md:space-y-20">
           <VelostaHero />
           <FeaturedTrips />
-          <TrendingDestinations />
+          {/* <TrendingDestinations />
           <DealBanner />
           {/* <TopAttractions /> */}
           <CustomerReviews />

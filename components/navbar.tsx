@@ -63,7 +63,9 @@ export default function Navbar({ className = "" }: NavbarProps) {
           {/* left: brand */}
           <div className="flex items-center gap-4">
             <BrandMark />
-            <nav className="flex items-center gap-4 pl-2 text-sm md:gap-6 md:pl-4 overflow-x-auto whitespace-nowrap scrollbar-thin">
+            <nav className="flex items-center gap-4 pl-0 text-sm md:gap-6 md:pl-4 overflow-x-auto whitespace-nowrap no-scrollbar ">
+              {/* content */}
+
               {navLinks.map((l) => (
                 <Link
                   key={l.href}
@@ -117,13 +119,13 @@ export default function Navbar({ className = "" }: NavbarProps) {
 
               <Button
                 asChild
-                className="h-9 rounded-full px-4 text-sm font-semibold text-[color:var(--color-brand-contrast)]"
+                className="h-9 rounded-full px-4 text-sm font-semibold text-[color:var(--color-brand-contrast)] hidden md:block"
                 style={{
                   background:
                     "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",
                 }}
               >
-                {/* <Link href="sign-in">Get Started</Link> */}
+                <Link href="sign-in">Get Started</Link>
               </Button>
 
               <div className="md:hidden">

@@ -48,7 +48,7 @@ export default function Footer() {
                   href="/velosta-ai"
                   className="hover:text-[var(--color-navy)]"
                 >
-                  Velost-AI
+                  Velosta-AI
                 </a>
               </li>
               <li>

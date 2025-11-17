@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { DestinationsModal } from "./destinations-modal";
+import Image from "next/image";
 
 export function VelostaHero() {
   return (
@@ -12,11 +13,19 @@ export function VelostaHero() {
           "relative h-[72vh] min-h-[560px] w-full overflow-hidden rounded-b-[40px]"
         )}
       >
-        <div
-          className="absolute inset-0 bg-center bg-cover"
-          style={{ backgroundImage: "url('/images/velosta-hero.jpg')" }}
-          aria-hidden="true"
-        />
+        <div className="absolute inset-0">
+          <Image
+            src="/images/velosta-hero.jpg"
+            alt="Velosta hero"
+            fill
+            priority
+            fetchPriority="high"
+            quality={75}
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+        </div>
+
         <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_50%_20%,transparent,rgba(0,0,0,0.45))]" />
         <div className="absolute left-10 top-1/2 hidden h-10 w-10 -translate-y-1/2 rounded-full border border-white/40 md:block" />
         <div className="absolute right-10 top-1/2 hidden h-10 w-10 -translate-y-1/2 rounded-full border border-white/40 md:block" />

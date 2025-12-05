@@ -125,7 +125,7 @@ export default function Navbar({ className = "" }: NavbarProps) {
                     "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",
                 }}
               >
-                <Link href="sign-in">Get Started</Link>
+                <Link href="/sign-in">Get Started</Link>
               </Button>
 
               <div className="md:hidden">

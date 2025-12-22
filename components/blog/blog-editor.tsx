@@ -280,7 +280,7 @@ export default function BlogEditor() {
       <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold text-[color:var(--color-navy)]">
-            ✨ Write Your Story
+            Write Your Story
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Premium editor with inline images & rich formatting

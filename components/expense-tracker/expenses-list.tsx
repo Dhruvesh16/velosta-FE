@@ -132,15 +132,18 @@ export function ExpensesList({
 
   if (expenses.length === 0) {
     return (
-      <div className="rounded-3xl border border-black/5 bg-white p-10 text-center">
-        <div className="mx-auto w-14 h-14 rounded-full bg-[var(--color-brand)]/10 flex items-center justify-center mb-4">
-          <Receipt className="h-6 w-6 text-[var(--color-brand)]" />
+      <div className="rounded-3xl border border-black/5 bg-white p-12 text-center">
+        <div className="mx-auto w-16 h-16 rounded-full bg-[var(--color-brand)]/10 flex items-center justify-center mb-5">
+          <Receipt className="h-7 w-7 text-[var(--color-brand)]" />
         </div>
-        <h3 className="text-lg font-medium text-[var(--color-navy)] mb-2">
+        <h3 className="text-xl font-semibold text-[var(--color-navy)] mb-2">
           No expenses yet
         </h3>
-        <p className="text-[var(--color-navy)]/60 text-sm">
-          Start adding expenses to track your trip spending.
+        <p className="text-[var(--color-navy)]/60 text-sm mb-1">
+          Start tracking your trip spending by adding your first expense.
+        </p>
+        <p className="text-[var(--color-navy)]/40 text-xs">
+          Click "Add Expense" above to get started
         </p>
       </div>
     );
@@ -183,12 +186,12 @@ export function ExpensesList({
       <div className="space-y-6">
         {groupedExpenses.map(([date, dayExpenses]) => (
           <div key={date}>
-            <div className="flex items-center gap-3 mb-3">
-              <h3 className="text-sm font-medium text-[var(--color-navy)]/60">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3">
+              <h3 className="text-xs sm:text-sm font-medium text-[var(--color-navy)]/60 truncate">
                 {format(new Date(date), "EEEE, MMMM d")}
               </h3>
               <div className="flex-1 h-px bg-black/5" />
-              <span className="text-sm text-[var(--color-navy)]/40">
+              <span className="text-xs sm:text-sm text-[var(--color-navy)]/40 flex-shrink-0">
                 {formatCurrency(dayExpenses.reduce((sum, e) => sum + e.amount, 0))}
               </span>
             </div>
@@ -270,20 +273,20 @@ function ExpenseCard({
   return (
     <div className="rounded-2xl border border-black/5 bg-white overflow-hidden hover:border-black/10 transition-colors">
       <div
-        className="flex items-center gap-4 p-4 cursor-pointer"
+        className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 cursor-pointer"
         onClick={onToggleExpand}
       >
         {/* Category Icon */}
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{
             backgroundColor: category?.color ? `${category.color}15` : "#f4f4f5",
             color: category?.color || "#71717a",
           }}
         >
           {category
-            ? categoryIcons[category.icon] || <Receipt className="h-4 w-4" />
-            : <Receipt className="h-4 w-4" />}
+            ? categoryIcons[category.icon] || <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            : <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
         </div>
 
         {/* Details */}
@@ -291,9 +294,9 @@ function ExpenseCard({
           <h4 className="font-medium text-[var(--color-navy)] truncate text-sm">
             {expense.description}
           </h4>
-          <div className="flex items-center gap-2 text-xs text-[var(--color-navy)]/50 mt-0.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-[var(--color-navy)]/50 mt-0.5 flex-wrap">
             <div className="flex items-center gap-1">
-              <Avatar className="w-4 h-4">
+              <Avatar className="w-3.5 h-3.5 sm:w-4 sm:h-4">
                 <AvatarFallback
                   style={{ backgroundColor: expense.paidBy.avatarColor }}
                   className="text-white text-[8px] font-medium"
@@ -301,25 +304,25 @@ function ExpenseCard({
                   {expense.paidBy.name.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <span>{expense.paidBy.name}</span>
+              <span className="truncate max-w-[60px] sm:max-w-none">{expense.paidBy.name}</span>
             </div>
-            <span>•</span>
-            <span>{splitType[expense.splitType as keyof typeof splitType]}</span>
+            <span className="hidden sm:inline">•</span>
+            <span className="hidden sm:inline">{splitType[expense.splitType as keyof typeof splitType]}</span>
           </div>
         </div>
 
         {/* Amount */}
         <div className="text-right flex-shrink-0">
-          <p className="font-semibold text-[var(--color-navy)]">
+          <p className="font-semibold text-[var(--color-navy)] text-sm sm:text-base">
             {formatCurrency(expense.amount)}
           </p>
-          <p className="text-xs text-[var(--color-navy)]/40">
+          <p className="text-[10px] sm:text-xs text-[var(--color-navy)]/40">
             {format(new Date(expense.date), "h:mm a")}
           </p>
         </div>
 
         {/* Expand/Collapse */}
-        <button className="p-1 hover:bg-muted rounded-full">
+        <button className="p-1 hover:bg-muted rounded-full flex-shrink-0">
           {isExpanded ? (
             <ChevronUp className="h-4 w-4 text-[var(--color-navy)]/40" />
           ) : (
@@ -330,8 +333,8 @@ function ExpenseCard({
         {/* Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-              <MoreVertical className="h-4 w-4 text-[var(--color-navy)]/40" />
+            <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 rounded-full flex-shrink-0">
+              <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[var(--color-navy)]/40" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="rounded-xl">
@@ -353,23 +356,23 @@ function ExpenseCard({
 
       {/* Expanded Details */}
       {isExpanded && (
-        <div className="px-4 pb-4 pt-2 border-t border-black/5 bg-muted/30">
+        <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-2 border-t border-black/5 bg-muted/30">
           {expense.notes && (
-            <p className="text-sm text-[var(--color-navy)]/70 mb-3">{expense.notes}</p>
+            <p className="text-xs sm:text-sm text-[var(--color-navy)]/70 mb-3">{expense.notes}</p>
           )}
           <p className="text-xs font-medium text-[var(--color-navy)]/50 uppercase tracking-wider mb-2">
             Split Details
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {expense.splits.map((split: any) => (
               <div
                 key={split.id}
-                className="flex items-center gap-2 bg-white rounded-xl p-2.5 border border-black/5"
+                className="flex items-center gap-2 bg-white rounded-xl p-2 sm:p-2.5 border border-black/5"
               >
-                <Avatar className="w-6 h-6">
+                <Avatar className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0">
                   <AvatarFallback
                     style={{ backgroundColor: split.member.avatarColor }}
-                    className="text-white text-[10px] font-medium"
+                    className="text-white text-[9px] sm:text-[10px] font-medium"
                   >
                     {split.member.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
@@ -377,7 +380,7 @@ function ExpenseCard({
                 <span className="flex-1 text-xs font-medium text-[var(--color-navy)] truncate">
                   {split.member.name}
                 </span>
-                <span className="text-xs font-medium text-[var(--color-navy)]/70">
+                <span className="text-xs font-medium text-[var(--color-navy)]/70 flex-shrink-0">
                   {formatCurrency(split.amount)}
                 </span>
               </div>

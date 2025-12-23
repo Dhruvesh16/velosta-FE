@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -31,7 +30,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, isTomorrow } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -49,6 +48,9 @@ import {
   Mountain,
   Fuel,
   HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
 } from "lucide-react";
 
 interface AddExpenseModalProps {
@@ -95,11 +97,14 @@ export function AddExpenseModal({
   const [categoryId, setCategoryId] = useState<string>("");
   const [paidById, setPaidById] = useState<string>("");
   const [splitType, setSplitType] = useState<"EQUAL" | "EXACT" | "PERCENTAGE" | "SHARES">("EQUAL");
-  const [notes, setNotes] = useState("");
-
+  
   // Split state
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [customSplits, setCustomSplits] = useState<Record<string, string>>({});
+  
+  // UI state
+  const [showAdvancedSplit, setShowAdvancedSplit] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const isEditing = !!expense;
 
@@ -112,8 +117,7 @@ export function AddExpenseModal({
       setCategoryId(expense.categoryId || "");
       setPaidById(expense.paidById);
       setSplitType(expense.splitType);
-      setNotes(expense.notes || "");
-
+      
       const memberIds = expense.splits.map((s: any) => s.memberId);
       setSelectedMembers(memberIds);
 
@@ -128,6 +132,9 @@ export function AddExpenseModal({
         }
       });
       setCustomSplits(splits);
+      
+      // Show advanced options if not equal split
+      setShowAdvancedSplit(expense.splitType !== "EQUAL");
     } else {
       resetForm();
     }
@@ -153,9 +160,10 @@ export function AddExpenseModal({
     setAmount("");
     setDate(new Date());
     setCategoryId("");
-    setNotes("");
     setSplitType("EQUAL");
     setCustomSplits({});
+    setShowAdvancedSplit(false);
+    setShowDatePicker(false);
     setError(null);
   };
 
@@ -253,7 +261,7 @@ export function AddExpenseModal({
     setError(null);
 
     if (!description.trim()) {
-      setError("Please enter a description");
+      setError("Please enter what you spent on");
       return;
     }
 
@@ -310,7 +318,6 @@ export function AddExpenseModal({
           paidById,
           splitType,
           splits,
-          notes: notes.trim() || undefined,
         }),
       });
 
@@ -331,43 +338,59 @@ export function AddExpenseModal({
 
   const splitPreview = calculateSplitPreview();
   const splitTotal = splitPreview.reduce((sum, s) => sum + s.amount, 0);
+  const isDateToday = isToday(date);
+  const isDateYesterday = isYesterday(date);
+  const isDateTomorrow = isTomorrow(date);
+  
+  const getDateLabel = () => {
+    if (isDateToday) return "Today";
+    if (isDateYesterday) return "Yesterday";
+    if (isDateTomorrow) return "Tomorrow";
+    return format(date, "MMM d, yyyy");
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] rounded-3xl p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-4">
-          <DialogTitle className="text-xl font-semibold text-[var(--color-navy)]">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[520px] max-h-[90vh] rounded-3xl p-0 overflow-hidden">
+        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
+          <DialogTitle className="text-lg sm:text-xl font-semibold text-[var(--color-navy)]">
             {isEditing ? "Edit Expense" : "Add Expense"}
           </DialogTitle>
-          <DialogDescription className="text-[var(--color-navy)]/60">
-            {isEditing ? "Update the expense details" : "Enter the expense details and split"}
+          <DialogDescription className="text-sm text-[var(--color-navy)]/60">
+            {isEditing ? "Update expense details" : "Quickly add what you spent"}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <ScrollArea className="max-h-[calc(90vh-200px)]">
-            <div className="px-6 pb-6 space-y-4">
+          <ScrollArea className="max-h-[calc(90vh-180px)] sm:max-h-[calc(90vh-200px)]">
+            <div className="px-4 sm:px-6 pb-20 sm:pb-24 space-y-4 sm:space-y-5">
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 rounded-xl border border-red-100">
                   {error}
                 </div>
               )}
 
-              {/* Description & Amount Row */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Main Fields - Description & Amount */}
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-navy)]/80">Description *</Label>
+                  <Label className="text-sm font-medium text-[var(--color-navy)]/70">
+                    What did you spend on?
+                  </Label>
                   <Input
-                    placeholder="e.g., Dinner"
+                    placeholder="e.g., Dinner at restaurant"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="h-11 rounded-xl border-black/10"
+                    className="h-12 text-base rounded-xl border-black/10 focus:border-[var(--color-brand)]/50"
+                    autoFocus
                   />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label className="text-[var(--color-navy)]/80">Amount *</Label>
+                  <Label className="text-sm font-medium text-[var(--color-navy)]/70">
+                    How much?
+                  </Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-navy)]/50 font-medium">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-[var(--color-navy)]">
                       {getCurrencySymbol()}
                     </span>
                     <Input
@@ -375,7 +398,7 @@ export function AddExpenseModal({
                       placeholder="0.00"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="h-11 pl-8 rounded-xl border-black/10"
+                      className="h-12 pl-10 text-lg font-semibold rounded-xl border-black/10 focus:border-[var(--color-brand)]/50"
                       min="0"
                       step="0.01"
                     />
@@ -383,235 +406,347 @@ export function AddExpenseModal({
                 </div>
               </div>
 
-              {/* Category & Date Row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[var(--color-navy)]/80">Category</Label>
-                  <Select value={categoryId} onValueChange={setCategoryId}>
-                    <SelectTrigger className="h-11 rounded-xl border-black/10">
-                      <SelectValue placeholder="Select category" />
+              {/* Quick Info Row - Paid By, Date, Category */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2">
+                {/* Paid By */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-[var(--color-navy)]/60">Paid by</Label>
+                  <Select value={paidById} onValueChange={setPaidById}>
+                    <SelectTrigger className="h-10 rounded-lg border-black/10 text-sm">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id} className="rounded-lg">
+                      {members.map((member) => (
+                        <SelectItem key={member.id} value={member.id} className="rounded-lg">
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-5 h-5 rounded flex items-center justify-center"
-                              style={{
-                                backgroundColor: `${cat.color}15`,
-                                color: cat.color,
-                              }}
-                            >
-                              {categoryIcons[cat.icon] || <Receipt className="h-3 w-3" />}
-                            </div>
-                            {cat.name}
+                            <Avatar className="w-4 h-4">
+                              <AvatarFallback
+                                style={{ backgroundColor: member.avatarColor }}
+                                className="text-white text-[8px]"
+                              >
+                                {member.name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">{member.name}</span>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[var(--color-navy)]/80">Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full h-11 justify-start text-left font-normal rounded-xl border-black/10",
-                          !date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? format(date, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 rounded-xl" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={(d) => d && setDate(d)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
 
-              {/* Paid By */}
-              <div className="space-y-2">
-                <Label className="text-[var(--color-navy)]/80">Paid by *</Label>
-                <Select value={paidById} onValueChange={setPaidById}>
-                  <SelectTrigger className="h-11 rounded-xl border-black/10">
-                    <SelectValue placeholder="Who paid?" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    {members.map((member) => (
-                      <SelectItem key={member.id} value={member.id} className="rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-5 h-5">
-                            <AvatarFallback
-                              style={{ backgroundColor: member.avatarColor }}
-                              className="text-white text-[10px]"
-                            >
-                              {member.name.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {member.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Split Type */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[var(--color-navy)]/80">Split between</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={selectAllMembers}
-                    className="h-7 text-xs rounded-full"
-                  >
-                    Select all
-                  </Button>
-                </div>
-
-                <Tabs value={splitType} onValueChange={(v) => setSplitType(v as any)}>
-                  <TabsList className="grid grid-cols-4 w-full rounded-full bg-muted/50 p-1">
-                    <TabsTrigger value="EQUAL" className="gap-1 text-xs rounded-full data-[state=active]:bg-white">
-                      <Users className="h-3 w-3" />
-                      Equal
-                    </TabsTrigger>
-                    <TabsTrigger value="EXACT" className="gap-1 text-xs rounded-full data-[state=active]:bg-white">
-                      <DollarSign className="h-3 w-3" />
-                      Exact
-                    </TabsTrigger>
-                    <TabsTrigger value="PERCENTAGE" className="gap-1 text-xs rounded-full data-[state=active]:bg-white">
-                      <Percent className="h-3 w-3" />
-                      %
-                    </TabsTrigger>
-                    <TabsTrigger value="SHARES" className="gap-1 text-xs rounded-full data-[state=active]:bg-white">
-                      <Hash className="h-3 w-3" />
-                      Shares
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <div className="mt-3 space-y-2">
-                    {members.map((member) => {
-                      const isSelected = selectedMembers.includes(member.id);
-                      const preview = splitPreview.find((s) => s.memberId === member.id);
-
-                      return (
-                        <div
-                          key={member.id}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-xl border transition-colors",
-                            isSelected
-                              ? "bg-[var(--color-brand)]/5 border-[var(--color-brand)]/20"
-                              : "bg-muted/30 border-transparent"
-                          )}
+                {/* Date - Simplified */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-[var(--color-navy)]/60">Date</Label>
+                  {!showDatePicker && !isDateToday ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowDatePicker(true)}
+                      className="h-10 w-full justify-start text-sm rounded-lg border-black/10"
+                    >
+                      {getDateLabel()}
+                    </Button>
+                  ) : (
+                    <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 w-full justify-start text-sm rounded-lg border-black/10"
                         >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleMember(member.id)}
-                          />
-                          <Avatar className="w-7 h-7">
-                            <AvatarFallback
-                              style={{ backgroundColor: member.avatarColor }}
-                              className="text-white text-xs"
-                            >
-                              {member.name.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="flex-1 font-medium text-sm text-[var(--color-navy)]">
-                            {member.name}
-                          </span>
-
-                          {isSelected && splitType !== "EQUAL" && (
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="number"
-                                value={customSplits[member.id] || ""}
-                                onChange={(e) =>
-                                  setCustomSplits((prev) => ({
-                                    ...prev,
-                                    [member.id]: e.target.value,
-                                  }))
-                                }
-                                className="w-16 h-7 text-sm text-right rounded-lg border-black/10"
-                                placeholder={splitType === "SHARES" ? "1" : "0"}
-                                min="0"
-                                step={splitType === "SHARES" ? "1" : "0.01"}
-                              />
-                              <span className="text-xs text-[var(--color-navy)]/50 w-5">
-                                {splitType === "PERCENTAGE" ? "%" : splitType === "SHARES" ? "×" : getCurrencySymbol()}
-                              </span>
-                            </div>
-                          )}
-
-                          {isSelected && (
-                            <span className="text-sm font-medium text-[var(--color-navy)]/60 min-w-[50px] text-right">
-                              {getCurrencySymbol()}{(preview?.amount || 0).toFixed(0)}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Split Summary */}
-                  {amount && parseFloat(amount) > 0 && (
-                    <div className="mt-3 p-3 bg-muted/30 rounded-xl flex items-center justify-between">
-                      <span className="text-sm text-[var(--color-navy)]/60">Total</span>
-                      <span
-                        className={cn(
-                          "font-semibold",
-                          Math.abs(splitTotal - parseFloat(amount)) > 0.01
-                            ? "text-red-500"
-                            : "text-emerald-600"
-                        )}
-                      >
-                        {getCurrencySymbol()}{splitTotal.toFixed(2)} / {getCurrencySymbol()}{parseFloat(amount).toFixed(2)}
-                      </span>
-                    </div>
+                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                          {getDateLabel()}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 rounded-xl" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={date}
+                          onSelect={(d) => {
+                            if (d) {
+                              setDate(d);
+                              setShowDatePicker(false);
+                            }
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   )}
-                </Tabs>
+                </div>
+
+                {/* Category - Optional Quick Pick */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-[var(--color-navy)]/60">Category</Label>
+                  <Select 
+                    value={categoryId || undefined} 
+                    onValueChange={(v) => {
+                      // Handle clearing: if value is "__none__", set to empty string
+                      setCategoryId(v === "__none__" ? "" : v);
+                    }}
+                  >
+                    <SelectTrigger className="h-10 rounded-lg border-black/10 text-sm">
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl z-[100]">
+                      {categoryId && (
+                        <SelectItem value="__none__" className="rounded-lg text-[var(--color-navy)]/50">
+                          <span className="text-sm">No category</span>
+                        </SelectItem>
+                      )}
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id} className="rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-4 h-4 rounded flex items-center justify-center"
+                              style={{
+                                backgroundColor: `${cat.color}15`,
+                                color: cat.color,
+                              }}
+                            >
+                              {categoryIcons[cat.icon] || <Receipt className="h-2.5 w-2.5" />}
+                            </div>
+                            <span className="text-sm">{cat.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              {/* Notes */}
-              {/* <div className="space-y-2">
-                <Label className="text-[var(--color-navy)]/80">Notes (Optional)</Label>
-                <Textarea
-                  placeholder="Add any details..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  className="resize-none rounded-xl border-black/10"
-                />
-              </div> */}
+              {/* Split Section - Simplified */}
+              <div className="space-y-3 pt-2 border-t border-black/5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-[var(--color-navy)]/70">
+                    Split between
+                  </Label>
+                  {selectedMembers.length < members.length && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectAllMembers}
+                      className="h-7 text-xs rounded-full text-[var(--color-brand)] hover:text-[var(--color-brand)]"
+                    >
+                      Select all
+                    </Button>
+                  )}
+                </div>
+
+                {/* Simple Equal Split View (Default) */}
+                {!showAdvancedSplit && splitType === "EQUAL" && (
+                  <>
+                    <div className="space-y-2">
+                      {members.map((member) => {
+                        const isSelected = selectedMembers.includes(member.id);
+                        const preview = splitPreview.find((s) => s.memberId === member.id);
+
+                        return (
+                          <div
+                            key={member.id}
+                            className={cn(
+                              "flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer",
+                              isSelected
+                                ? "bg-[var(--color-brand)]/5 border-[var(--color-brand)]/30"
+                                : "bg-muted/30 border-transparent hover:bg-muted/50"
+                            )}
+                            onClick={() => toggleMember(member.id)}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleMember(member.id)}
+                              className="pointer-events-none"
+                            />
+                            <Avatar className="w-7 h-7">
+                              <AvatarFallback
+                                style={{ backgroundColor: member.avatarColor }}
+                                className="text-white text-xs font-medium"
+                              >
+                                {member.name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="flex-1 font-medium text-sm text-[var(--color-navy)]">
+                              {member.name}
+                            </span>
+                            {isSelected && amount && (
+                              <span className="text-sm font-semibold text-[var(--color-brand)]">
+                                {getCurrencySymbol()}{(preview?.amount || 0).toFixed(0)}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Split Summary */}
+                    {amount && parseFloat(amount) > 0 && selectedMembers.length > 0 && (
+                      <div className="p-3 bg-emerald-50/50 rounded-lg border border-emerald-100 flex items-center justify-between">
+                        <span className="text-sm text-[var(--color-navy)]/70">
+                          {selectedMembers.length} {selectedMembers.length === 1 ? "person" : "people"} × {getCurrencySymbol()}{(parseFloat(amount) / selectedMembers.length).toFixed(0)}
+                        </span>
+                        <span className="font-semibold text-emerald-600">
+                          {getCurrencySymbol()}{splitTotal.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Advanced Split Toggle */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setShowAdvancedSplit(true);
+                        setSplitType("EXACT");
+                      }}
+                      className="w-full h-9 text-xs rounded-lg text-[var(--color-navy)]/60 hover:text-[var(--color-navy)] hover:bg-muted/50"
+                    >
+                      <Sparkles className="h-3 w-3 mr-1.5" />
+                      Custom split amounts
+                      <ChevronDown className="h-3 w-3 ml-auto" />
+                    </Button>
+                  </>
+                )}
+
+                {/* Advanced Split View */}
+                {showAdvancedSplit && (
+                  <>
+                    <Tabs value={splitType} onValueChange={(v) => setSplitType(v as any)}>
+                      <TabsList className="grid grid-cols-4 w-full rounded-lg bg-muted/50 p-1 h-9">
+                        <TabsTrigger value="EQUAL" className="text-xs rounded-md data-[state=active]:bg-white">
+                          Equal
+                        </TabsTrigger>
+                        <TabsTrigger value="EXACT" className="text-xs rounded-md data-[state=active]:bg-white">
+                          Exact
+                        </TabsTrigger>
+                        <TabsTrigger value="PERCENTAGE" className="text-xs rounded-md data-[state=active]:bg-white">
+                          %
+                        </TabsTrigger>
+                        <TabsTrigger value="SHARES" className="text-xs rounded-md data-[state=active]:bg-white">
+                          Shares
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <div className="mt-3 space-y-2">
+                        {members.map((member) => {
+                          const isSelected = selectedMembers.includes(member.id);
+                          const preview = splitPreview.find((s) => s.memberId === member.id);
+
+                          return (
+                            <div
+                              key={member.id}
+                              className={cn(
+                                "flex items-center gap-3 p-2.5 rounded-lg border transition-colors",
+                                isSelected
+                                  ? "bg-[var(--color-brand)]/5 border-[var(--color-brand)]/20"
+                                  : "bg-muted/30 border-transparent"
+                              )}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleMember(member.id)}
+                              />
+                              <Avatar className="w-7 h-7">
+                                <AvatarFallback
+                                  style={{ backgroundColor: member.avatarColor }}
+                                  className="text-white text-xs"
+                                >
+                                  {member.name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="flex-1 font-medium text-sm text-[var(--color-navy)]">
+                                {member.name}
+                              </span>
+
+                              {isSelected && splitType !== "EQUAL" && (
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    value={customSplits[member.id] || ""}
+                                    onChange={(e) =>
+                                      setCustomSplits((prev) => ({
+                                        ...prev,
+                                        [member.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="w-16 h-7 text-sm text-right rounded-lg border-black/10"
+                                    placeholder={splitType === "SHARES" ? "1" : "0"}
+                                    min="0"
+                                    step={splitType === "SHARES" ? "1" : "0.01"}
+                                  />
+                                  <span className="text-xs text-[var(--color-navy)]/50 w-5">
+                                    {splitType === "PERCENTAGE" ? "%" : splitType === "SHARES" ? "×" : getCurrencySymbol()}
+                                  </span>
+                                </div>
+                              )}
+
+                              {isSelected && (
+                                <span className="text-sm font-medium text-[var(--color-brand)] min-w-[50px] text-right">
+                                  {getCurrencySymbol()}{(preview?.amount || 0).toFixed(0)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Split Summary */}
+                      {amount && parseFloat(amount) > 0 && (
+                        <div className={cn(
+                          "mt-3 p-3 rounded-lg flex items-center justify-between",
+                          Math.abs(splitTotal - parseFloat(amount)) > 0.01
+                            ? "bg-red-50 border border-red-100"
+                            : "bg-emerald-50/50 border border-emerald-100"
+                        )}>
+                          <span className="text-sm text-[var(--color-navy)]/70">Total</span>
+                          <span
+                            className={cn(
+                              "font-semibold",
+                              Math.abs(splitTotal - parseFloat(amount)) > 0.01
+                                ? "text-red-500"
+                                : "text-emerald-600"
+                            )}
+                          >
+                            {getCurrencySymbol()}{splitTotal.toFixed(2)} / {getCurrencySymbol()}{parseFloat(amount).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </Tabs>
+
+                    {/* Collapse Advanced */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setShowAdvancedSplit(false);
+                        setSplitType("EQUAL");
+                      }}
+                      className="w-full h-9 text-xs rounded-lg text-[var(--color-navy)]/60 hover:text-[var(--color-navy)] hover:bg-muted/50"
+                    >
+                      <ChevronUp className="h-3 w-3 mr-1.5" />
+                      Use equal split
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </ScrollArea>
 
-          <DialogFooter className="p-4 border-t border-black/5 gap-2">
+          <DialogFooter className="p-3 sm:p-4 border-t border-black/5 gap-2 bg-background relative z-10 flex-col sm:flex-row">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
-              className="rounded-full"
+              className="rounded-full w-full sm:w-auto order-2 sm:order-1"
             >
               Cancel
             </Button>
-            
-          </DialogFooter>
-          <Button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full text-[var(--color-brand-contrast)] font-medium"
+              className="rounded-full text-[var(--color-brand-contrast)] font-medium px-6 relative z-10 w-full sm:w-auto order-1 sm:order-2"
               style={{
                 background: "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",
               }}
@@ -622,11 +757,12 @@ export function AddExpenseModal({
                   {isEditing ? "Updating..." : "Adding..."}
                 </>
               ) : isEditing ? (
-                "Update Expense"
+                "Update"
               ) : (
                 "Add Expense"
               )}
             </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

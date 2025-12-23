@@ -167,189 +167,210 @@ export function SettlementModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] rounded-3xl">
-        <DialogHeader>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
-              <Wallet className="h-5 w-5 text-emerald-600" />
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[480px] rounded-3xl">
+        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
+          <div className="flex items-center gap-2 sm:gap-3 mb-1">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+              <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold text-[var(--color-navy)]">
-                Record Settlement
+            <div className="min-w-0">
+              <DialogTitle className="text-lg sm:text-xl font-semibold text-[var(--color-navy)]">
+                Record Payment
               </DialogTitle>
-              <DialogDescription className="text-[var(--color-navy)]/60">
-                Record a payment between members.
+              <DialogDescription className="text-xs sm:text-sm text-[var(--color-navy)]/60">
+                Mark a payment as settled between members
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4 sm:space-y-5">
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 rounded-xl border border-red-100">
               {error}
             </div>
           )}
 
-          {/* Quick Select from Suggested Debts */}
+          {/* Quick Select from Suggested Debts - More Prominent */}
           {debts.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-[var(--color-navy)]/80">Suggested</Label>
-              <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                {debts.map((debt, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSelectDebt(idx)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                      selectedDebt === idx
-                        ? "border-emerald-500 bg-emerald-50"
-                        : "border-black/5 hover:border-black/10 hover:bg-muted/30"
-                    }`}
-                  >
-                    <Avatar className="w-7 h-7">
-                      <AvatarFallback
-                        style={{ backgroundColor: debt.from.avatarColor }}
-                        className="text-white text-xs font-medium"
-                      >
-                        {debt.from.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 text-left">
-                      <p className="text-sm text-[var(--color-navy)]">
-                        <span className="font-medium">{debt.from.name}</span>
-                        <span className="text-[var(--color-navy)]/50"> pays </span>
-                        <span className="font-medium">{debt.to.name}</span>
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-[var(--color-navy)]/30" />
-                    <Avatar className="w-7 h-7">
-                      <AvatarFallback
-                        style={{ backgroundColor: debt.to.avatarColor }}
-                        className="text-white text-xs font-medium"
-                      >
-                        {debt.to.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-semibold text-emerald-600 min-w-[60px] text-right">
-                      {getCurrencySymbol()}{debt.amount.toFixed(0)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {debts.length > 0 && (
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-black/5" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-[var(--color-navy)]/40">
-                  Or enter manually
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium text-[var(--color-navy)]/70">
+                  Quick Select
+                </Label>
+                <span className="text-xs text-[var(--color-navy)]/50">
+                  {debts.length} {debts.length === 1 ? "payment" : "payments"} pending
                 </span>
               </div>
+              <ScrollArea className="max-h-[200px]">
+                <div className="space-y-2 pr-2">
+                  {debts.map((debt, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSelectDebt(idx)}
+                      className={`w-full flex items-center gap-2 sm:gap-3 p-3 sm:p-3.5 rounded-xl border-2 transition-all ${
+                        selectedDebt === idx
+                          ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                          : "border-black/5 hover:border-emerald-200 hover:bg-emerald-50/50 bg-white"
+                      }`}
+                    >
+                      <Avatar className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0">
+                        <AvatarFallback
+                          style={{ backgroundColor: debt.from.avatarColor }}
+                          className="text-white text-[10px] sm:text-xs font-semibold"
+                        >
+                          {debt.from.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 text-left min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-[var(--color-navy)] truncate">
+                          {debt.from.name}
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-[var(--color-navy)]/50 truncate">
+                          pays {debt.to.name}
+                        </p>
+                      </div>
+                      <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[var(--color-navy)]/30 flex-shrink-0 hidden sm:block" />
+                      <Avatar className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0">
+                        <AvatarFallback
+                          style={{ backgroundColor: debt.to.avatarColor }}
+                          className="text-white text-[10px] sm:text-xs font-semibold"
+                        >
+                          {debt.to.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className={`font-bold text-sm sm:text-base min-w-[60px] sm:min-w-[70px] text-right flex-shrink-0 ${
+                        selectedDebt === idx ? "text-emerald-600" : "text-[var(--color-brand)]"
+                      }`}>
+                        {getCurrencySymbol()}{debt.amount.toFixed(0)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           )}
 
-          {/* Manual Entry */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-[var(--color-navy)]/80">From</Label>
-              <Select value={fromMemberId} onValueChange={setFromMemberId}>
-                <SelectTrigger className="h-11 rounded-xl border-black/10">
-                  <SelectValue placeholder="Who pays" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {members.map((member) => (
-                    <SelectItem key={member.id} value={member.id} className="rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="w-5 h-5">
-                          <AvatarFallback
-                            style={{ backgroundColor: member.avatarColor }}
-                            className="text-white text-[10px]"
-                          >
-                            {member.name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {member.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-[var(--color-navy)]/80">To</Label>
-              <Select value={toMemberId} onValueChange={setToMemberId}>
-                <SelectTrigger className="h-11 rounded-xl border-black/10">
-                  <SelectValue placeholder="Who receives" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {members.map((member) => (
-                    <SelectItem key={member.id} value={member.id} className="rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="w-5 h-5">
-                          <AvatarFallback
-                            style={{ backgroundColor: member.avatarColor }}
-                            className="text-white text-[10px]"
-                          >
-                            {member.name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {member.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {/* Manual Entry - Only show if no debts or if user wants to customize */}
+          {(debts.length === 0 || selectedDebt === null || 
+            (selectedDebt !== null && (parseFloat(amount) !== debts[selectedDebt]?.amount || fromMemberId !== debts[selectedDebt]?.from.memberId || toMemberId !== debts[selectedDebt]?.to.memberId))) && (
+            <>
+              {debts.length > 0 && (
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-black/5" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-background px-3 text-[var(--color-navy)]/40">
+                      Or enter manually
+                    </span>
+                  </div>
+                </div>
+              )}
 
-          <div className="space-y-2">
-            <Label className="text-[var(--color-navy)]/80">Amount</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-navy)]/50 font-medium">
-                {getCurrencySymbol()}
-              </span>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="h-11 pl-8 text-lg font-medium rounded-xl border-black/10"
-                min="0"
-                step="0.01"
-              />
-            </div>
-          </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs sm:text-sm text-[var(--color-navy)]/70">From</Label>
+                    <Select value={fromMemberId} onValueChange={setFromMemberId}>
+                      <SelectTrigger className="h-10 rounded-lg border-black/10 text-sm">
+                        <SelectValue placeholder="Who pays" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {members.map((member) => (
+                          <SelectItem key={member.id} value={member.id} className="rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-4 h-4">
+                                <AvatarFallback
+                                  style={{ backgroundColor: member.avatarColor }}
+                                  className="text-white text-[8px]"
+                                >
+                                  {member.name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">{member.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs sm:text-sm text-[var(--color-navy)]/70">To</Label>
+                    <Select value={toMemberId} onValueChange={setToMemberId}>
+                      <SelectTrigger className="h-10 rounded-lg border-black/10 text-sm">
+                        <SelectValue placeholder="Who receives" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {members.map((member) => (
+                          <SelectItem key={member.id} value={member.id} className="rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-4 h-4">
+                                <AvatarFallback
+                                  style={{ backgroundColor: member.avatarColor }}
+                                  className="text-white text-[8px]"
+                                >
+                                  {member.name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">{member.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-          <div className="space-y-2">
-            <Label className="text-[var(--color-navy)]/80">Notes (Optional)</Label>
-            <Textarea
-              placeholder="e.g., Paid via UPI"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="resize-none rounded-xl border-black/10"
-            />
-          </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-[var(--color-navy)]/70">Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base font-semibold text-[var(--color-navy)]">
+                      {getCurrencySymbol()}
+                    </span>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="h-11 pl-8 text-lg font-semibold rounded-lg border-black/10"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
 
-          <DialogFooter className="pt-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-sm text-[var(--color-navy)]/70">
+                    Notes <span className="text-[var(--color-navy)]/40 font-normal">(Optional)</span>
+                  </Label>
+                  <Textarea
+                    placeholder="e.g., Paid via UPI"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    className="resize-none rounded-lg border-black/10"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          <DialogFooter className="pt-2 gap-2 flex-col sm:flex-row">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
-              className="rounded-full"
+              className="rounded-full w-full sm:w-auto order-2 sm:order-1"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isLoading}
-              className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={isLoading || !fromMemberId || !toMemberId || !amount}
+              className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 w-full sm:w-auto order-1 sm:order-2"
             >
               {isLoading ? (
                 <>
@@ -357,7 +378,7 @@ export function SettlementModal({
                   Recording...
                 </>
               ) : (
-                "Record Settlement"
+                "Record Payment"
               )}
             </Button>
           </DialogFooter>

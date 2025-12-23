@@ -132,19 +132,24 @@ export function ExpensesList({
 
   if (expenses.length === 0) {
     return (
-      <div className="rounded-3xl border border-black/5 bg-white p-12 text-center">
-        <div className="mx-auto w-16 h-16 rounded-full bg-[var(--color-brand)]/10 flex items-center justify-center mb-5">
-          <Receipt className="h-7 w-7 text-[var(--color-brand)]" />
+      <div className="rounded-3xl border border-black/5 bg-gradient-to-br from-white to-[var(--color-cream)]/30 p-8 sm:p-12 text-center">
+        <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[var(--color-brand)]/10 to-[var(--color-brand)]/5 flex items-center justify-center mb-5 animate-pulse">
+          <Receipt className="h-8 w-8 sm:h-10 sm:w-10 text-[var(--color-brand)]" />
         </div>
-        <h3 className="text-xl font-semibold text-[var(--color-navy)] mb-2">
+        <h3 className="text-xl sm:text-2xl font-semibold text-[var(--color-navy)] mb-2">
           No expenses yet
         </h3>
-        <p className="text-[var(--color-navy)]/60 text-sm mb-1">
+        <p className="text-[var(--color-navy)]/60 text-sm sm:text-base mb-4 max-w-md mx-auto">
           Start tracking your trip spending by adding your first expense.
         </p>
-        <p className="text-[var(--color-navy)]/40 text-xs">
-          Click "Add Expense" above to get started
-        </p>
+        <div className="mt-6 p-4 bg-white/60 rounded-2xl border border-black/5 max-w-md mx-auto">
+          <p className="text-xs sm:text-sm font-medium text-[var(--color-navy)]/70 mb-2">
+            💡 Pro Tip
+          </p>
+          <p className="text-xs text-[var(--color-navy)]/60">
+            Use quick add templates for common expenses like food, transport, and accommodation to save time!
+          </p>
+        </div>
       </div>
     );
   }

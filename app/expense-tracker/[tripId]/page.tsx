@@ -14,6 +14,7 @@ import { SettlementModal } from "@/components/expense-tracker/settlement-modal";
 import { TripSettingsModal } from "@/components/expense-tracker/trip-settings-modal";
 import { MembersModal } from "@/components/expense-tracker/members-modal";
 import { AnalyticsSheet } from "@/components/expense-tracker/analytics-sheet";
+import { ExpenseInsights } from "@/components/expense-tracker/expense-insights";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -288,7 +289,18 @@ export default function TripDetailPage() {
                   </Button>
                 </div>
 
-                <TabsContent value="expenses" className="mt-0">
+                <TabsContent value="expenses" className="mt-0 space-y-6">
+                  {/* Expense Insights */}
+                  {trip.expenses.length > 0 && (
+                    <ExpenseInsights
+                      expenses={trip.expenses}
+                      analytics={analytics}
+                      currency={trip.currency}
+                      totalBudget={trip.totalBudget}
+                    />
+                  )}
+                  
+                  {/* Expenses List */}
                   <ExpensesList
                     expenses={trip.expenses}
                     members={trip.members}

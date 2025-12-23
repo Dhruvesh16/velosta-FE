@@ -51,7 +51,9 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  Zap,
 } from "lucide-react";
+import { QuickExpenseTemplates } from "./quick-expense-templates";
 
 interface AddExpenseModalProps {
   open: boolean;
@@ -105,6 +107,7 @@ export function AddExpenseModal({
   // UI state
   const [showAdvancedSplit, setShowAdvancedSplit] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showQuickTemplates, setShowQuickTemplates] = useState(!expense);
 
   const isEditing = !!expense;
 
@@ -351,8 +354,8 @@ export function AddExpenseModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[520px] max-h-[90vh] rounded-3xl p-0 overflow-hidden">
-        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[520px] max-h-[90vh] rounded-3xl p-0 overflow-hidden flex flex-col">
+        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 flex-shrink-0">
           <DialogTitle className="text-lg sm:text-xl font-semibold text-[var(--color-navy)]">
             {isEditing ? "Edit Expense" : "Add Expense"}
           </DialogTitle>
@@ -361,13 +364,49 @@ export function AddExpenseModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <ScrollArea className="max-h-[calc(90vh-180px)] sm:max-h-[calc(90vh-200px)]">
-            <div className="px-4 sm:px-6 pb-20 sm:pb-24 space-y-4 sm:space-y-5">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1 min-h-0 max-h-[calc(90vh-200px)] overflow-y-auto">
+            <div className="px-4 sm:px-6 pb-6 space-y-4 sm:space-y-5">
               {error && (
                 <div className="p-3 text-sm text-red-600 bg-red-50 rounded-xl border border-red-100">
                   {error}
                 </div>
+              )}
+
+              {/* Quick Expense Templates */}
+              {showQuickTemplates && !expense && (
+                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                  <QuickExpenseTemplates
+                    onSelectTemplate={(template) => {
+                      setDescription(template.description);
+                      const matchingCategory = categories.find(
+                        (cat) => cat.name === template.category
+                      );
+                      if (matchingCategory) {
+                        setCategoryId(matchingCategory.id);
+                      }
+                      setShowQuickTemplates(false);
+                      // Focus on amount input
+                      setTimeout(() => {
+                        const amountInput = document.querySelector('input[type="number"]') as HTMLInputElement;
+                        amountInput?.focus();
+                      }, 100);
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Toggle Quick Templates */}
+              {!expense && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowQuickTemplates(!showQuickTemplates)}
+                  className="w-full h-9 text-xs rounded-lg text-[var(--color-navy)]/60 hover:text-[var(--color-navy)] hover:bg-muted/50 flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Zap className={`h-3 w-3 transition-transform ${showQuickTemplates ? 'rotate-12' : ''}`} />
+                  {showQuickTemplates ? "Hide quick add" : "Show quick add"}
+                </Button>
               )}
 
               {/* Main Fields - Description & Amount */}

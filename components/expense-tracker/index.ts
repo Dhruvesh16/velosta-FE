@@ -9,3 +9,5 @@ export { SettlementModal } from "./settlement-modal";
 export { TripSettingsModal } from "./trip-settings-modal";
 export { MembersModal } from "./members-modal";
 export { AnalyticsSheet } from "./analytics-sheet";
+export { QuickExpenseTemplates } from "./quick-expense-templates";
+export { ExpenseInsights } from "./expense-insights";

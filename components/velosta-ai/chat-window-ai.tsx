@@ -1,23 +1,20 @@
 "use client";
 
-import type React from "react";
-
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Send, Sparkles, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/app/utils/context";
-import { DateRangePicker } from "../../components/travel-planner/date-range-picker";
-import { TravelTypeSelector } from "../../components/travel-planner/travel-type-selector";
-import { TravelerCounter } from "../../components/travel-planner/traveler-counter";
-import { TravelVibeSelector } from "../../components/travel-planner/travel-vibe-selector";
-import { MustVisitInput } from "../../components/travel-planner/must-visit-input";
-import { PreferencesSection } from "../../components/travel-planner/preferences-section";
+import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { ItineraryPDFExport } from "./itinerary-pdf-export";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  isItinerary?: boolean;
+  itineraryData?: any;
 }
 
 interface TripData {
@@ -29,923 +26,543 @@ interface TripData {
   travelVibe?: string[];
   mustVisitPlaces?: string[];
   preferences?: Record<string, string[]>;
-  accommodation?: string;
-  specialRequests?: string;
 }
 
-export function ChatWindow() {
+interface ChatWindowProps {
+  onItinerary?: (itinerary: any, tripData: TripData) => void;
+}
+
+// ─── Itinerary Card Renderer ──────────────────────────────────────────────────
+function ItineraryCard({
+  data,
+  tripData,
+}: {
+  data: any;
+  tripData: TripData;
+}) {
+  if (!data?.itineraryTable) return null;
+
+  return (
+    <div className="space-y-4 text-sm">
+      {/* Header */}
+      <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+        <MapPin size={18} className="text-amber-600 mt-0.5 shrink-0" />
+        <div>
+          <p className="font-semibold text-amber-800 text-base">
+            {data.destination}
+          </p>
+          <p className="text-amber-700 text-xs mt-0.5">
+            {data.duration} &nbsp;·&nbsp; {data.totalBudget || data.totalEstimatedCost}
+          </p>
+          {data.summary && (
+            <p className="text-gray-700 text-xs mt-2 leading-relaxed">
+              {data.summary}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Budget breakdown */}
+      {data.budgetBreakdown && (
+        <div className="rounded-xl border border-amber-100 overflow-hidden">
+          <div className="bg-amber-50 px-4 py-2 border-b border-amber-100">
+            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+              Budget Breakdown
+            </p>
+          </div>
+          <div className="p-3 grid grid-cols-2 gap-2">
+            {Object.entries(data.budgetBreakdown).map(([k, v]) => (
+              <div key={k} className="flex justify-between text-xs bg-white rounded-lg px-3 py-2 border border-gray-100">
+                <span className="text-gray-500 capitalize">{k}</span>
+                <span className="font-semibold text-amber-700">{v as string}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Day cards */}
+      {Array.isArray(data.itineraryTable) && data.itineraryTable.map((day: any, i: number) => (
+        <div key={i} className="rounded-xl border border-gray-200 overflow-hidden">
+          {/* Day header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-600">
+            <div>
+              <span className="text-white font-bold text-sm">Day {day.day || i + 1}</span>
+              {day.theme && (
+                <span className="text-amber-100 text-xs ml-2">— {day.theme}</span>
+              )}
+            </div>
+            {day.dailyCost && (
+              <span className="bg-white/20 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                {day.dailyCost}
+              </span>
+            )}
+          </div>
+
+          {/* Activities */}
+          <div className="bg-white divide-y divide-gray-50">
+            {Array.isArray(day.rows) && day.rows.map((row: any, j: number) => (
+              <div key={j} className="px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-xs text-amber-600 font-medium w-16 shrink-0 pt-0.5">
+                    {row.time || "—"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-800 text-sm">{row.activity}</p>
+                    {row.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{row.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                      {row.distance && (
+                        <span className="text-xs text-gray-400">{row.distance}</span>
+                      )}
+                      {row.pricing && (
+                        <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                          {row.pricing}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Meals & Stay */}
+          {(day.meals || day.accommodation) && (
+            <div className="bg-gray-50 border-t border-gray-100 px-4 py-3 space-y-1.5">
+              {day.meals?.breakfast && (
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-amber-600">🍳 Breakfast:</span> {day.meals.breakfast}
+                </p>
+              )}
+              {day.meals?.lunch && (
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-amber-600">🥗 Lunch:</span> {day.meals.lunch}
+                </p>
+              )}
+              {day.meals?.dinner && (
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-amber-600">🍽️ Dinner:</span> {day.meals.dinner}
+                </p>
+              )}
+              {day.accommodation && (
+                <p className="text-xs text-gray-600 pt-1 border-t border-gray-200">
+                  <span className="font-medium text-amber-600">🏨 Stay:</span> {day.accommodation}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Cost saving tips */}
+      {data.expenseSummary?.costSavingTips?.length > 0 && (
+        <div className="rounded-xl border border-green-100 bg-green-50 p-4">
+          <p className="text-xs font-semibold text-green-700 mb-2 uppercase tracking-wide">
+            💡 Cost Saving Tips
+          </p>
+          <ul className="space-y-1">
+            {data.expenseSummary.costSavingTips.map((tip: string, i: number) => (
+              <li key={i} className="text-xs text-green-700 flex items-start gap-1.5">
+                <span className="mt-0.5">•</span>
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Total cost banner */}
+      {data.totalEstimatedCost && (
+        <div className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 p-4 text-center">
+          <p className="text-amber-100 text-xs mb-1">Total Estimated Cost</p>
+          <p className="text-white text-2xl font-bold">{data.totalEstimatedCost}</p>
+        </div>
+      )}
+
+      {/* Local tips */}
+      {Array.isArray(data.localTips) && data.localTips.length > 0 && (
+        <div className="rounded-xl border border-gray-200 p-4">
+          <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+            Local Tips
+          </p>
+          <ul className="space-y-1.5">
+            {data.localTips.map((tip: string, i: number) => (
+              <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                <span className="text-amber-500 mt-0.5">✦</span>
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* PDF Export */}
+      <div className="flex justify-center pt-1">
+        <ItineraryPDFExport itineraryData={data} tripData={tripData} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Fallback Itinerary Generator ─────────────────────────────────────────────
+// Produces a static itinerary when the API fails, so the user never stays stuck.
+function generateFallbackItinerary(destination: string, budget?: string, days: number = 3) {
+  const dayPlans = [];
+  for (let d = 1; d <= days; d++) {
+    const rows = [];
+    if (d === 1) {
+      rows.push(
+        { time: "08:00 AM", activity: `Travel to ${destination}`, description: "Depart from your city. Enjoy the journey!", distance: "—", pricing: "Included in transport" },
+        { time: "02:00 PM", activity: "Check-in to hotel / homestay", description: "Freshen up and rest after the journey", distance: "—", pricing: "See accommodation" },
+        { time: "05:00 PM", activity: "Explore local area", description: `Evening walk around ${destination}. Visit local markets, cafes, and streets.`, distance: "Nearby", pricing: "Free" },
+        { time: "08:00 PM", activity: "Dinner at local restaurant", description: "Try local cuisine at a popular spot", distance: "Nearby", pricing: "₹300–₹500" }
+      );
+    } else if (d === days) {
+      rows.push(
+        { time: "08:00 AM", activity: "Breakfast & checkout", description: "Pack up and check out from accommodation", distance: "—", pricing: "Included" },
+        { time: "10:00 AM", activity: "Visit final attraction", description: `Visit a popular landmark or temple in ${destination} before leaving`, distance: "5–10 km", pricing: "₹50–₹200" },
+        { time: "01:00 PM", activity: "Lunch & souvenir shopping", description: "Grab lunch and pick up souvenirs", distance: "Nearby", pricing: "₹300–₹500" },
+        { time: "03:00 PM", activity: "Return journey", description: "Head back home with great memories!", distance: "—", pricing: "Included in transport" }
+      );
+    } else {
+      rows.push(
+        { time: "08:00 AM", activity: "Breakfast at hotel", description: "Start the day with a hearty breakfast", distance: "—", pricing: "₹200–₹300" },
+        { time: "10:00 AM", activity: `Day ${d} sightseeing`, description: `Explore popular attractions and scenic spots in ${destination}`, distance: "10–20 km", pricing: "₹200–₹500" },
+        { time: "01:00 PM", activity: "Lunch", description: "Try a different local restaurant", distance: "Nearby", pricing: "₹300–₹400" },
+        { time: "03:00 PM", activity: "Afternoon activity", description: "Adventure sport, nature walk, or cultural experience", distance: "5–15 km", pricing: "₹500–₹1,000" },
+        { time: "07:00 PM", activity: "Dinner & evening relaxation", description: "Wind down with dinner and a relaxed evening", distance: "Nearby", pricing: "₹300–₹500" }
+      );
+    }
+
+    dayPlans.push({
+      day: d,
+      theme: d === 1 ? "Arrival & First Impressions" : d === days ? "Last Day & Return" : `Day ${d} — Explore & Discover`,
+      rows,
+      dailyCost: `₹${Math.round((parseInt(budget?.replace(/[^\d]/g, "") || "8000") / days) * 0.9)}`
+    });
+  }
+
+  return {
+    type: "itinerary",
+    destination,
+    duration: `${days} days`,
+    totalBudget: budget || "₹8,000",
+    totalEstimatedCost: budget || "₹8,000",
+    summary: `Here's a ${days}-day trip plan for ${destination}. This is a suggested itinerary — you can customize it by chatting with me!`,
+    itineraryTable: dayPlans,
+    localTips: [
+      "Book accommodation in advance during peak season",
+      "Carry cash — not all places accept cards",
+      "Try street food for authentic flavors at lower costs"
+    ],
+    isFallback: true,
+  };
+}
+
+// ─── Main ChatWindow ──────────────────────────────────────────────────────────
+export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [phase, setPhase] = useState<"guided" | "free">("guided");
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [tripData, setTripData] = useState<TripData>({});
-  const [currentItinerary, setCurrentItinerary] = useState<any>(null);
   const [conversationHistory, setConversationHistory] = useState<
     Array<{ role: string; content: string }>
   >([]);
+  const [currentItinerary, setCurrentItinerary] = useState<any>(null);
+  const [tripData, setTripData] = useState<TripData>({});
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { accessToken, user } = useUser();
+  const { selectedDestination, selectedTier, duration, userLocation, generatedItinerary, setGeneratedItinerary } = useOnboardingStore();
+  const autoSentRef = useRef(false);
 
-  const questions = [
-    { key: "destination", text: "Where would you like to go?" },
-    { key: "travelType", text: "Who's traveling with you?", type: "selector" },
-    {
-      key: "dateRange",
-      text: "When are you planning to travel?",
-      type: "calendar",
-    },
-    { key: "travelers", text: "How many travelers?", type: "counter" },
-    { key: "budget", text: "What's your expected budget for the trip?" },
-    { key: "travelVibe", text: "What's your travel vibe?", type: "vibe" },
-    {
-      key: "mustVisitPlaces",
-      text: "Are there any must-visit places on your list?",
-      type: "places",
-    },
-    {
-      key: "preferences",
-      text: "Let's set your preferences",
-      type: "preferences",
-    },
-  ];
-
-  // Auto-scroll
+  // Auto-scroll to bottom
   useEffect(() => {
-    listRef.current?.scrollTo({
-      top: listRef.current.scrollHeight,
-      behavior: "smooth",
-    });
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // Initialize greeting
+  // Initial greeting — adapts based on whether a destination was pre-selected
   useEffect(() => {
-    if (user?.name && messages.length === 0) {
-      setMessages([
-        {
-          id: "assistant-start",
-          role: "assistant",
-          content: `Hey ${user.name}! I'm Velosta AI. Let's plan your trip.\n\n${questions[0].text}`,
-        },
-      ]);
+    if (messages.length === 0) {
+      const name = user?.name ? user.name.split(" ")[0] : null;
+
+      let greeting: string;
+      if (selectedDestination) {
+        greeting = name
+          ? `Hey ${name}! Great choice — ${selectedDestination} is amazing!`
+          : `Great choice — ${selectedDestination} is amazing!`;
+      } else {
+        greeting = name
+          ? `Hey ${name}! I'm Velosta AI — your spatial travel planner. Tell me where you want to go, your rough budget, and how many days you have. I'll build the perfect itinerary for you.`
+          : `Hey! I'm Velosta AI — your spatial travel planner. Tell me where you want to go, your rough budget, and how many days you have. I'll build the perfect itinerary for you.`;
+      }
+
+      setMessages([{ id: "greeting", role: "assistant", content: greeting }]);
     }
-  }, [user?.name]);
+  }, [user?.name, selectedDestination]);
 
-  function safeParseJSON(str: string) {
-    try {
-      return JSON.parse(str);
-    } catch {
-      return null;
-    }
-  }
+  // ── Pick up pre-generated itinerary from explore-map ─────────────────────
+  // The API call already happened in explore-map.tsx before transitioning here.
+  // We just need to display it and sync with the map.
+  useEffect(() => {
+    if (autoSentRef.current || !generatedItinerary || !selectedDestination) return;
+    autoSentRef.current = true;
 
-  function isProbablyJson(str: string) {
-    const trimmed = str.trim();
-    return (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"))
-    );
-  }
+    const data = generatedItinerary;
+    console.log(data, "hola - ChatWindow received pre-generated itinerary");
 
-  // Submit message
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || isLoading) return;
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: text,
+    // Show the itinerary in chat
+    setCurrentItinerary(data);
+    const extractedTripData: TripData = {
+      destination: data.destination,
+      budget: data.totalEstimatedCost || data.totalBudget,
     };
+    setTripData(extractedTripData);
+    onItinerary?.(data, extractedTripData);
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
-
+    const itineraryMsg: Message = {
+      id: `a-itin-${Date.now()}`,
+      role: "assistant",
+      content: data.summary || `Here's your ${data.destination} itinerary!`,
+      isItinerary: true,
+      itineraryData: data,
+    };
+    setMessages((prev) => [...prev, itineraryMsg]);
     setConversationHistory((prev) => [
       ...prev,
-      { role: "user", content: text },
+      { role: "assistant", content: `[Generated itinerary for ${data.destination}]` },
     ]);
 
-    if (phase === "guided") {
-      const current = questions[questionIndex];
-      const updatedTripData = { ...tripData, [current.key]: text };
-      setTripData(updatedTripData);
+    // Clear from onboarding store so it doesn't re-trigger
+    setGeneratedItinerary(null);
+  }, [generatedItinerary, selectedDestination, onItinerary, setGeneratedItinerary]);
 
-      if (questionIndex < questions.length - 1) {
-        const next = questions[questionIndex + 1];
-        setQuestionIndex((i) => i + 1);
-        setTimeout(() => {
-          const assistantMsg = next.text;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `assistant-${Date.now()}`,
-              role: "assistant",
-              content: assistantMsg,
+  // Send message handler
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      const text = input.trim();
+      if (!text || isLoading) return;
+
+      const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: text };
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setIsLoading(true);
+
+      const updatedHistory = [...conversationHistory, { role: "user", content: text }];
+      setConversationHistory(updatedHistory);
+
+      // Timeout protection — abort if API takes > 45 seconds
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
             },
-          ]);
-          setConversationHistory((prev) => [
-            ...prev,
-            { role: "assistant", content: assistantMsg },
-          ]);
-          setIsLoading(false);
-        }, 300);
-      } else {
-        const generatingMsg = "Perfect! Generating your itinerary now...";
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: generatingMsg,
-          },
-        ]);
-        setConversationHistory((prev) => [
-          ...prev,
-          { role: "assistant", content: generatingMsg },
-        ]);
-        await generateItinerary(updatedTripData);
-        setPhase("free");
-        setIsLoading(false);
-      }
-      return;
-    }
+            signal: controller.signal,
+            body: JSON.stringify({
+              userSaid: text,
+              conversationHistory: updatedHistory,
+              currentItinerary: currentItinerary,
+              isModificationRequest: !!currentItinerary,
+            }),
+          }
+        );
 
-    // Free-form chat
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            userSaid: text,
-            context: tripData,
-            currentItinerary: currentItinerary,
-            conversationHistory: conversationHistory,
-            isModificationRequest: true,
-          }),
-        }
-      );
+        const data = await res.json();
+        console.log(data, "hola");
+        if (!res.ok) throw new Error(data.error || "Request failed");
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to process message");
-
-      if (data.isTextResponse) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `assistant-${Date.now()}`,
+        if (data.isTextResponse) {
+          // Plain chat reply
+          const assistantMsg: Message = {
+            id: `a-${Date.now()}`,
             role: "assistant",
             content: data.message,
-          },
-        ]);
-        setConversationHistory((prev) => [
-          ...prev,
-          { role: "assistant", content: data.message },
-        ]);
-      } else {
-        if (data.itineraryTable) {
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setConversationHistory((prev) => [
+            ...prev,
+            { role: "assistant", content: data.message },
+          ]);
+        } else if (data.itineraryTable) {
+          // Itinerary generated/updated — sync with map + itinerary panel
           setCurrentItinerary(data);
-        }
 
-        const assistantResponse = JSON.stringify(data, null, 2);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `assistant-${Date.now()}`,
+          // Extract trip context from itinerary data for PDF export
+          const extractedTripData: TripData = {
+            destination: data.destination,
+            budget: data.totalEstimatedCost || data.totalBudget,
+          };
+          setTripData(extractedTripData);
+
+          // Fire callback to sync map + itinerary panel
+          onItinerary?.(data, extractedTripData);
+
+          const assistantMsg: Message = {
+            id: `a-${Date.now()}`,
             role: "assistant",
-            content: assistantResponse,
-          },
-        ]);
-        setConversationHistory((prev) => [
-          ...prev,
-          { role: "assistant", content: assistantResponse },
-        ]);
+            content: data.summary || "Here's your itinerary!",
+            isItinerary: true,
+            itineraryData: data,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          setConversationHistory((prev) => [
+            ...prev,
+            { role: "assistant", content: `[Generated itinerary for ${data.destination}]` },
+          ]);
 
-        if (data.modificationsApplied && data.modificationsApplied.length > 0) {
-          setTimeout(() => {
-            const modsMsg = `Applied changes:\n${data.modificationsApplied
-              .map((m: string) => `• ${m}`)
-              .join("\n")}`;
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `assistant-${Date.now()}`,
+          // Show modifications notice if any
+          if (data.modificationsApplied?.length > 0) {
+            setTimeout(() => {
+              const modsMsg: Message = {
+                id: `a-mods-${Date.now()}`,
                 role: "assistant",
-                content: modsMsg,
-              },
-            ]);
-          }, 500);
+                content: `Changes applied:\n${data.modificationsApplied.map((m: string) => `• ${m}`).join("\n")}`,
+              };
+              setMessages((prev) => [...prev, modsMsg]);
+            }, 400);
+          }
+        } else {
+          // Fallback: unexpected response shape
+          const fallbackText = data.message || data.summary || "I received your request but couldn't process it. Could you try rephrasing?";
+          setMessages((prev) => [
+            ...prev,
+            { id: `a-fallback-${Date.now()}`, role: "assistant", content: fallbackText },
+          ]);
         }
-      }
-    } catch (err) {
-      console.error("Error:", err);
-      const errorMsg = "Something went wrong. Try again later.";
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: errorMsg,
-        },
-      ]);
-      setConversationHistory((prev) => [
-        ...prev,
-        { role: "assistant", content: errorMsg },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function generateItinerary(finalData: TripData) {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            ...finalData,
-            conversationHistory: conversationHistory,
-            isInitialGeneration: true,
-          }),
-        }
-      );
-
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(data.error || "Failed to generate itinerary");
-
-      setCurrentItinerary(data);
-
-      const itineraryResponse = JSON.stringify(data, null, 2);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: itineraryResponse,
-        },
-      ]);
-      setConversationHistory((prev) => [
-        ...prev,
-        { role: "assistant", content: itineraryResponse },
-      ]);
-    } catch (err) {
-      console.error("Itinerary error:", err);
-      const errorMsg = "Failed to generate itinerary. Please retry.";
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: errorMsg,
-        },
-      ]);
-      setConversationHistory((prev) => [
-        ...prev,
-        { role: "assistant", content: errorMsg },
-      ]);
-    }
-  }
-
-  // === MOBILE-OPTIMIZED RENDER: EXPENSE SUMMARY ===
-  function renderExpenseSummary(expenseSummary: any) {
-    if (!expenseSummary || typeof expenseSummary !== "object") return null;
-
-    const {
-      perPersonBreakdown,
-      totalPerPerson,
-      totalForGroup,
-      costSavingTips,
-    } = expenseSummary;
-
-    return (
-      <div className="mt-6 md:mt-8 border-2 border-[#DA880F] rounded-xl p-4 md:p-6 bg-gradient-to-br from-[#FFF6EE] to-white text-xs md:text-sm">
-        <h2 className="text-lg md:text-2xl font-bold text-[#DA880F] mb-4 md:mb-6 flex items-center gap-2">
-          Complete Expense Summary
-        </h2>
-
-        {perPersonBreakdown && (
-          <div className="space-y-3 mb-4 md:mb-6">
-            <h3 className="text-sm md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">
-              Per Person Breakdown:
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-              {Object.entries(perPersonBreakdown).map(
-                ([category, data]: any) => (
-                  <div
-                    key={category}
-                    className="bg-white border border-[#DA880F]/20 rounded-lg p-3 md:p-4 shadow-sm"
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <h4 className="font-semibold text-[#DA880F] capitalize text-xs md:text-sm">
-                        {category === "miscellaneous"
-                          ? "Misc. Expenses"
-                          : category}
-                      </h4>
-                      <span className="font-bold text-gray-800 text-xs md:text-base">
-                        {data.amount}
-                      </span>
-                    </div>
-                    {Array.isArray(data.details) && data.details.length > 0 && (
-                      <ul className="text-xs text-gray-600 space-y-1 mt-2 pl-3">
-                        {data.details.map((detail: string, i: number) => (
-                          <li key={i} className="list-disc text-xs">
-                            {detail}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
-          {totalPerPerson && (
-            <div className="bg-[#DA880F]/10 border-2 border-[#DA880F] rounded-lg p-3 md:p-4 text-center">
-              <p className="text-xs text-gray-600 mb-1">Total Per Person</p>
-              <p className="text-lg md:text-2xl font-bold text-[#DA880F]">
-                {totalPerPerson}
-              </p>
-            </div>
-          )}
-          {totalForGroup && (
-            <div className="bg-[#DA880F] text-white rounded-lg p-3 md:p-4 text-center">
-              <p className="text-xs opacity-90 mb-1">Total for Group</p>
-              <p className="text-lg md:text-2xl font-bold">{totalForGroup}</p>
-            </div>
-          )}
-        </div>
-
-        {Array.isArray(costSavingTips) && costSavingTips.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 md:p-4">
-            <h4 className="font-semibold text-green-800 mb-2 text-xs md:text-sm flex items-center gap-2">
-              Cost Saving Tips
-            </h4>
-            <ul className="space-y-1.5 text-xs md:text-sm text-green-700">
-              {costSavingTips.map((tip: string, i: number) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-green-600 mt-0.5 text-xs">
-                    Checkmark
-                  </span>
-                  <span>{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // === MOBILE-OPTIMIZED RENDER: ITINERARY TABLE ===
-  function renderItineraryTable(data: any) {
-    if (!data || typeof data !== "object") {
-      return <p className="text-gray-600">Invalid itinerary data</p>;
-    }
-
-    return (
-      <div className="space-y-6 text-sm md:text-base">
-        {data.summary && (
-          <p className="leading-relaxed text-gray-800">
-            <span className="font-semibold text-[#DA880F]">Summary:</span>{" "}
-            {data.summary}
-          </p>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-700">
-          {data.destination && (
-            <p>
-              <b className="text-[#DA880F]">Destination:</b> {data.destination}
-            </p>
-          )}
-          {data.duration && (
-            <p>
-              <b className="text-[#DA880F]">Duration:</b> {data.duration}
-            </p>
-          )}
-        </div>
-
-        {data.budgetBreakdown && (
-          <div className="bg-[#FFF6EE] border border-[#DA880F]/20 rounded-lg p-4">
-            <h3 className="text-base md:text-lg font-semibold text-[#DA880F] mb-3">
-              Budget Overview:
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
-              {Object.entries(data.budgetBreakdown).map(([key, value]) => (
-                <div key={key} className="flex justify-between">
-                  <span className="text-gray-700 capitalize">{key}:</span>
-                  <span className="font-semibold text-[#DA880F]">
-                    {value as string}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {data.totalBudget && (
-              <div className="mt-3 pt-3 border-t border-[#DA880F]/20 flex justify-between font-bold text-sm md:text-base">
-                <span className="text-gray-800">Total Budget:</span>
-                <span className="text-[#DA880F]">{data.totalBudget}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {Array.isArray(data.itineraryTable) &&
-          data.itineraryTable.length > 0 && (
-            <div className="space-y-6">
-              {data.itineraryTable.map((day: any, index: number) => (
-                <div
-                  key={day.day || index}
-                  className="border border-[#DA880F]/20 bg-[#FFF6EE] rounded-xl p-4 md:p-5"
-                >
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
-                    <h4 className="font-semibold text-[#DA880F] text-base md:text-lg">
-                      Day {day.day || index + 1}
-                      {day.theme ? `: ${day.theme}` : ""}
-                    </h4>
-                    {day.dailyCost && (
-                      <span className="bg-[#DA880F] text-white px-2.5 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">
-                        {day.dailyCost}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Mobile: Stacked Cards */}
-                  <div className="block md:hidden">
-                    {Array.isArray(day.rows) &&
-                      day.rows.map((row: any, i: number) => (
-                        <div
-                          key={i}
-                          className="bg-white rounded-lg p-3 mb-2 border border-[#DA880F]/10"
-                        >
-                          {row.time && (
-                            <p className="text-xs font-medium text-[#DA880F]">
-                              {row.time}
-                            </p>
-                          )}
-                          {row.activity && (
-                            <p className="font-semibold text-gray-800 mt-1">
-                              {row.activity}
-                            </p>
-                          )}
-                          {row.description && (
-                            <p className="text-xs text-gray-600 mt-1">
-                              {row.description}
-                            </p>
-                          )}
-                          <div className="flex justify-between mt-2 text-xs">
-                            {row.distance && (
-                              <span className="text-gray-500">
-                                {row.distance}
-                              </span>
-                            )}
-                            {row.pricing && (
-                              <span className="font-semibold text-[#DA880F]">
-                                {row.pricing}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-
-                  {/* Desktop: Scrollable Table */}
-                  <div className="hidden md:block overflow-x-auto -mx-1">
-                    <div className="min-w-[640px] md:min-w-0">
-                      <table className="w-full text-xs md:text-sm border-collapse">
-                        <thead className="bg-[#DA880F]/10 text-[#DA880F] sticky top-0 z-10">
-                          <tr>
-                            <th className="border px-3 py-2 text-left font-medium">
-                              Time
-                            </th>
-                            <th className="border px-3 py-2 text-left font-medium">
-                              Activity
-                            </th>
-                            <th className="border px-3 py-2 text-left font-medium">
-                              Description
-                            </th>
-                            <th className="border px-3 py-2 text-left font-medium">
-                              Distance
-                            </th>
-                            <th className="border px-3 py-2 text-left font-medium">
-                              Pricing
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Array.isArray(day.rows) &&
-                            day.rows.map((row: any, i: number) => (
-                              <tr
-                                key={i}
-                                className="border-t hover:bg-[#DA880F]/5"
-                              >
-                                <td className="border px-3 py-2 font-medium">
-                                  {row.time || "-"}
-                                </td>
-                                <td className="border px-3 py-2 font-medium">
-                                  {row.activity || "-"}
-                                </td>
-                                <td className="border px-3 py-2 text-gray-700">
-                                  {row.description || "-"}
-                                </td>
-                                <td className="border px-3 py-2 text-gray-600">
-                                  {row.distance || "-"}
-                                </td>
-                                <td className="border px-3 py-2 font-semibold text-[#DA880F]">
-                                  {row.pricing || "-"}
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {day.meals && (
-                    <div className="mt-4 space-y-1 text-xs md:text-sm">
-                      {day.meals.breakfast && (
-                        <p>
-                          <b className="text-[#DA880F]">Breakfast:</b>{" "}
-                          {day.meals.breakfast}
-                        </p>
-                      )}
-                      {day.meals.lunch && (
-                        <p>
-                          <b className="text-[#DA880F]">Lunch:</b>{" "}
-                          {day.meals.lunch}
-                        </p>
-                      )}
-                      {day.meals.dinner && (
-                        <p>
-                          <b className="text-[#DA880F]">Dinner:</b>{" "}
-                          {day.meals.dinner}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {day.accommodation && (
-                    <p className="mt-3 text-xs md:text-sm">
-                      <b className="text-[#DA880F]">Stay:</b>{" "}
-                      {day.accommodation}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-        {data.expenseSummary && renderExpenseSummary(data.expenseSummary)}
-
-        {Array.isArray(data.localTips) && data.localTips.length > 0 && (
-          <div className="text-xs md:text-sm">
-            <h3 className="text-base md:text-lg font-semibold text-[#DA880F] mb-2">
-              Local Tips:
-            </h3>
-            <ul className="list-disc pl-5 space-y-1 text-gray-700">
-              {data.localTips.map((tip: string, i: number) => (
-                <li key={i}>{tip}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {data.totalEstimatedCost && (
-          <div className="bg-gradient-to-r from-[#DA880F] to-[#c9770b] text-white rounded-xl p-5 md:p-6 text-center">
-            <p className="text-xs md:text-sm opacity-90 mb-1">
-              Total Estimated Trip Cost
-            </p>
-            <p className="text-xl md:text-3xl font-bold">
-              {data.totalEstimatedCost}
-            </p>
-          </div>
-        )}
-
-        <div className="flex justify-center mt-6">
-          <ItineraryPDFExport itineraryData={data} tripData={tripData} />
-        </div>
-      </div>
-    );
-  }
-
-  // === RENDER QUESTION COMPONENTS ===
-  function renderQuestionComponent() {
-    const current = questions[questionIndex];
-    if (!current || phase !== "guided") return null;
-
-    const nextStep = () => {
-      if (questionIndex < questions.length - 1) {
-        const next = questions[questionIndex + 1];
-        setQuestionIndex((i) => i + 1);
-        const assistantMsg = next.text;
+      } catch (err: any) {
+        console.error("Chat error:", err);
+        const isTimeout = err?.name === "AbortError";
         setMessages((prev) => [
           ...prev,
           {
-            id: `assistant-${Date.now()}`,
+            id: `a-err-${Date.now()}`,
             role: "assistant",
-            content: assistantMsg,
+            content: isTimeout
+              ? "The request took too long. Please try sending your message again."
+              : err?.message?.includes("429") || err?.message?.includes("rate")
+              ? "I'm hitting a rate limit right now. Please wait a few seconds and try again."
+              : "Unable to generate itinerary. Please try again.",
           },
         ]);
-        setConversationHistory((prev) => [
-          ...prev,
-          { role: "assistant", content: assistantMsg },
-        ]);
+      } finally {
+        clearTimeout(timeout);
+        setIsLoading(false);
+        inputRef.current?.focus();
       }
-    };
+    },
+    [input, isLoading, conversationHistory, currentItinerary, accessToken, onItinerary]
+  );
 
-    switch (current.type) {
-      case "selector":
-        return (
-          <TravelTypeSelector
-            onSelect={(type) => {
-              const updatedData = { ...tripData, travelType: type };
-              setTripData(updatedData);
-              setMessages((prev) => [
-                ...prev,
-                { id: `user-${Date.now()}`, role: "user", content: type },
-              ]);
-              setConversationHistory((prev) => [
-                ...prev,
-                { role: "user", content: type },
-              ]);
-              nextStep();
-            }}
-          />
-        );
-
-      case "calendar":
-        return (
-          <DateRangePicker
-            onSelect={(start, end) => {
-              const updatedData = { ...tripData, dateRange: { start, end } };
-              setTripData(updatedData);
-              const content = `${start} to ${end}`;
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: `user-${Date.now()}`,
-                  role: "user",
-                  content,
-                },
-              ]);
-              setConversationHistory((prev) => [
-                ...prev,
-                { role: "user", content },
-              ]);
-              nextStep();
-            }}
-            onClose={() => {}}
-          />
-        );
-
-      case "counter":
-        return (
-          <div className="mb-4">
-            <TravelerCounter
-              onUpdate={(adults, children) =>
-                setTripData((prev) => ({
-                  ...prev,
-                  travelers: { adults, children },
-                }))
-              }
-            />
-            <Button
-              onClick={() => {
-                const { adults = 1, children = 0 } = tripData.travelers || {};
-                const content = `${adults} adult${
-                  adults > 1 ? "s" : ""
-                }, ${children} child${children !== 1 ? "ren" : ""}`;
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: `user-${Date.now()}`,
-                    role: "user",
-                    content,
-                  },
-                ]);
-                setConversationHistory((prev) => [
-                  ...prev,
-                  { role: "user", content },
-                ]);
-                nextStep();
-              }}
-              className="mt-4 w-full bg-[#DA880F] hover:bg-[#c9770b] text-white"
-            >
-              Continue
-            </Button>
-          </div>
-        );
-
-      case "vibe":
-        return (
-          <div className="mb-4">
-            <TravelVibeSelector
-              onSelect={(vibes) =>
-                setTripData((prev) => ({ ...prev, travelVibe: vibes }))
-              }
-            />
-            <Button
-              onClick={() => {
-                const content =
-                  tripData.travelVibe && tripData.travelVibe.length > 0
-                    ? tripData.travelVibe.join(", ")
-                    : "Not specified";
-                setMessages((prev) => [
-                  ...prev,
-                  { id: `user-${Date.now()}`, role: "user", content },
-                ]);
-                setConversationHistory((prev) => [
-                  ...prev,
-                  { role: "user", content },
-                ]);
-                nextStep();
-              }}
-              className="mt-4 w-full bg-[#DA880F] hover:bg-[#c9770b] text-white"
-            >
-              Continue
-            </Button>
-          </div>
-        );
-
-      case "places":
-        return (
-          <div className="mb-4">
-            <MustVisitInput
-              onUpdate={(places) =>
-                setTripData((prev) => ({ ...prev, mustVisitPlaces: places }))
-              }
-            />
-            <Button
-              onClick={() => {
-                const content =
-                  tripData.mustVisitPlaces &&
-                  tripData.mustVisitPlaces.length > 0
-                    ? tripData.mustVisitPlaces.join(", ")
-                    : "No specific places";
-                setMessages((prev) => [
-                  ...prev,
-                  { id: `user-${Date.now()}`, role: "user", content },
-                ]);
-                setConversationHistory((prev) => [
-                  ...prev,
-                  { role: "user", content },
-                ]);
-                nextStep();
-              }}
-              className="mt-4 w-full bg-[#DA880F] hover:bg-[#c9770b] text-white"
-            >
-              Continue
-            </Button>
-          </div>
-        );
-
-      case "preferences":
-        return (
-          <div className="mb-4">
-            <PreferencesSection
-              onUpdate={(prefs) =>
-                setTripData((prev) => ({ ...prev, preferences: prefs }))
-              }
-            />
-            <Button
-              onClick={async () => {
-                const content = "Preferences set";
-                const generatingMsg =
-                  "Perfect! Generating your itinerary now...";
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: `user-${Date.now()}`,
-                    role: "user",
-                    content,
-                  },
-                  {
-                    id: `assistant-${Date.now()}`,
-                    role: "assistant",
-                    content: generatingMsg,
-                  },
-                ]);
-                setConversationHistory((prev) => [
-                  ...prev,
-                  { role: "user", content },
-                  { role: "assistant", content: generatingMsg },
-                ]);
-
-                setIsLoading(true);
-                await generateItinerary(tripData);
-                setPhase("free");
-                setIsLoading(false);
-              }}
-              className="mt-4 w-full bg-[#DA880F] hover:bg-[#c9770b] text-white"
-              disabled={isLoading}
-            >
-              {isLoading ? "Generating..." : "Generate Itinerary"}
-            </Button>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  }
-
-  // === MAIN RENDER ===
   return (
-    <section className="flex min-h-[100svh] flex-col bg-[#FFF9F3] pt-[calc(5rem+env(safe-area-inset-top,0px))]">
+    <section className="flex flex-col h-full bg-[#FFF9F3]">
+      {/* Message list */}
       <div
         ref={listRef}
-  className="flex-1 overflow-y-auto px-3 md:px-6 pb-28 md:pb-32 pt-4 md:pt-6 space-y-3 md:space-y-4 text-sm"
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
+        style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(218,136,15,0.2) transparent" }}
       >
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={cn(
-              "flex mb-3",
-              m.role === "user" ? "justify-end" : "justify-start"
-            )}
-          >
-            <div
-              className={cn(
-                "max-w-full sm:max-w-2xl lg:max-w-3xl rounded-2xl px-4 md:px-5 py-3 md:py-4 text-xs md:text-sm shadow-sm whitespace-pre-wrap",
-                m.role === "user"
-                  ? "bg-[#DA880F]/90 text-white"
-                  : "bg-white border border-[#DA880F]/30 text-gray-900"
-              )}
+        <AnimatePresence initial={false}>
+          {messages.map((m) => (
+            <motion.div
+              key={m.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22 }}
+              className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
             >
-              {m.role === "assistant" && isProbablyJson(m.content)
-                ? renderItineraryTable(safeParseJSON(m.content) || {})
-                : m.content}
-            </div>
-          </div>
-        ))}
+              {/* Avatar for assistant */}
+              {m.role === "assistant" && (
+                <div className="w-7 h-7 rounded-full shrink-0 mr-2 mt-0.5 flex items-center justify-center bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm">
+                  <Sparkles size={13} className="text-white" />
+                </div>
+              )}
 
+              <div
+                className={cn(
+                  "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
+                  m.role === "user"
+                    ? "bg-amber-500 text-white rounded-tr-sm"
+                    : m.isItinerary
+                    ? "bg-white border border-amber-100 text-gray-900 rounded-tl-sm w-full"
+                    : "bg-white border border-gray-100 text-gray-800 rounded-tl-sm"
+                )}
+              >
+                {m.isItinerary && m.itineraryData ? (
+                  <ItineraryCard data={m.itineraryData} tripData={tripData} />
+                ) : (
+                  <p className="whitespace-pre-wrap">{m.content}</p>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Typing indicator */}
         {isLoading && (
-          <div className="flex justify-start mb-4">
-            <div className="bg-white border rounded-2xl px-4 py-3 text-sm shadow-sm">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-[#DA880F] rounded-full animate-bounce" />
-                <div className="w-2 h-2 bg-[#DA880F] rounded-full animate-bounce [animation-delay:0.15s]" />
-                <div className="w-2 h-2 bg-[#DA880F] rounded-full animate-bounce [animation-delay:0.3s]" />
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div className="w-7 h-7 rounded-full shrink-0 mr-2 flex items-center justify-center bg-gradient-to-br from-amber-400 to-amber-600">
+              <Sparkles size={13} className="text-white" />
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+              <div className="flex gap-1.5 items-center h-4">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="w-2 h-2 rounded-full bg-amber-400 animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
-
-        {phase === "guided" && renderQuestionComponent()}
       </div>
 
-      {/* Input Field */}
-      <form
-        onSubmit={handleSubmit}
-        className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-[#FFF9F3] via-[#FFF9F3] to-transparent pt-2 px-2 md:px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] backdrop-blur-md"
-      >
-        <p className="text-xs text-black text-center mb-2">
-          Chat history is not saved — please export as PDF before leaving.
+      {/* Input bar */}
+      <div className="shrink-0 border-t border-amber-100 bg-[#FFF9F3] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+        <p className="text-[10px] text-gray-400 text-center mb-2">
+          Chat history is not saved — export as PDF before leaving.
         </p>
-
-        <div className="mx-auto w-full max-w-2xl px-2 md:px-0">
-          <div className="rounded-full border border-[#DA880F]/30 bg-white flex items-center gap-2 px-3 py-1.5 shadow-sm">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-              placeholder={
-                phase === "guided"
-                  ? "Type your answer..."
-                  : "Ask anything about your trip or request changes..."
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
               }
-              className="w-full border-none focus:ring-0 focus:outline-none bg-transparent text-sm leading-tight placeholder-gray-400"
-            />
-            <Button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="rounded-full bg-[#DA880F] hover:bg-[#c9770b] text-white px-4 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {isLoading ? "..." : "Send"}
-            </Button>
-          </div>
-        </div>
-      </form>
+            }}
+            placeholder="Tell me where you want to go..."
+            className="flex-1 min-w-0 bg-white border border-amber-200 rounded-full px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+            disabled={isLoading}
+            aria-label="Chat with Velosta AI"
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            className="shrink-0 w-10 h-10 rounded-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-sm"
+            aria-label="Send message"
+          >
+            <Send size={16} />
+          </button>
+        </form>
+      </div>
     </section>
   );
 }

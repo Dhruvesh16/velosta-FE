@@ -1,5 +1,5 @@
-// ── Google Maps Geocoding Service ─────────────────────────────────────────────
-// Uses Google Geocoding API for accurate place resolution.
+// ── Mapbox Geocoding Service ──────────────────────────────────────────────────
+// Uses Mapbox Geocoding API for accurate place resolution.
 // All coordinates are [lng, lat] internally for consistency with map stores.
 
 import type { ItineraryDay, MapMarker } from "@/lib/types/planner.types";
@@ -9,7 +9,7 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 // ── Haversine distance in km ────────────────────────────────────────────────
 function haversineKm(
@@ -38,18 +38,9 @@ const SKIP_PATTERNS = [
   /\brest\b/i,
   /free\s+time/i,
   /pack\s+up/i,
-  /breakfast\s+at\s+(hotel|stay)/i,
-  /\bhotel\b/i,
-  /\bhomestay\b/i,
-  /on\s+the\s+way/i,
   /freshen\s+up/i,
   /\bleisure\b/i,
   /\bsleep\b/i,
-  /\brelax\b/i,
-  /\bdinner\s+at/i,
-  /\blunch\s+at/i,
-  /\bbreakfast\b/i,
-  /\bsnacks?\b/i,
 ];
 
 function shouldSkipGeocoding(name: string): boolean {
@@ -68,32 +59,37 @@ function isWithinRange(
 const geocodeCache = new Map<string, [number, number] | null>();
 
 /**
- * Geocode via Google Geocoding API.  Returns [lng, lat] or null.
+ * Geocode via Mapbox Geocoding API.  Returns [lng, lat] or null.
  */
 async function geocodePlace(
   placeName: string,
   regionBias?: string
 ): Promise<[number, number] | null> {
-  if (!GOOGLE_KEY) return null;
+  if (!MAPBOX_TOKEN) return null;
 
   const cacheKey = `${placeName}|${regionBias ?? ""}`;
   if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey)!;
 
   try {
+    const query = regionBias ? `${placeName}, ${regionBias}` : placeName;
     const params = new URLSearchParams({
-      address: regionBias ? `${placeName}, ${regionBias}` : placeName,
-      key: GOOGLE_KEY,
-      region: "in",
+      access_token: MAPBOX_TOKEN,
+      limit: "1",
+      types: "place,locality,poi,address",
     });
+    // Bias results toward India for travel context
+    if (regionBias) {
+      params.set("country", "in");
+    }
 
     const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?${params}`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?${params}`
     );
     const data = await res.json();
 
-    if (data.status === "OK" && data.results?.[0]) {
-      const loc = data.results[0].geometry.location;
-      const coords: [number, number] = [loc.lng, loc.lat];
+    if (data.features?.[0]) {
+      const [lng, lat] = data.features[0].center;
+      const coords: [number, number] = [lng, lat];
       geocodeCache.set(cacheKey, coords);
       return coords;
     }
@@ -112,8 +108,36 @@ export async function geocodeDestination(
   return geocodePlace(destination);
 }
 
+export interface PlaceSuggestion {
+  name: string;
+  fullName: string;
+  coordinates: [number, number];
+}
+
+/** Autocomplete search for places via Google Places Autocomplete (proxied) */
+export async function searchPlaces(
+  query: string,
+  limit = 5
+): Promise<PlaceSuggestion[]> {
+  if (!query.trim()) return [];
+
+  try {
+    const params = new URLSearchParams({
+      input: query.trim(),
+      limit: String(limit),
+    });
+
+    const res = await fetch(`/api/places/autocomplete?${params}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Verify LLM-provided coordinates via Google Geocoding.
+ * Verify LLM-provided coordinates via Mapbox Geocoding.
  */
 export async function verifyDestinationCoords(
   name: string,
@@ -125,7 +149,7 @@ export async function verifyDestinationCoords(
 }
 
 /**
- * Enrich itinerary with accurate coordinates via Google Geocoding.
+ * Enrich itinerary with accurate coordinates via Mapbox Geocoding.
  */
 export async function enrichItineraryWithCoordinates(
   days: ItineraryDay[],

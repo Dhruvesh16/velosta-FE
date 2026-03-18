@@ -5,9 +5,12 @@ import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { usePlannerStore } from "@/lib/stores/planner-store";
+import { useMapStore } from "@/lib/stores/map-store";
+import type { MapMarker } from "@/lib/types/planner.types";
 import ProtectedRoute from "../utils/protected-routes";
 import CloudLandingScene from "@/components/velosta-ai/onboarding/cloud-landing";
 import BudgetSelection from "@/components/velosta-ai/onboarding/budget-selection";
+import PackageSelection from "@/components/velosta-ai/onboarding/package-selection";
 import TripInputs from "@/components/velosta-ai/onboarding/trip-inputs";
 import SpatialPlannerShell from "@/components/velosta-ai/spatial-planner/spatial-planner-shell";
 
@@ -25,18 +28,36 @@ const TRANSITION = {
 };
 
 export default function PlanPage() {
-  const { flowStep, selectedTier, selectedDestination } = useOnboardingStore();
-  const { setTripData } = usePlannerStore();
+  const { flowStep, selectedTier, selectedDestination, selectedPackage } = useOnboardingStore();
+  const { setTripData, itineraryData } = usePlannerStore();
+  const { setMarkers, flyTo, markers } = useMapStore();
 
-  // Pre-seed trip data when entering planner — must be in useEffect, not render body
+  // Pre-seed trip data + map markers from package when entering planner
   useEffect(() => {
     if (flowStep === "planner" && selectedDestination) {
       setTripData({
         destination: selectedDestination,
         budget: selectedTier ? selectedTier.range : undefined,
       });
+
+      // If we have a selected package and no AI-generated markers yet, seed map from package
+      if (selectedPackage && markers.length === 0) {
+        // Fly to destination
+        flyTo(selectedPackage.coordinates, 13, 45);
+
+        // Convert package points to map markers
+        const pkgMarkers: MapMarker[] = selectedPackage.itineraryPoints.map((pt, idx) => ({
+          id: `pkg-${idx}`,
+          coordinates: pt.coordinates,
+          label: pt.name,
+          dayIndex: 0,
+          activityIndex: idx,
+          type: pt.type === "food" ? "meal" : pt.type === "stay" ? "stay" : "activity",
+        }));
+        setMarkers(pkgMarkers);
+      }
     }
-  }, [flowStep, selectedDestination, selectedTier, setTripData]);
+  }, [flowStep, selectedDestination, selectedTier, selectedPackage, setTripData, flyTo, setMarkers, markers.length, itineraryData]);
 
   return (
     <ProtectedRoute>
@@ -50,6 +71,12 @@ export default function PlanPage() {
         {flowStep === "budget" && (
           <motion.div key="budget" {...TRANSITION}>
             <BudgetSelection />
+          </motion.div>
+        )}
+
+        {flowStep === "packages" && (
+          <motion.div key="packages" {...TRANSITION}>
+            <PackageSelection />
           </motion.div>
         )}
 

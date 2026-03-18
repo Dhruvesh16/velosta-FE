@@ -1,7 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ArrowLeft, Clock, MapPin } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Clock, MapPin, Pencil, X } from "lucide-react";
 import {
   useOnboardingStore,
   BUDGET_TIERS,
@@ -79,6 +80,25 @@ function BudgetCard({
 
 export default function BudgetSelection() {
   const { selectTier, setFlowStep } = useOnboardingStore();
+  const [showCustom, setShowCustom] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
+
+  function handleCustomSubmit() {
+    const amount = parseInt(customAmount, 10);
+    if (!amount || amount < 500) return;
+    const customTier: BudgetTier = {
+      id: "custom",
+      label: "Custom Budget",
+      range: `₹${amount.toLocaleString("en-IN")}`,
+      min: Math.max(0, amount - 1000),
+      max: amount,
+      emoji: "🎯",
+      tagline: "Your exact budget",
+      examples: [],
+      duration: "Flexible",
+    };
+    selectTier(customTier);
+  }
 
   return (
     <div className="fixed inset-0 bg-[#FFF9F3] overflow-y-auto">
@@ -134,15 +154,69 @@ export default function BudgetSelection() {
           ))}
         </div>
 
-        {/* Custom budget hint */}
-        <motion.p
-          className="text-center text-xs text-gray-400 mt-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          Or just tell the AI your exact budget — it'll adapt to anything.
-        </motion.p>
+        {/* Custom budget option */}
+        <AnimatePresence mode="wait">
+          {!showCustom ? (
+            <motion.button
+              key="custom-trigger"
+              onClick={() => setShowCustom(true)}
+              className="w-full mt-6 py-4 rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50/50 hover:border-amber-400 hover:bg-amber-50 transition-all flex items-center justify-center gap-2 text-amber-600 font-medium text-sm active:scale-[0.98]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ delay: 0.6 }}
+            >
+              <Pencil size={14} />
+              Set your own budget
+            </motion.button>
+          ) : (
+            <motion.div
+              key="custom-input"
+              className="mt-6 bg-white rounded-2xl border border-amber-200 p-5 shadow-sm"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-gray-800 font-semibold text-sm flex items-center gap-2">
+                  <span className="text-lg">🎯</span> Custom Budget
+                </p>
+                <button
+                  onClick={() => setShowCustom(false)}
+                  className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1 relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">₹</span>
+                  <input
+                    type="number"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    min={500}
+                    className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 text-sm font-medium placeholder:text-gray-300 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                    onKeyDown={(e) => e.key === "Enter" && handleCustomSubmit()}
+                    autoFocus
+                  />
+                </div>
+                <motion.button
+                  onClick={handleCustomSubmit}
+                  disabled={!customAmount || parseInt(customAmount, 10) < 500}
+                  className="px-6 py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-40 transition-all"
+                  style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  Go →
+                </motion.button>
+              </div>
+              <p className="text-gray-400 text-[11px] mt-2">Min ₹500 per person</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

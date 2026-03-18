@@ -27,7 +27,7 @@ export default function ActivityRowItem({
     isDragging,
   } = useSortable({ id: row.id });
 
-  const { setActiveMarker } = useMapStore();
+  const { setActiveMarker, flyTo } = useMapStore();
   const { removeActivity } = usePlannerStore();
 
   const style = {
@@ -43,7 +43,12 @@ export default function ActivityRowItem({
       style={style}
       layout
       className="group flex items-start gap-2 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-amber-50 transition-colors"
-      onClick={() => setActiveMarker(row.id)}
+      onClick={() => {
+        setActiveMarker(row.id);
+        if (row.coordinates) {
+          flyTo(row.coordinates, 15, 50);
+        }
+      }}
       role="listitem"
     >
       {/* Drag handle */}

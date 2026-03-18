@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   MapPin,
-  Navigation,
   Calendar,
   Loader2,
   AlertCircle,
 } from "lucide-react";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
-import { fetchDiscoveredDestinations } from "@/lib/services/destination-service";
-import { geocodeDestination } from "@/lib/services/geocoding";
+import { geocodeDestination, searchPlaces } from "@/lib/services/geocoding";
+import type { PlaceSuggestion } from "@/lib/services/geocoding";
 import CloudOverlay from "./cloud-overlay";
 
 const DURATION_OPTIONS = [
@@ -34,135 +33,155 @@ export default function TripInputs() {
     duration,
     setDuration,
     setUserLocation,
-    setDiscoveredDestinations,
     setLoadingDestinations,
     setFlowStep,
     isLoadingDestinations,
+    setGeneratedItinerary,
+    setGeneratingItinerary,
+    selectDestination,
   } = useOnboardingStore();
   const { accessToken } = useUser();
 
   const [locationText, setLocationText] = useState("");
-  const [detectedLocation, setDetectedLocation] = useState<{
+  const [selectedPlace, setSelectedPlace] = useState<{
     name: string;
     coordinates: [number, number];
   } | null>(null);
-  const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Detect location via browser geolocation
-  const handleDetectLocation = useCallback(async () => {
-    console.log("handle detect location")
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser");
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (inputWrapperRef.current && !inputWrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Debounced autocomplete search
+  const handleLocationChange = useCallback((value: string) => {
+    setLocationText(value);
+    setSelectedPlace(null);
+    setError(null);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
-    setIsDetecting(true);
-    setError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        // Reverse geocode to get city name
-        try {
-          const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
-          const res = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${token}&types=place&limit=1`
-          );
-          const data = await res.json();
-          const cityName =
-            data.features?.[0]?.place_name?.split(",")[0] || "Your Location";
-
-          setDetectedLocation({
-            name: cityName,
-            coordinates: [longitude, latitude],
-          });
-          setLocationText(cityName);
-          setIsDetecting(false);
-        } catch {
-          setDetectedLocation({
-            name: "Your Location",
-            coordinates: [longitude, latitude],
-          });
-          setLocationText("Your Location");
-          setIsDetecting(false);
-        }
-      },
-      (err) => {
-        setIsDetecting(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          setError("Location access denied. Please type your city instead.");
-        } else {
-          setError("Could not detect location. Please type your city.");
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    debounceRef.current = setTimeout(async () => {
+      const results = await searchPlaces(value);
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
+    }, 300);
   }, []);
 
-  // Submit and discover destinations
-  const handleExplore = useCallback(async () => {
-    console.log("clicked")
+  const handleSelectSuggestion = useCallback((suggestion: PlaceSuggestion) => {
+    setLocationText(suggestion.name);
+    setSelectedPlace({
+      name: suggestion.name,
+      coordinates: suggestion.coordinates,
+    });
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setError(null);
+  }, []);
+
+  // Submit — generate itinerary directly for the chosen destination
+  const handlePlanTrip = useCallback(async () => {
     if (!selectedTier) return;
 
-    let location = detectedLocation;
+    let destination = selectedPlace;
 
-    // If user typed a city, geocode it
-    if (!location && locationText.trim()) {
+    // If user typed a place but didn't pick from autocomplete, geocode it
+    if (!destination && locationText.trim()) {
       const coords = await geocodeDestination(locationText.trim());
       if (coords) {
-        location = { name: locationText.trim(), coordinates: coords };
+        destination = { name: locationText.trim(), coordinates: coords };
       } else {
-        setError("Could not find that location. Try a different city name.");
+        setError("Could not find that place. Try a different name.");
         return;
       }
     }
 
-    if (!location) {
-      setError("Please enter your current city or detect your location.");
+    if (!destination) {
+      setError("Please enter a destination.");
       return;
     }
 
     setError(null);
-    setUserLocation(location);
+    setUserLocation(destination);
     setLoadingDestinations(true);
+    setGeneratingItinerary(true);
+
+    const days = duration ?? 3;
+    const budget = selectedTier.range ?? "";
+
+    let autoMsg = `Plan a ${days}-day trip to ${destination.name}`;
+    if (budget) autoMsg += ` with a budget of ${budget}`;
+    autoMsg += `. Generate the full itinerary now.`;
 
     try {
-      console.log("entred try")
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
 
-      const destinations = await fetchDiscoveredDestinations(
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
         {
-          budget: { min: selectedTier.min, max: selectedTier.max, label: selectedTier.range },
-          duration,
-          userLocation: location,
-        },
-        accessToken || ""
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            userSaid: autoMsg,
+            conversationHistory: [],
+            currentItinerary: null,
+            isModificationRequest: false,
+          }),
+        }
       );
-      console.log(destinations,"destinations from llm")
 
-      setDiscoveredDestinations(destinations);
+      clearTimeout(timeout);
+      const data = await res.json();
+
+      if (data.itineraryTable) {
+        setGeneratedItinerary(data);
+      } else {
+        setGeneratedItinerary(null);
+      }
+    } catch (err) {
+      console.error("[PLAN] error:", err);
+      setGeneratedItinerary(null);
+    } finally {
+      setGeneratingItinerary(false);
       setLoadingDestinations(false);
-      setFlowStep("explore");
-    } catch (err: any) {
-      console.error("Destination discovery failed:", err);
-      setLoadingDestinations(false);
-      setError(
-        err.message || "Failed to discover destinations. Please try again."
-      );
+      selectDestination(destination.name);
     }
   }, [
     selectedTier,
-    detectedLocation,
+    selectedPlace,
     locationText,
     duration,
     accessToken,
     setUserLocation,
     setLoadingDestinations,
-    setDiscoveredDestinations,
-    setFlowStep,
+    setGeneratedItinerary,
+    setGeneratingItinerary,
+    selectDestination,
   ]);
 
-  const isReady = (detectedLocation || locationText.trim()) && duration > 0;
+  const isReady = (selectedPlace || locationText.trim()) && duration > 0;
 
   return (
     <>
@@ -170,7 +189,7 @@ export default function TripInputs() {
       <CloudOverlay
         visible={isLoadingDestinations}
         mode="loading"
-        message="Discovering amazing places for you..."
+        message="Planning your trip..."
       />
 
       <div className="fixed inset-0 bg-[#FFF9F3] overflow-y-auto">
@@ -178,7 +197,7 @@ export default function TripInputs() {
         <div className="sticky top-0 z-20 bg-[#FFF9F3]/90 backdrop-blur-md border-b border-amber-100/60">
           <div className="max-w-lg mx-auto px-6 py-4 flex items-center gap-3">
             <button
-              onClick={() => setFlowStep("budget")}
+              onClick={() => setFlowStep("packages")}
               className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-all active:scale-95"
               aria-label="Go back"
             >
@@ -204,19 +223,18 @@ export default function TripInputs() {
             className="mb-8"
           >
             <h2 className="text-2xl md:text-3xl font-bold text-gray-800 leading-tight">
-              Where are you{" "}
+              Where do you want to{" "}
               <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
-                starting from
+                go
               </span>
               ?
             </h2>
             <p className="text-gray-400 text-sm mt-2">
-              We&apos;ll find the best destinations reachable within your budget
-              and time.
+              Tell us your destination and AI will plan the perfect itinerary.
             </p>
           </motion.div>
 
-          {/* Location Input */}
+          {/* Destination Input */}
           <motion.div
             className="mb-6"
             initial={{ opacity: 0, y: 16 }}
@@ -225,41 +243,57 @@ export default function TripInputs() {
           >
             <label className="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">
               <MapPin size={12} className="inline mr-1" />
-              Your Location
+              Destination
             </label>
-            <div className="flex gap-2">
+            <div className="relative" ref={inputWrapperRef}>
               <input
                 type="text"
                 value={locationText}
-                onChange={(e) => {
-                  setLocationText(e.target.value);
-                  setDetectedLocation(null);
-                  setError(null);
+                onChange={(e) => handleLocationChange(e.target.value)}
+                onFocus={() => {
+                  if (suggestions.length > 0) setShowSuggestions(true);
                 }}
-                placeholder="e.g. Bangalore, Mumbai, Delhi..."
-                className="flex-1 bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                placeholder="e.g. Jibhi, Manali, Goa..."
+                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
               />
-              <button
-                onClick={handleDetectLocation}
-                disabled={isDetecting}
-                className="shrink-0 px-4 py-3 bg-white border border-amber-200 rounded-xl text-amber-600 hover:bg-amber-50 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 text-sm font-medium"
-              >
-                {isDetecting ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Navigation size={14} />
+
+              {/* Autocomplete suggestions dropdown */}
+              <AnimatePresence>
+                {showSuggestions && suggestions.length > 0 && (
+                  <motion.ul
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-amber-200 rounded-xl shadow-lg overflow-hidden"
+                  >
+                    {suggestions.map((s, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectSuggestion(s)}
+                          className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors flex items-start gap-3 border-b border-gray-50 last:border-b-0"
+                        >
+                          <MapPin size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
+                            <p className="text-xs text-gray-400 truncate">{s.fullName}</p>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </motion.ul>
                 )}
-                <span className="hidden sm:inline">Detect</span>
-              </button>
+              </AnimatePresence>
             </div>
-            {detectedLocation && (
+            {selectedPlace && (
               <motion.p
                 className="text-xs text-green-600 mt-2 flex items-center gap-1"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
               >
-                <Navigation size={10} />
-                Detected: {detectedLocation.name}
+                <MapPin size={10} />
+                {selectedPlace.name}
               </motion.p>
             )}
           </motion.div>
@@ -306,7 +340,7 @@ export default function TripInputs() {
 
           {/* CTA */}
           <motion.button
-            onClick={handleExplore}
+            onClick={handlePlanTrip}
             disabled={!isReady || isLoadingDestinations}
             className="w-full py-4 rounded-xl text-white font-semibold text-base transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
@@ -330,11 +364,11 @@ export default function TripInputs() {
             {isLoadingDestinations ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 size={18} className="animate-spin" />
-                Discovering...
+                Planning...
               </span>
             ) : (
               <span>
-                Explore Destinations →
+                Plan My Trip →
               </span>
             )}
           </motion.button>
@@ -345,7 +379,7 @@ export default function TripInputs() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
           >
-            AI will find the best places reachable from your city
+            Velosta AI will create a personalized itinerary for you
           </motion.p>
         </div>
       </div>

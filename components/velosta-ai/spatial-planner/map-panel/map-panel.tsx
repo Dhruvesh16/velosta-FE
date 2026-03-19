@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
+import { Loader } from "@googlemaps/js-api-loader";
 import { motion } from "framer-motion";
 import { Sun, Moon } from "lucide-react";
 import { useMapStore } from "@/lib/stores/map-store";
@@ -30,18 +30,14 @@ function getDayColor(i: number): string {
 }
 
 // Singleton loader — prevents multiple loads
-let initDone = false;
 let mapsReady: Promise<void> | null = null;
 function loadGoogleMaps(): Promise<void> {
   if (mapsReady) return mapsReady;
-  if (!initDone) {
-    setOptions({ key: GOOGLE_KEY, v: "weekly" });
-    initDone = true;
-  }
+  const loader = new Loader({ apiKey: GOOGLE_KEY, version: "weekly" });
   // importLibrary("maps") bootstraps the API; "marker" loads AdvancedMarkerElement
   mapsReady = Promise.all([
-    importLibrary("maps"),
-    importLibrary("marker"),
+    loader.importLibrary("maps"),
+    loader.importLibrary("marker"),
   ]).then(() => {});
   return mapsReady;
 }

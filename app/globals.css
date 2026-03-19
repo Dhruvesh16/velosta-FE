@@ -1,3 +1,4 @@
+@import "mapbox-gl/dist/mapbox-gl.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -86,6 +87,30 @@
   --color-brand-contrast: oklch(0.985 0 0); /* white for text on brand */
   --color-cream: oklch(0.985 0.02 70); /* soft warm surface */
   --color-navy: oklch(0.26 0.05 260); /* deep navy */
+
+  /* ── Velosta AI Spatial Planner Design Tokens ── */
+  --sp-bg-deep:        #FFF9F3;
+  --sp-bg-mid:         #FFF5E6;
+  --sp-bg-card:        rgba(255, 255, 255, 0.85);
+  --sp-border:         rgba(251, 191, 36, 0.2);
+  --sp-border-bright:  rgba(251, 191, 36, 0.35);
+  --sp-glass:          rgba(255, 255, 255, 0.85);
+
+  --sp-blue:           #2563EB;
+  --sp-cyan:           #22D3EE;
+  --sp-purple:         #7C3AED;
+
+  --sp-score-good:     #16A34A;
+  --sp-score-warn:     #F59E0B;
+  --sp-score-risk:     #EA580C;
+  --sp-score-bad:      #DC2626;
+
+  --sp-fatigue-low:    #22D3EE;
+  --sp-fatigue-high:   #DC2626;
+
+  --sp-panel-chat:     380px;
+  --sp-panel-itinerary:420px;
+  --sp-radius-card:    1rem;
 }
 
 @theme inline {
@@ -165,3 +190,98 @@
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
 }
+
+/* ── Velosta AI Spatial Planner Utilities ── */
+.sp-glass {
+  background: var(--sp-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius-card);
+}
+
+.sp-glass-bright {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--sp-border-bright);
+  border-radius: var(--sp-radius-card);
+}
+
+.sp-bg {
+  background: linear-gradient(135deg, var(--sp-bg-deep) 0%, var(--sp-bg-mid) 100%);
+}
+
+.sp-text-gradient {
+  background: linear-gradient(90deg, var(--sp-cyan), var(--sp-blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sp-panel-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(217,119,6,0.15) transparent;
+}
+
+.sp-panel-scroll::-webkit-scrollbar { width: 4px; }
+.sp-panel-scroll::-webkit-scrollbar-track { background: transparent; }
+.sp-panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(217,119,6,0.15);
+  border-radius: 2px;
+}
+
+@keyframes sp-pulse-ring {
+  0%   { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.sp-marker-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: sp-pulse-ring 1.8s ease-out infinite;
+}
+
+@keyframes sp-draw-line {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.sp-route-draw {
+  animation: sp-draw-line 1.4s ease-out forwards;
+}
+
+/* Drag handle */
+.sp-drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.sp-drag-handle:active { cursor: grabbing; }
+
+/* Marker bounce-in animation — scale only, no translateY to avoid anchor displacement */
+@keyframes markerBounce {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  80%  { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.marker-bounce-in {
+  animation: markerBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: center center;
+}
+
+/* Marker hover scale */
+@keyframes markerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+  50%      { box-shadow: 0 0 0 8px transparent; }
+}
+
+.marker-hover-pulse:hover {
+  animation: markerPulse 1.5s ease-in-out infinite;
+}
+

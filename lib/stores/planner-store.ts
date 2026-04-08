@@ -64,15 +64,17 @@ function normalizeDay(day: RawItineraryDay, index: number): ItineraryDay {
       const rawRow = row as any;
       let coordinates: [number, number] | undefined = row.coordinates;
       if (!coordinates && rawRow.lat != null && rawRow.lng != null) {
-        const lat = Number(rawRow.lat);
-        const lng = Number(rawRow.lng);
-        // Basic range validation only — distance validation happens in enrichItineraryWithCoordinates
-        if (
-          !isNaN(lat) && !isNaN(lng) &&
-          lat >= 6 && lat <= 40 &&   // India lat range (rough)
-          lng >= 65 && lng <= 100    // India lng range (rough)
-        ) {
-          coordinates = [lng, lat]; // Mapbox uses [lng, lat]
+        let lat = Number(rawRow.lat);
+        let lng = Number(rawRow.lng);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          // Detect swapped lat/lng — if lat looks like an Indian longitude and vice versa, swap them
+          if (lat > 60 && lat <= 100 && lng >= 6 && lng <= 40) {
+            [lat, lng] = [lng, lat];
+          }
+          // Accept valid global coordinates (lat ±90, lng ±180)
+          if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            coordinates = [lng, lat]; // Mapbox uses [lng, lat]
+          }
         }
       }
 

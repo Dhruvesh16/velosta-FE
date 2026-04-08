@@ -329,6 +329,10 @@ interface OnboardingState {
   selectedDestination: string | null;
   userLocation: UserLocation | null;
   duration: number; // trip days
+  budgetAmount: number;
+  travelerType: string;
+  travelerCount: number;
+  interests: string[];
   discoveredDestinations: DiscoveredDestination[];
   isLoadingDestinations: boolean;
   /** Itinerary data generated before entering planner */
@@ -341,6 +345,10 @@ interface OnboardingState {
   selectDestination: (destination: string) => void;
   setUserLocation: (location: UserLocation) => void;
   setDuration: (days: number) => void;
+  setBudgetAmount: (amount: number) => void;
+  setTravelerType: (type: string) => void;
+  setTravelerCount: (count: number) => void;
+  setInterests: (interests: string[]) => void;
   setDiscoveredDestinations: (destinations: DiscoveredDestination[]) => void;
   setLoadingDestinations: (loading: boolean) => void;
   setGeneratedItinerary: (data: any | null) => void;
@@ -355,6 +363,10 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
   selectedDestination: null,
   userLocation: null,
   duration: 3,
+  budgetAmount: 5000,
+  travelerType: "solo",
+  travelerCount: 1,
+  interests: [],
   discoveredDestinations: [],
   isLoadingDestinations: false,
   generatedItinerary: null,
@@ -380,6 +392,11 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
 
   setDuration: (days) => set({ duration: days }),
 
+  setBudgetAmount: (amount) => set({ budgetAmount: amount }),
+  setTravelerType: (type) => set({ travelerType: type }),
+  setTravelerCount: (count) => set({ travelerCount: count }),
+  setInterests: (interests) => set({ interests }),
+
   setDiscoveredDestinations: (destinations) =>
     set({ discoveredDestinations: destinations }),
 
@@ -398,6 +415,10 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       selectedDestination: null,
       userLocation: null,
       duration: 3,
+      budgetAmount: 5000,
+      travelerType: "solo",
+      travelerCount: 1,
+      interests: [],
       discoveredDestinations: [],
       isLoadingDestinations: false,
       generatedItinerary: null,

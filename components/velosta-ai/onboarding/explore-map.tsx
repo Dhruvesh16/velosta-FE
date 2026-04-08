@@ -4,692 +4,822 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, MapPin, Clock, Star, X, Navigation, Utensils, Camera, Tent } from "lucide-react";
 import {
-  useOnboardingStore,
-  type DiscoveredDestination,
-  type TravelPackage,
-} from "@/lib/stores/onboarding-store";
+  ArrowLeft,
+  MapPin,
+  Clock,
+  Loader2,
+  X,
+  Star,
+  Layers,
+  FilterX,
+  User,
+  Heart,
+  Users,
+  Home,
+  ChevronRight,
+  IndianRupee,
+} from "lucide-react";
+import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
+import { DESTINATIONS, type Destination } from "@/lib/data/destinations";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
-/** Icon + color for itinerary point types */
-const POINT_STYLES: Record<string, { color: string; emoji: string }> = {
-  stay: { color: "#2563EB", emoji: "🏨" },
-  activity: { color: "#16A34A", emoji: "🎯" },
-  food: { color: "#EA580C", emoji: "🍜" },
-  scenic: { color: "#8B5CF6", emoji: "📸" },
-};
+const CATEGORY_OPTIONS = [
+  { id: "nature", label: "Nature", emoji: "🌿" },
+  { id: "culture", label: "Culture", emoji: "🏛️" },
+  { id: "adventure", label: "Adventure", emoji: "🏔️" },
+  { id: "relaxation", label: "Relaxation", emoji: "🧘" },
+  { id: "food", label: "Food", emoji: "🍜" },
+  { id: "nightlife", label: "Nightlife", emoji: "🌃" },
+  { id: "photography", label: "Photography", emoji: "📸" },
+  { id: "shopping", label: "Shopping", emoji: "🛍️" },
+  { id: "wellness", label: "Wellness", emoji: "💆" },
+];
 
-/** Pin color based on budget fit (for discovered destinations) */
-function getPinColor(fit: string): string {
-  switch (fit) {
-    case "perfect": return "#16A34A";
-    case "stretch": return "#F59E0B";
-    case "premium": return "#EA580C";
-    default: return "#D97706";
-  }
+const TRAVELER_TYPES = [
+  { id: "solo", label: "Solo", Icon: User },
+  { id: "couple", label: "Couple", Icon: Heart },
+  { id: "friends", label: "Friends", Icon: Users },
+  { id: "family", label: "Family", Icon: Home },
+] as const;
+
+const DURATION_OPTIONS = [2, 3, 5, 7, 10, 14];
+
+function getBudgetFit(dest: Destination, budget: number): "perfect" | "stretch" | "over" {
+  if (dest.costMax <= budget) return "perfect";
+  if (dest.costMin <= budget) return "stretch";
+  return "over";
 }
+
+function getBudgetColor(fit: "perfect" | "stretch" | "over") {
+  if (fit === "perfect") return "#22c55e";
+  if (fit === "stretch") return "#f59e0b";
+  return "#ef4444";
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 export default function ExploreMapView() {
   const {
-    selectedTier,
-    selectedPackage,
-    discoveredDestinations,
-    userLocation,
-    duration,
-    selectDestination,
     setFlowStep,
-    isLoadingDestinations,
+    budgetAmount,
+    duration: storeDuration,
+    travelerType: storeTravelerType,
+    interests: storeInterests,
+    userLocation,
     setGeneratedItinerary,
     setGeneratingItinerary,
-    isGeneratingItinerary,
+    selectDestination,
+    setUserLocation,
+    setDuration: setStoreDuration,
   } = useOnboardingStore();
   const { accessToken } = useUser();
 
+  // ── Filter state (seeded from store) ──
+  const [budget, setBudget] = useState(budgetAmount);
+  const [duration, setDuration] = useState(storeDuration);
+  const [tripType, setTripType] = useState(storeTravelerType);
+  const [categories, setCategories] = useState<string[]>([...storeInterests]);
+  const [isSatellite, setIsSatellite] = useState(false);
+
+  // ── UI state ──
+  const [hoveredDest, setHoveredDest] = useState<Destination | null>(null);
+  const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // ── Refs ──
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const popupRef = useRef<mapboxgl.Popup | null>(null);
 
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [activePoint, setActivePoint] = useState<TravelPackage["itineraryPoints"][number] | null>(null);
-  const [activePin, setActivePin] = useState<DiscoveredDestination | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  // ── Filter destinations ──
+  const filtered = useMemo(() => {
+    return DESTINATIONS.filter((d) => {
+      if (d.costMin > budget) return false;
+      if (d.durationMin > duration) return false;
+      if (tripType && !d.bestFor.includes(tripType)) return false;
+      if (categories.length > 0 && !categories.some((c) => d.categories.includes(c)))
+        return false;
+      return true;
+    });
+  }, [budget, duration, tripType, categories]);
 
-  // Determine if we're in package mode (from packages step) or discover mode (from trip-inputs)
-  const isPackageMode = !!selectedPackage;
+  const sliderPct = ((budget - 1000) / (50000 - 1000)) * 100;
 
-  // Fetch road-snapped route geometry from Mapbox Directions API
-  const fetchRouteGeometry = useCallback(async (coords: [number, number][]) => {
-    if (coords.length < 2) return null;
-    try {
-      const coordStr = coords.map((c) => `${c[0]},${c[1]}`).join(";");
-      const res = await fetch(`/api/directions?coords=${encodeURIComponent(coordStr)}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data.geometry ?? null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Center of the map
-  const center = useMemo((): [number, number] => {
-    if (selectedPackage) return selectedPackage.coordinates;
-    if (userLocation) return userLocation.coordinates;
-    return [78.9629, 20.5937]; // India center
-  }, [selectedPackage, userLocation]);
-
-  // ── Initialize Mapbox map ────────────────────────────────────────────────
+  // ── Initialize map ──
   useEffect(() => {
     if (!mapContainerRef.current || !MAPBOX_TOKEN) return;
-
     mapboxgl.accessToken = MAPBOX_TOKEN;
-
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: "mapbox://styles/mapbox/outdoors-v12",
-      center: center,
-      zoom: selectedPackage ? 10 : 5,
-      pitch: 45,
-      bearing: -10,
-      antialias: true,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: userLocation?.coordinates ?? [78.9629, 20.5937],
+      zoom: userLocation ? 6 : 4.5,
+      pitch: 20,
+      attributionControl: false,
     });
-
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
-
+    map.addControl(new mapboxgl.NavigationControl(), "bottom-right");
     map.on("load", () => {
-      // Enable 3D terrain
-      map.addSource("mapbox-dem", {
-        type: "raster-dem",
-        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-        tileSize: 512,
-        maxzoom: 14,
-      });
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
-
-      // Sky layer
-      map.addLayer({
-        id: "sky",
-        type: "sky",
-        paint: {
-          "sky-type": "atmosphere",
-          "sky-atmosphere-sun": [0.0, 0.0],
-          "sky-atmosphere-sun-intensity": 15,
-        },
-      });
-
-      // 3D buildings
-      const layers = map.getStyle().layers;
-      const labelLayerId = layers?.find(
-        (l) => l.type === "symbol" && l.layout?.["text-field"]
-      )?.id;
-      map.addLayer(
-        {
-          id: "3d-buildings",
-          source: "composite",
-          "source-layer": "building",
-          filter: ["==", "extrude", "true"],
-          type: "fill-extrusion",
-          minzoom: 12,
-          paint: {
-            "fill-extrusion-color": "#f5e6d3",
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-base": ["get", "min_height"],
-            "fill-extrusion-opacity": 0.7,
-          },
-        },
-        labelLayerId
-      );
-
       mapRef.current = map;
+      map.resize();
       setMapLoaded(true);
-      // Ensure canvas fills container after layout settles
-      setTimeout(() => map.resize(), 100);
     });
-
     return () => {
-      markersRef.current.forEach((m) => m.remove());
-      markersRef.current = [];
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Add markers and route for selected package ───────────────────────────
+  // ── Toggle satellite ──
+  useEffect(() => {
+    if (!mapRef.current) return;
+    setMapLoaded(false);
+    const map = mapRef.current;
+    map.once("style.load", () => setMapLoaded(true));
+    map.setStyle(
+      isSatellite
+        ? "mapbox://styles/mapbox/satellite-streets-v12"
+        : "mapbox://styles/mapbox/streets-v12"
+    );
+  }, [isSatellite]);
+
+  // ── Update markers ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Clear existing markers
+    // Clear old markers + popup
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
 
-    // Clear old route layers
-    if (map.getLayer("route-line")) map.removeLayer("route-line");
-    if (map.getLayer("route-border")) map.removeLayer("route-border");
-    if (map.getSource("route")) map.removeSource("route");
+    const bounds = new mapboxgl.LngLatBounds();
 
-    if (isPackageMode && selectedPackage) {
-      const points = selectedPackage.itineraryPoints;
-      const bounds = new mapboxgl.LngLatBounds();
+    filtered.forEach((dest) => {
+      const fit = getBudgetFit(dest, budget);
+      const color = getBudgetColor(fit);
 
-      // Add numbered markers for each itinerary point
-      points.forEach((pt, idx) => {
-        const style = POINT_STYLES[pt.type] || POINT_STYLES.activity;
+      const el = document.createElement("div");
+      el.style.cssText = "cursor:pointer;z-index:1;";
 
-        const el = document.createElement("div");
-        el.className = "mapbox-itinerary-marker";
-        el.style.cssText = `cursor: pointer;`;
+      const markerBubble = document.createElement("div");
+      markerBubble.style.cssText = `
+        width:42px;height:42px;border-radius:50%;
+        background:${color};color:white;display:flex;
+        align-items:center;justify-content:center;
+        font-size:18px;border:3px solid white;
+        box-shadow:0 2px 8px rgba(0,0,0,0.3);
+        transition:transform 0.2s;
+      `;
+      markerBubble.textContent = dest.emoji;
+      el.appendChild(markerBubble);
 
-        const inner = document.createElement("div");
-        inner.style.cssText = `
-          width: 36px; height: 36px;
-          background: ${style.color};
-          border: 3px solid white;
-          border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 14px; font-weight: 700; color: white;
-          box-shadow: 0 3px 10px rgba(0,0,0,0.25), 0 0 0 2px ${style.color}40;
-          cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        `;
-        inner.textContent = String(idx + 1);
-        el.appendChild(inner);
-        el.addEventListener("mouseenter", () => {
-          inner.style.transform = "scale(1.2)";
-          inner.style.boxShadow = `0 4px 14px rgba(0,0,0,0.3), 0 0 0 3px ${style.color}50`;
-        });
-        el.addEventListener("mouseleave", () => {
-          inner.style.transform = "scale(1)";
-          inner.style.boxShadow = `0 3px 10px rgba(0,0,0,0.25), 0 0 0 2px ${style.color}40`;
-        });
-        el.addEventListener("click", () => {
-          setActivePoint(pt);
-          map.flyTo({ center: pt.coordinates, zoom: 15, pitch: 50, duration: 1000 });
-        });
+      el.addEventListener("mouseenter", () => {
+        markerBubble.style.transform = "scale(1.3)";
+        el.style.zIndex = "10";
+        setHoveredDest(dest);
 
-        const marker = new mapboxgl.Marker({ element: el, draggable: false })
-          .setLngLat(pt.coordinates)
-          .addTo(map);
+        const popup = new mapboxgl.Popup({
+          offset: 28,
+          closeButton: false,
+          closeOnClick: false,
+          maxWidth: "260px",
+        })
+          .setHTML(
+            `<div style="font-family:system-ui;padding:4px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:20px">${dest.emoji}</span>
+            <div>
+              <div style="font-weight:700;font-size:14px">${dest.name}</div>
+              <div style="font-size:11px;color:#666">${dest.state}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;font-size:11px;color:#555;margin-bottom:4px">
+            <span>⏱ ${dest.durationMin}–${dest.durationMax}d</span>
+            <span>💰 ₹${(dest.costMin / 1000).toFixed(0)}K–₹${(dest.costMax / 1000).toFixed(0)}K</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${dest.highlights
+              .slice(0, 3)
+              .map(
+                (h) =>
+                  `<span style="background:#f3f4f6;padding:2px 6px;border-radius:8px;font-size:10px">${h}</span>`
+              )
+              .join("")}
+          </div>
+          <div style="margin-top:4px">
+            <span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600;color:white;background:${color}">
+              ${fit === "perfect" ? "✓ Within budget" : fit === "stretch" ? "~ Stretch" : "✗ Over budget"}
+            </span>
+          </div>
+        </div>`
+          )
+          .setLngLat(dest.coordinates);
 
-        markersRef.current.push(marker);
-        bounds.extend(pt.coordinates);
+        if (popupRef.current) popupRef.current.remove();
+        popup.addTo(map);
+        popupRef.current = popup;
       });
 
-      // Draw route line connecting all points (road-snapped)
-      const routeCoords = points.map((p) => p.coordinates);
+      el.addEventListener("mouseleave", () => {
+        markerBubble.style.transform = "scale(1)";
+        el.style.zIndex = "1";
+        setHoveredDest(null);
+        if (popupRef.current) {
+          popupRef.current.remove();
+          popupRef.current = null;
+        }
+      });
 
-      const addRouteToMap = (geometry: { type: string; coordinates: [number, number][] }) => {
-        if (map.getSource("route")) {
-          (map.getSource("route") as mapboxgl.GeoJSONSource).setData({
-            type: "Feature",
-            properties: {},
-            geometry,
-          });
-        } else {
-          map.addSource("route", {
-            type: "geojson",
-            data: {
-              type: "Feature",
-              properties: {},
-              geometry,
-            },
-          });
+      el.addEventListener("click", () => {
+        setSelectedDest(dest);
+      });
 
-          // Dark border layer underneath
-          map.addLayer({
-            id: "route-border",
-            type: "line",
-            source: "route",
-            layout: { "line-join": "round", "line-cap": "round" },
-            paint: {
-              "line-color": "#7a4d00",
-              "line-width": 8,
-              "line-opacity": 0.6,
-            },
-          });
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat(dest.coordinates)
+        .addTo(map);
+      markersRef.current.push(marker);
+      bounds.extend(dest.coordinates);
+    });
 
-          // Main colored route line on top
-          map.addLayer({
-            id: "route-line",
-            type: "line",
-            source: "route",
-            layout: { "line-join": "round", "line-cap": "round" },
-            paint: {
-              "line-color": "#f59e0b",
-              "line-width": 5,
-              "line-opacity": 0.95,
-            },
+    if (filtered.length === 1) {
+      map.flyTo({ center: filtered[0].coordinates, zoom: 8, duration: 1000 });
+    } else if (filtered.length > 1) {
+      try {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        if (
+          Number.isFinite(ne.lng) &&
+          Number.isFinite(ne.lat) &&
+          Number.isFinite(sw.lng) &&
+          Number.isFinite(sw.lat)
+        ) {
+          map.fitBounds(bounds, {
+            padding: { top: 80, bottom: 80, left: 350, right: 330 },
+            maxZoom: 8,
+            duration: 1000,
           });
         }
-      };
+      } catch {
+        // bounds empty or invalid — skip
+      }
+    }
+  }, [filtered, budget, mapLoaded]);
 
-      // Straight-line fallback first
-      addRouteToMap({ type: "LineString", coordinates: routeCoords });
+  // ── Build Itinerary ──
+  const handleBuildItinerary = useCallback(
+    async (dest: Destination) => {
+      setIsGenerating(true);
+      setGeneratingItinerary(true);
 
-      // Then upgrade to road-following geometry
-      fetchRouteGeometry(routeCoords).then((geometry) => {
-        if (geometry && mapRef.current) {
-          const src = mapRef.current.getSource("route") as mapboxgl.GeoJSONSource | undefined;
-          if (src) {
-            src.setData({ type: "Feature", properties: {}, geometry });
+      const interestStr =
+        categories.length > 0 ? ` focusing on ${categories.join(", ")}` : "";
+      const autoMsg = `Plan a ${duration}-day trip to ${dest.name}, ${dest.state} with a budget of ₹${budget.toLocaleString("en-IN")} for ${tripType} traveler(s)${interestStr}. Generate the full itinerary now.`;
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort("Request timed out"), 45000);
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              userSaid: autoMsg,
+              conversationHistory: [],
+              currentItinerary: null,
+              isModificationRequest: false,
+            }),
           }
-        }
-      });
-
-      // Fit bounds with padding
-      if (points.length > 1) {
-        map.fitBounds(bounds, { padding: { top: 120, bottom: 250, left: 60, right: 60 }, duration: 1500 });
-      } else if (points.length === 1) {
-        map.flyTo({ center: points[0].coordinates, zoom: 13, pitch: 50, duration: 1500 });
-      }
-    } else if (!isPackageMode && discoveredDestinations.length > 0) {
-      // Discover mode — show destination pins
-      const bounds = new mapboxgl.LngLatBounds();
-
-      discoveredDestinations.forEach((dest) => {
-        const color = getPinColor(dest.budgetFit);
-        const el = document.createElement("div");
-        el.style.cssText = `cursor: pointer;`;
-
-        const inner = document.createElement("div");
-        inner.style.cssText = `
-          width: 28px; height: 28px;
-          background: ${color};
-          border: 3px solid white;
-          border-radius: 50%;
-          box-shadow: 0 3px 10px rgba(0,0,0,0.25), 0 0 0 2px ${color}40;
-          cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        `;
-        el.appendChild(inner);
-        el.addEventListener("mouseenter", () => { inner.style.transform = "scale(1.2)"; inner.style.boxShadow = `0 4px 14px rgba(0,0,0,0.3), 0 0 0 3px ${color}50`; });
-        el.addEventListener("mouseleave", () => { inner.style.transform = "scale(1)"; inner.style.boxShadow = `0 3px 10px rgba(0,0,0,0.25), 0 0 0 2px ${color}40`; });
-        el.addEventListener("click", () => {
-          setActivePin(dest);
-          map.flyTo({ center: [dest.coordinates[0], dest.coordinates[1]], zoom: 12, pitch: 45, duration: 1000 });
-        });
-
-        const marker = new mapboxgl.Marker({ element: el, draggable: false })
-          .setLngLat(dest.coordinates)
-          .addTo(map);
-
-        markersRef.current.push(marker);
-        bounds.extend(dest.coordinates);
-      });
-
-      // User location marker
-      if (userLocation) {
-        const userEl = document.createElement("div");
-        userEl.style.cssText = `
-          width: 20px; height: 20px;
-          background: #2563EB;
-          border: 3px solid white;
-          border-radius: 50%;
-          box-shadow: 0 0 0 6px rgba(37,99,235,0.2), 0 2px 8px rgba(0,0,0,0.3);
-        `;
-        const userMarker = new mapboxgl.Marker({ element: userEl })
-          .setLngLat(userLocation.coordinates)
-          .addTo(map);
-        markersRef.current.push(userMarker);
-        bounds.extend(userLocation.coordinates);
-      }
-
-      map.fitBounds(bounds, { padding: 80, duration: 1500 });
-    }
-  }, [mapLoaded, selectedPackage, isPackageMode, discoveredDestinations, userLocation]);
-
-  // ── Plan trip with AI (for discover mode) ────────────────────────────────
-  async function handlePlanTrip() {
-    const destName = activePin?.name ?? selectedPackage?.destination;
-    if (!destName) return;
-
-    setIsTransitioning(true);
-    setGeneratingItinerary(true);
-
-    const days = selectedPackage?.days ?? duration ?? 3;
-    const budget = selectedTier?.range ?? "";
-
-    let autoMsg = `Plan a ${days}-day trip to ${destName}`;
-    if (budget) autoMsg += ` with a budget of ${budget}`;
-    autoMsg += `. Generate the full itinerary now.`;
-
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            userSaid: autoMsg,
-            conversationHistory: [],
-            currentItinerary: null,
-            isModificationRequest: false,
-          }),
-        }
-      );
-
-      clearTimeout(timeout);
-      const data = await res.json();
-
-      if (data.itineraryTable) {
-        setGeneratedItinerary(data);
-      } else {
+        );
+        clearTimeout(timeout);
+        const data = await res.json();
+        setGeneratedItinerary(data.itineraryTable ? data : null);
+      } catch (err) {
+        console.error("[PLAN] error:", err);
         setGeneratedItinerary(null);
+      } finally {
+        setIsGenerating(false);
+        setGeneratingItinerary(false);
+        setUserLocation({ name: dest.name, coordinates: dest.coordinates });
+        setStoreDuration(duration);
+        selectDestination(dest.name);
       }
-    } catch (err) {
-      console.error("[PLAN] error:", err);
-      setGeneratedItinerary(null);
-    } finally {
-      setGeneratingItinerary(false);
-      selectDestination(destName);
-    }
-  }
+    },
+    [
+      budget,
+      duration,
+      tripType,
+      categories,
+      accessToken,
+      setGeneratedItinerary,
+      setGeneratingItinerary,
+      setUserLocation,
+      setStoreDuration,
+      selectDestination,
+    ]
+  );
 
-  // ── No token fallback ────────────────────────────────────────────────────
+  const clearFilters = () => {
+    setBudget(budgetAmount);
+    setDuration(storeDuration);
+    setTripType(storeTravelerType);
+    setCategories([...storeInterests]);
+  };
+
+  const toggleCategory = (id: string) => {
+    setCategories((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
+  };
+
   if (!MAPBOX_TOKEN) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#FFF9F3]">
-        <div className="bg-white border border-amber-200 rounded-2xl p-8 max-w-sm mx-4 text-center shadow-lg">
-          <p className="text-3xl mb-3">🗺️</p>
-          <h3 className="text-gray-800 font-semibold text-sm mb-2">Map not configured</h3>
-          <p className="text-gray-400 text-xs">
-            Add <code className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]">NEXT_PUBLIC_MAPBOX_TOKEN</code> to enable the map.
-          </p>
-        </div>
+      <div className="fixed inset-0 flex items-center justify-center bg-gray-100">
+        <p className="text-red-500">Mapbox token missing.</p>
       </div>
     );
   }
 
+  // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 bg-[#FFF9F3]">
+    <>
       {/* Loading overlay */}
-      {isTransitioning && (
-        <div className="absolute inset-0 z-40 bg-[#FFF9F3]/90 backdrop-blur-sm flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-10 h-10 border-3 border-amber-200 border-t-amber-500 rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-gray-700 text-sm font-medium">
-              {isGeneratingItinerary
-                ? `Creating itinerary for ${activePin?.name ?? selectedPackage?.destination ?? "your trip"}...`
-                : `Opening planner...`}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Mapbox Map */}
-      <div ref={mapContainerRef} className="absolute inset-0 z-0" style={{ width: '100%', height: '100%' }} />
-
-      {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 z-20">
-        <div className="flex items-center gap-3 px-4 md:px-6 py-4">
-          <button
-            onClick={() => setFlowStep(isPackageMode ? "packages" : "trip-inputs")}
-            className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700 shadow-sm active:scale-95 transition-all"
-            aria-label="Back"
+      <AnimatePresence>
+        {isGenerating && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <ArrowLeft size={15} />
-          </button>
-
-          {isPackageMode && selectedPackage ? (
-            <div className="bg-white/90 backdrop-blur-md border border-amber-200 rounded-full px-4 py-2 shadow-sm">
-              <p className="text-gray-800 font-semibold text-xs">
-                {selectedPackage.image} {selectedPackage.name}
-                <span className="text-amber-600 ml-2">{selectedPackage.costLabel}</span>
+            <div className="text-center">
+              <Loader2 size={40} className="animate-spin text-amber-500 mx-auto mb-4" />
+              <p className={`font-serif text-xl font-bold text-gray-800`}>
+                Building your itinerary...
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Our AI is crafting the perfect trip
               </p>
             </div>
-          ) : (
-            <>
-              <div className="bg-white/90 backdrop-blur-md border border-amber-200 rounded-full px-4 py-2 shadow-sm">
-                <p className="text-gray-800 font-semibold text-xs">
-                  {selectedTier?.emoji} {selectedTier?.label}
-                  <span className="text-amber-600 ml-2">{selectedTier?.range}</span>
-                </p>
-              </div>
-              {userLocation && (
-                <div className="bg-white/90 backdrop-blur-md border border-blue-200 rounded-full px-3 py-2 shadow-sm">
-                  <p className="text-blue-700 text-[11px] flex items-center gap-1">
-                    <Navigation size={10} />
-                    {userLocation.name}
-                  </p>
-                </div>
-              )}
-              <div className="ml-auto bg-white/90 backdrop-blur-md border border-gray-200 rounded-full px-3 py-2 shadow-sm">
-                <p className="text-gray-500 text-[11px]">
-                  <span className="font-semibold text-gray-700">{discoveredDestinations.length}</span> destinations
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Itinerary stops legend (package mode) */}
-      {isPackageMode && selectedPackage && (
-        <div className="absolute top-20 left-4 md:left-6 z-20">
-          <div className="bg-white/90 backdrop-blur-md border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm space-y-1.5">
-            <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">Stop Types</p>
-            {Object.entries(POINT_STYLES).map(([type, { color, emoji }]) => (
-              <div key={type} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full border-2 border-white" style={{ background: color, boxShadow: `0 0 4px ${color}40` }} />
-                <span className="text-[10px] text-gray-500 capitalize">{type}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Discover mode legend */}
-      {!isPackageMode && discoveredDestinations.length > 0 && (
-        <div className="absolute top-20 left-4 md:left-6 z-20">
-          <div className="bg-white/90 backdrop-blur-md border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm space-y-1.5">
-            <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">Budget Fit</p>
-            {[
-              { color: "#16A34A", label: "Perfect fit" },
-              { color: "#F59E0B", label: "Slight stretch" },
-              { color: "#EA580C", label: "Premium" },
-            ].map(({ color, label }) => (
-              <div key={color} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full border-2 border-white" style={{ background: color, boxShadow: `0 0 4px ${color}40` }} />
-                <span className="text-[10px] text-gray-500">{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Package mode — itinerary point detail + Plan CTA */}
-      <AnimatePresence>
-        {isPackageMode && selectedPackage && (
-          <motion.div
-            className="absolute bottom-0 left-0 right-0 z-30 px-4 pb-6 md:pb-8"
-            initial={{ y: 200, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 200, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          >
-            <div className="max-w-lg mx-auto bg-white border border-amber-100 rounded-2xl shadow-xl overflow-hidden">
-              {/* Header */}
-              <div className="px-5 py-4 bg-gradient-to-r from-amber-500 to-orange-500">
-                <h3 className="text-white font-bold text-lg leading-tight">
-                  {selectedPackage.destination}
-                </h3>
-                <p className="text-white/80 text-xs mt-0.5">
-                  {selectedPackage.days} days · {selectedPackage.itineraryPoints.length} stops · {selectedPackage.costLabel}
-                </p>
-              </div>
-
-              {/* Stops list */}
-              <div className="px-5 py-4 max-h-40 overflow-y-auto space-y-2">
-                {selectedPackage.itineraryPoints.map((pt, idx) => {
-                  const style = POINT_STYLES[pt.type] || POINT_STYLES.activity;
-                  const isActive = activePoint?.name === pt.name;
-                  return (
-                    <button
-                      key={pt.name}
-                      onClick={() => {
-                        setActivePoint(pt);
-                        mapRef.current?.flyTo({ center: pt.coordinates, zoom: 15, pitch: 50, duration: 800 });
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all ${
-                        isActive ? "bg-amber-50 border border-amber-200" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <div
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
-                        style={{ background: style.color }}
-                      >
-                        {idx + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-gray-800 font-medium text-sm truncate">{pt.name}</p>
-                        <p className="text-gray-400 text-[10px] capitalize">{pt.type}</p>
-                      </div>
-                      <span className="text-sm">{style.emoji}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* CTA */}
-              <div className="px-5 pb-5 pt-2">
-                <motion.button
-                  onClick={handlePlanTrip}
-                  disabled={isTransitioning}
-                  className="w-full py-3 rounded-xl text-white font-semibold text-sm active:scale-[0.98] transition-transform disabled:opacity-70"
-                  style={{
-                    background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                    boxShadow: "0 4px 16px rgba(245,158,11,0.3)",
-                  }}
-                  whileHover={{ boxShadow: "0 6px 24px rgba(245,158,11,0.4)" }}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <MapPin size={15} />
-                    Plan this trip with AI
-                  </span>
-                </motion.button>
-              </div>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Discover mode — destination detail card */}
-      <AnimatePresence>
-        {!isPackageMode && activePin && (
-          <motion.div
-            className="absolute bottom-0 left-0 right-0 z-30 px-4 pb-6 md:pb-8"
-            initial={{ y: 200, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 200, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          >
-            <div className="max-w-lg mx-auto bg-white border border-amber-100 rounded-2xl shadow-xl overflow-hidden">
-              <div
-                className="relative px-5 py-4"
-                style={{ background: `linear-gradient(135deg, ${getPinColor(activePin.budgetFit)}, ${getPinColor(activePin.budgetFit)}cc)` }}
-              >
-                <button
-                  onClick={() => {
-                    setActivePin(null);
-                    mapRef.current?.flyTo({ center: center, zoom: 5, duration: 800 });
-                  }}
-                  className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-                  aria-label="Close"
-                >
-                  <X size={13} />
-                </button>
-                <h3 className="text-white font-bold text-lg leading-tight">{activePin.name}</h3>
-                <p className="text-white/70 text-xs mt-0.5">{activePin.state}</p>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-amber-50 rounded-xl px-3 py-2.5 text-center border border-amber-100">
-                    <p className="text-amber-700 font-bold text-sm">{activePin.estimatedCost}</p>
-                    <p className="text-gray-400 text-[10px] mt-0.5">est. cost</p>
-                  </div>
-                  <div className="bg-orange-50 rounded-xl px-3 py-2.5 text-center border border-orange-100">
-                    <p className="text-orange-700 font-bold text-sm flex items-center justify-center gap-1">
-                      <Clock size={11} />{activePin.recommendedDays}d
-                    </p>
-                    <p className="text-gray-400 text-[10px] mt-0.5">ideal</p>
-                  </div>
-                  <div className="bg-green-50 rounded-xl px-3 py-2.5 text-center border border-green-100">
-                    <p className="text-green-700 font-bold text-sm flex items-center justify-center gap-1">
-                      <Star size={11} />{activePin.season}
-                    </p>
-                    <p className="text-gray-400 text-[10px] mt-0.5">best season</p>
-                  </div>
-                </div>
-                <p className="text-gray-600 text-sm leading-relaxed">{activePin.tagline}</p>
-                <div className="flex flex-wrap gap-2">
-                  {activePin.highlights.map((h: string) => (
-                    <span key={h} className="bg-gray-50 border border-gray-100 text-gray-600 text-[11px] px-2.5 py-1 rounded-full">{h}</span>
-                  ))}
-                </div>
-                <motion.button
-                  onClick={handlePlanTrip}
-                  disabled={isTransitioning}
-                  className="w-full py-3 rounded-xl text-white font-semibold text-sm active:scale-[0.98] transition-transform disabled:opacity-70"
-                  style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)", boxShadow: "0 4px 16px rgba(245,158,11,0.3)" }}
-                  whileHover={{ boxShadow: "0 6px 24px rgba(245,158,11,0.4)" }}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <MapPin size={15} />Plan this trip with AI
-                  </span>
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Hint */}
-      <AnimatePresence>
-        {!isPackageMode && !activePin && discoveredDestinations.length > 0 && (
-          <motion.div
-            className="absolute bottom-6 left-0 right-0 z-20 flex justify-center pointer-events-none"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ delay: 1, duration: 0.6 }}
-          >
-            <div className="bg-white/90 backdrop-blur-md border border-amber-100 rounded-full px-4 py-2 shadow-sm">
-              <p className="text-gray-500 text-xs">Click a pin to explore</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Empty state (discover mode only) */}
-      {!isPackageMode && discoveredDestinations.length === 0 && !isLoadingDestinations && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#FFF9F3]/80 z-20">
-          <div className="bg-white border border-amber-200 rounded-2xl p-8 max-w-sm mx-4 text-center shadow-lg">
-            <p className="text-3xl mb-3">🗺️</p>
-            <h3 className="text-gray-800 font-semibold text-sm mb-2">No destinations found</h3>
-            <p className="text-gray-400 text-xs mb-4">Try adjusting your budget or duration.</p>
+      <div className="fixed inset-0 flex bg-gray-100">
+        {/* ── Left Sidebar: Filters ─────────────────────────────── */}
+        <motion.div
+          className="h-full bg-white/95 backdrop-blur-lg border-r border-gray-200 flex flex-col z-20 shadow-lg"
+          initial={{ x: -320 }}
+          animate={{ x: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          style={{ width: 300 }}
+        >
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
             <button
-              onClick={() => setFlowStep("trip-inputs")}
-              className="text-xs px-5 py-2.5 rounded-full font-medium bg-amber-500 text-white hover:bg-amber-600 transition-all active:scale-95"
+              onClick={() => setFlowStep("budget")}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              Adjust Inputs
+              <ArrowLeft size={18} className="text-gray-600" />
+            </button>
+            <div>
+              <p className="text-[10px] tracking-[0.2em] text-amber-600 font-semibold uppercase">
+                Velosta
+              </p>
+              <h2 className={`font-serif text-lg font-bold text-gray-800`}>
+                Explore
+              </h2>
+            </div>
+          </div>
+
+          {/* Scrollable filters */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+            {/* Budget */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                Budget
+              </label>
+              <div className="text-center mb-2">
+                <span className="text-xl font-bold text-gray-800">
+                  ₹{budget.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="relative w-full h-2 rounded-full">
+                <div className="absolute inset-0 bg-amber-100 rounded-full" />
+                <div
+                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-[width] duration-75"
+                  style={{ width: `${sliderPct}%` }}
+                />
+                <input
+                  type="range"
+                  min={1000}
+                  max={50000}
+                  step={500}
+                  value={budget}
+                  onChange={(e) => setBudget(Number(e.target.value))}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-500 rounded-full shadow border-2 border-white pointer-events-none transition-[left] duration-75"
+                  style={{ left: `calc(${sliderPct}% - 8px)` }}
+                />
+              </div>
+              <div className="flex justify-between text-[9px] text-gray-400 mt-1">
+                <span>₹1K</span>
+                <span>₹50K</span>
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                Duration
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {DURATION_OPTIONS.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDuration(d)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      duration === d
+                        ? "bg-amber-500 border-amber-500 text-white"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-amber-400"
+                    }`}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Trip Type */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                Trip Type
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {TRAVELER_TYPES.map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setTripType(tripType === id ? "" : id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      tripType === id
+                        ? "bg-amber-500 border-amber-500 text-white"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-amber-400"
+                    }`}
+                  >
+                    <Icon size={13} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                Category
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_OPTIONS.map(({ id, label, emoji }) => (
+                  <button
+                    key={id}
+                    onClick={() => toggleCategory(id)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      categories.includes(id)
+                        ? "bg-amber-500 border-amber-500 text-white"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-amber-400"
+                    }`}
+                  >
+                    <span>{emoji}</span>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Clear Filters */}
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-2 text-xs text-gray-400 hover:text-amber-600 transition-colors"
+            >
+              <FilterX size={13} />
+              Clear Filters
             </button>
           </div>
+
+          {/* Bottom: count + legend */}
+          <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/80">
+            <p className="text-xs font-semibold text-gray-600 mb-2">
+              Matching destinations:{" "}
+              <span className="text-amber-600">{filtered.length}</span>
+            </p>
+            <div className="flex items-center gap-3 text-[10px] text-gray-400">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Within budget
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Stretch
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Over
+              </span>
+            </div>
+            <button
+              onClick={() => setIsSatellite(!isSatellite)}
+              className="mt-2 flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-amber-600 transition-colors"
+            >
+              <Layers size={12} />
+              {isSatellite ? "Street View" : "Satellite View"}
+            </button>
+          </div>
+        </motion.div>
+
+        {/* ── Map ────────────────────────────────────────────────── */}
+        <div className="flex-1 relative min-w-0 min-h-0 z-10">
+          <div
+            ref={mapContainerRef}
+            className="absolute inset-0"
+            style={{ width: "100%", height: "100%" }}
+          />
         </div>
-      )}
-    </div>
+
+        {/* ── Right Sidebar: Destination List ────────────────────── */}
+        <motion.div
+          className="h-full bg-white/95 backdrop-blur-lg border-l border-gray-200 flex flex-col z-20 shadow-lg"
+          initial={{ x: 320 }}
+          animate={{ x: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          style={{ width: 300 }}
+        >
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className={`font-serif text-lg font-bold text-gray-800`}>
+              All Destinations
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {filtered.length} places match your filters
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="p-6 text-center">
+                <p className="text-4xl mb-3">🗺️</p>
+                <p className="text-sm font-medium text-gray-600">
+                  No destinations match
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Try adjusting your filters
+                </p>
+              </div>
+            ) : (
+              filtered.map((dest) => {
+                const fit = getBudgetFit(dest, budget);
+                const color = getBudgetColor(fit);
+                return (
+                  <button
+                    key={dest.id}
+                    onClick={() => setSelectedDest(dest)}
+                    className={`w-full text-left px-5 py-3.5 border-b border-gray-50 hover:bg-amber-50/50 transition-colors flex items-start gap-3 ${
+                      hoveredDest?.id === dest.id ? "bg-amber-50/50" : ""
+                    }`}
+                  >
+                    <span
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
+                      style={{
+                        background: `${color}15`,
+                        border: `2px solid ${color}40`,
+                      }}
+                    >
+                      {dest.emoji}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-800 truncate">
+                        {dest.name}
+                      </p>
+                      <p className="text-xs text-gray-400">{dest.state}</p>
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
+                        <span>
+                          ₹{(dest.costMin / 1000).toFixed(0)}K–₹
+                          {(dest.costMax / 1000).toFixed(0)}K
+                        </span>
+                        <span>·</span>
+                        <span>
+                          {dest.durationMin}–{dest.durationMax}d
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-gray-300 mt-1 shrink-0" />
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ── Detail Modal ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {selectedDest && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setSelectedDest(null)}
+            />
+
+            {/* Modal card */}
+            <motion.div
+              className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
+              initial={{ scale: 0.92, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, y: 20 }}
+            >
+              {/* Header with satellite image */}
+              <div className="relative rounded-t-2xl overflow-hidden">
+                {/* Satellite image from Mapbox Static API */}
+                <img
+                  src={`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${selectedDest.coordinates[0]},${selectedDest.coordinates[1]},11,0/500x250@2x?access_token=${MAPBOX_TOKEN}`}
+                  alt={selectedDest.name}
+                  className="w-full h-48 object-cover"
+                />
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+
+                <button
+                  onClick={() => setSelectedDest(null)}
+                  className="absolute top-4 right-4 p-1.5 rounded-full bg-black/30 hover:bg-black/50 transition-colors backdrop-blur-sm"
+                >
+                  <X size={16} className="text-white" />
+                </button>
+
+                {/* Emoji badge */}
+                <span className="absolute top-4 left-4 text-2xl bg-white/90 backdrop-blur-sm w-10 h-10 flex items-center justify-center rounded-xl shadow-sm">
+                  {selectedDest.emoji}
+                </span>
+
+                {/* Text overlay */}
+                <div className="absolute bottom-0 left-0 right-0 px-6 pb-5">
+                  <h2 className="font-serif text-2xl font-bold text-white drop-shadow-lg">
+                    {selectedDest.name}
+                  </h2>
+                  <p className="text-sm text-white/80 flex items-center gap-1 mt-0.5">
+                    <MapPin size={12} /> {selectedDest.state}
+                  </p>
+
+                  <div className="flex items-center gap-4 mt-3 text-sm text-white/90">
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} className="text-amber-300" />
+                      {selectedDest.durationMin}–{selectedDest.durationMax} days
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <IndianRupee size={14} className="text-amber-300" />
+                      {selectedDest.costMin.toLocaleString("en-IN")}–
+                      {selectedDest.costMax.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  {/* Budget fit badge */}
+                  {(() => {
+                    const fit = getBudgetFit(selectedDest, budget);
+                    return (
+                      <span
+                        className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold text-white"
+                      style={{ background: getBudgetColor(fit) }}
+                    >
+                      {fit === "perfect"
+                        ? "✓ Within budget"
+                        : fit === "stretch"
+                          ? "~ Stretch"
+                          : "✗ Over budget"}
+                    </span>
+                  );
+                })()}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="px-6 py-5 space-y-5">
+                {/* Highlights */}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Highlights
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedDest.highlights.map((h, i) => (
+                      <span
+                        key={i}
+                        className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium"
+                      >
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top Places */}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Top Places
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedDest.topPlaces.map((p, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-3 p-2.5 bg-gray-50 rounded-xl"
+                      >
+                        <span className="text-lg shrink-0">{p.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800">
+                            {p.name}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {p.desc}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-semibold text-gray-600">
+                            {p.cost}
+                          </p>
+                          <p className="text-[10px] text-amber-500 flex items-center gap-0.5 justify-end">
+                            <Star size={10} fill="currentColor" /> {p.rating}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Best For */}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Best For
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedDest.bestFor.map((b) => (
+                      <span
+                        key={b}
+                        className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize"
+                      >
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={() => setSelectedDest(null)}
+                    className="px-4 py-3 rounded-xl text-gray-500 text-sm font-medium hover:bg-gray-100 transition-colors"
+                  >
+                    Other Options
+                  </button>
+                  <motion.button
+                    onClick={() => handleBuildItinerary(selectedDest)}
+                    disabled={isGenerating}
+                    className="flex-1 py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-60"
+                    style={{
+                      background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                      boxShadow: "0 8px 30px rgba(245,158,11,0.3)",
+                    }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    {isGenerating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 size={16} className="animate-spin" />{" "}
+                        Generating...
+                      </span>
+                    ) : (
+                      "Build Itinerary →"
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
-

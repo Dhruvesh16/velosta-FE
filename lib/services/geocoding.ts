@@ -60,14 +60,16 @@ const geocodeCache = new Map<string, [number, number] | null>();
 
 /**
  * Geocode via Mapbox Geocoding API.  Returns [lng, lat] or null.
+ * @param proximity - Optional [lng, lat] to bias results toward (critical for accuracy)
  */
 async function geocodePlace(
   placeName: string,
-  regionBias?: string
+  regionBias?: string,
+  proximity?: [number, number]
 ): Promise<[number, number] | null> {
   if (!MAPBOX_TOKEN) return null;
 
-  const cacheKey = `${placeName}|${regionBias ?? ""}`;
+  const cacheKey = `${placeName}|${regionBias ?? ""}|${proximity?.join(",") ?? ""}`;
   if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey)!;
 
   try {
@@ -75,11 +77,11 @@ async function geocodePlace(
     const params = new URLSearchParams({
       access_token: MAPBOX_TOKEN,
       limit: "1",
-      types: "place,locality,poi,address",
+      types: "poi,poi.landmark,address,place,locality,neighborhood",
     });
-    // Bias results toward India for travel context
-    if (regionBias) {
-      params.set("country", "in");
+    // Use proximity bias — this makes Mapbox return the closest match to the destination
+    if (proximity) {
+      params.set("proximity", `${proximity[0]},${proximity[1]}`);
     }
 
     const res = await fetch(
@@ -176,15 +178,15 @@ export async function enrichItineraryWithCoordinates(
         batch.map(async (row) => {
           if (shouldSkipGeocoding(row.activity)) return null;
 
-          // Validate existing LLM coordinates
-          if (row.coordinates && isWithinRange(row.coordinates, destCenter, 150)) {
-            return row.coordinates;
+          // Always geocode via Mapbox with proximity bias for best accuracy
+          const geocoded = await geocodePlace(row.activity, destination, destCenter);
+          if (geocoded && isWithinRange(geocoded, destCenter, 300)) {
+            return geocoded;
           }
 
-          // Geocode via Google
-          const geocoded = await geocodePlace(row.activity, destination);
-          if (geocoded && isWithinRange(geocoded, destCenter, 150)) {
-            return geocoded;
+          // Fall back to LLM coordinates if geocoding fails but they're in range
+          if (row.coordinates && isWithinRange(row.coordinates, destCenter, 300)) {
+            return row.coordinates;
           }
 
           return null;

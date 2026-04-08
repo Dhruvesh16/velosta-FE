@@ -1,14 +1,21 @@
 "use client";
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Map, FileDown, RotateCcw, MapPin, Utensils, Camera, Bed,
   Sun, Sunset, Moon, Coffee, Navigation, Copy, BedDouble, UtensilsCrossed,
+  Send, Sparkles, ChevronDown, ChevronUp, Loader2, ArrowLeft, Share2, Settings,
 } from "lucide-react";
 import { usePlannerStore } from "@/lib/stores/planner-store";
 import { useMapStore } from "@/lib/stores/map-store";
 import { useUIStore } from "@/lib/stores/ui-store";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
+import { useUser } from "@/app/utils/context";
+import {
+  geocodeDestination,
+  enrichItineraryWithCoordinates,
+  itineraryToMarkers,
+} from "@/lib/services/geocoding";
 import LocationCard from "./location-card";
 import SuggestionsPanel from "./suggestions-panel";
 import { exportItineraryPDF } from "@/lib/services/index";
@@ -83,8 +90,15 @@ export default function ItineraryPanel() {
     activeDay,
     setActiveDay,
   } = usePlannerStore();
-  const { activeMarkerId } = useMapStore();
-  const { setMobileTab } = useUIStore();
+  const { accessToken } = useUser();
+  const { activeMarkerId, setMarkers, flyTo } = useMapStore();
+
+  // ── AI Chat state ──
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiExpanded, setAiExpanded] = useState(false);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const aiInputRef = useRef<HTMLInputElement>(null);  const { setMobileTab } = useUIStore();
   const { selectedPackage } = useOnboardingStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -122,6 +136,89 @@ export default function ItineraryPanel() {
       .join("\n");
     navigator.clipboard.writeText(`Day ${currentDay.day}: ${currentDay.theme}\n\n${text}`);
   }
+
+  // ── AI Refine Handler ──
+  const handleAiSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      const text = aiInput.trim();
+      if (!text || aiLoading || !itineraryData) return;
+
+      setAiInput("");
+      setAiLoading(true);
+      setAiMessage(null);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              userSaid: text,
+              conversationHistory: [
+                { role: "assistant", content: `[Current itinerary for ${itineraryData.destination}]` },
+                { role: "user", content: text },
+              ],
+              currentItinerary: itineraryData,
+              isModificationRequest: true,
+            }),
+          }
+        );
+        clearTimeout(timeout);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Request failed");
+
+        if (data.isTextResponse) {
+          setAiMessage(data.message);
+        } else if (data.itineraryTable) {
+          // Sync updated itinerary
+          const extractedTripData = {
+            destination: data.destination,
+            budget: data.totalEstimatedCost || data.totalBudget,
+          };
+          usePlannerStore.getState().setItineraryData(data, extractedTripData);
+
+          const destCoords = await geocodeDestination(data.destination);
+          if (destCoords) flyTo(destCoords, 12, 0);
+
+          const currentItin = usePlannerStore.getState().itinerary;
+          const enriched = await enrichItineraryWithCoordinates(currentItin, data.destination);
+          usePlannerStore.setState(() => ({
+            itinerary: enriched,
+            spentBudget: enriched.reduce((sum, d) => {
+              const m = (d.dailyCost ?? "").replace(/[₹$€£,\s]/g, "").match(/[\d.]+/);
+              return sum + (m ? parseFloat(m[0]) : 0);
+            }, 0),
+          }));
+          setMarkers(itineraryToMarkers(enriched));
+
+          setAiMessage(data.summary || "Itinerary updated!");
+          if (data.modificationsApplied?.length > 0) {
+            setAiMessage(
+              `Changes applied:\n${data.modificationsApplied.map((m: string) => `• ${m}`).join("\n")}`
+            );
+          }
+        }
+      } catch (err: any) {
+        setAiMessage(
+          err.name === "AbortError"
+            ? "Request timed out. Try again."
+            : "Something went wrong. Please try again."
+        );
+      } finally {
+        setAiLoading(false);
+      }
+    },
+    [aiInput, aiLoading, itineraryData, accessToken, flyTo, setMarkers]
+  );
 
   // ── Empty state ──────────────────────────────────────────────────────────
   if (!itineraryData) {
@@ -217,9 +314,33 @@ export default function ItineraryPanel() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#FAFAFA]">
+      {/* ── Destination Header ────────────────────────────────── */}
+      <div className="shrink-0 px-4 py-3 bg-white border-b border-gray-100 flex items-center gap-3">
+        <button
+          onClick={() => useOnboardingStore.getState().setFlowStep("explore")}
+          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
+        >
+          <ArrowLeft size={16} className="text-gray-600" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-sm font-bold text-gray-900 truncate">{destination}</h1>
+          <p className="text-[10px] text-gray-400">
+            {destination} · {itinerary.length} {itinerary.length === 1 ? "day" : "days"}{tripData?.travelType ? ` · ${tripData.travelType}` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={handleExportPDF} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Export PDF">
+            <FileDown size={15} className="text-gray-500" />
+          </button>
+          <button onClick={handleCopyItinerary} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Share">
+            <Share2 size={15} className="text-gray-500" />
+          </button>
+        </div>
+      </div>
+
       {/* ── Day Tabs ──────────────────────────────────────────── */}
       <div className="shrink-0 border-b border-gray-100 bg-white">
-        <div className="flex items-center gap-1 px-3 py-2 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-0.5 px-3 py-2 overflow-x-auto scrollbar-none">
           {itinerary.map((day, i) => {
             const color = getDayColor(i);
             const isActive = i === activeDay;
@@ -227,17 +348,27 @@ export default function ItineraryPanel() {
               <button
                 key={day.id}
                 onClick={() => setActiveDay(i)}
-                className={`relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`relative flex flex-col items-center px-3.5 py-1.5 rounded-lg text-center whitespace-nowrap transition-all min-w-0 ${
                   isActive
                     ? "bg-gray-900 text-white shadow-sm"
                     : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                 }`}
               >
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: color }}
-                />
-                Day {day.day}
+                <span className="text-xs font-semibold">Day {day.day}</span>
+                {day.dailyCost && (
+                  <span className={`text-[9px] ${isActive ? "text-gray-300" : "text-gray-400"}`}>
+                    {day.dailyCost}
+                  </span>
+                )}
+                <span className={`text-[9px] ${isActive ? "text-gray-300" : "text-gray-400"}`}>
+                  {day.rows.length}
+                </span>
+                {isActive && (
+                  <span
+                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                )}
               </button>
             );
           })}
@@ -246,51 +377,26 @@ export default function ItineraryPanel() {
 
       {/* ── Day Header ────────────────────────────────────────── */}
       {currentDay && (
-        <div className="shrink-0 px-4 pt-4 pb-3 bg-white border-b border-gray-100">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-base font-bold text-gray-900 leading-snug">
+        <div className="shrink-0 px-4 pt-3 pb-2 bg-white border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-gray-900 leading-snug">
                 {currentDay.theme || `Day ${currentDay.day}`}
               </h2>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <div className="flex items-center gap-2 mt-1">
                 {currentDay.dailyCost && (
                   <span
-                    className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                     style={{ background: `${dayColor}15`, color: dayColor }}
                   >
                     {currentDay.dailyCost}
                   </span>
                 )}
-                <span className="text-[11px] text-gray-400">
-                  {currentDay.rows.length} {currentDay.rows.length === 1 ? "stop" : "stops"}
+                <span className="text-[10px] text-gray-400">
+                  {currentDay.rows.length} {currentDay.rows.length === 1 ? "activity" : "activities"}
                 </span>
               </div>
             </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 mt-3">
-            <button
-              onClick={handleExportPDF}
-              className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
-            >
-              <FileDown size={12} />
-              Export PDF
-            </button>
-            <button
-              onClick={handleCopyItinerary}
-              className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
-            >
-              <Copy size={12} />
-              Copy
-            </button>
-            <button
-              onClick={() => setMobileTab("chat")}
-              className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all bg-gray-900 text-white hover:bg-gray-800"
-            >
-              <RotateCcw size={12} />
-              Modify
-            </button>
           </div>
         </div>
       )}
@@ -391,6 +497,87 @@ export default function ItineraryPanel() {
         </AnimatePresence>
 
         <div className="h-4" />
+      </div>
+
+      {/* ── AI Refine Input ─────────────────────────────────── */}
+      <div className="shrink-0 border-t border-gray-200 bg-white">
+        {/* Expandable toggle */}
+        <button
+          onClick={() => {
+            setAiExpanded((v) => !v);
+            if (!aiExpanded) setTimeout(() => aiInputRef.current?.focus(), 100);
+          }}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Sparkles size={13} className="text-amber-500" />
+            Ask AI to refine your trip
+          </span>
+          {aiExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+        </button>
+
+        <AnimatePresence>
+          {aiExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              {/* AI response message */}
+              {aiMessage && (
+                <div className="px-4 pb-2">
+                  <div className="text-[11px] text-gray-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 whitespace-pre-line">
+                    {aiMessage}
+                  </div>
+                </div>
+              )}
+
+              {/* Suggestion chips */}
+              <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+                {["Add a sunset viewpoint", "Swap restaurants", "Optimize my budget", "Suggest hidden gems"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setAiInput(s);
+                      aiInputRef.current?.focus();
+                    }}
+                    className="text-[10px] px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-amber-400 hover:text-amber-600 transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input */}
+              <form onSubmit={handleAiSubmit} className="px-4 pb-3 flex items-center gap-2">
+                <input
+                  ref={aiInputRef}
+                  type="text"
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAiSubmit(e);
+                    }
+                  }}
+                  placeholder={`e.g. Add a sunset viewpoint on Day ${(activeDay || 0) + 1}...`}
+                  className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-full px-3.5 py-2 text-xs text-gray-800 placeholder-gray-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                  disabled={aiLoading}
+                />
+                <button
+                  type="submit"
+                  disabled={aiLoading || !aiInput.trim()}
+                  className="shrink-0 w-8 h-8 rounded-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-sm"
+                >
+                  {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                </button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

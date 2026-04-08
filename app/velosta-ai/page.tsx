@@ -8,13 +8,19 @@ import { usePlannerStore } from "@/lib/stores/planner-store";
 import { useMapStore } from "@/lib/stores/map-store";
 import type { MapMarker } from "@/lib/types/planner.types";
 import ProtectedRoute from "../utils/protected-routes";
-import CloudLandingScene from "@/components/velosta-ai/onboarding/cloud-landing";
-import BudgetSelection from "@/components/velosta-ai/onboarding/budget-selection";
 import PackageSelection from "@/components/velosta-ai/onboarding/package-selection";
 import TripInputs from "@/components/velosta-ai/onboarding/trip-inputs";
 import SpatialPlannerShell from "@/components/velosta-ai/spatial-planner/spatial-planner-shell";
 
-// Map-heavy components — no SSR
+// Mapbox-dependent components — no SSR
+const CloudLandingScene = dynamic(
+  () => import("@/components/velosta-ai/onboarding/cloud-landing"),
+  { ssr: false }
+);
+const BudgetSelection = dynamic(
+  () => import("@/components/velosta-ai/onboarding/budget-selection"),
+  { ssr: false }
+);
 const ExploreMapView = dynamic(
   () => import("@/components/velosta-ai/onboarding/explore-map"),
   { ssr: false }

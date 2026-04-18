@@ -9,7 +9,7 @@ interface FatigueBarProps {
 
 const COLOR_MAP: Record<FatigueLabel, string> = {
   Light: "#16A34A",
-  Moderate: "#F59E0B",
+  Moderate: "#D97757",
   Intense: "#EA580C",
   Exhausting: "#DC2626",
 };

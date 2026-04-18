@@ -21,7 +21,7 @@ function PackageCard({
   return (
     <motion.button
       onClick={() => onSelect(pkg)}
-      className="group relative w-full text-left bg-white rounded-2xl border border-amber-100 overflow-hidden transition-colors hover:border-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+      className="group relative w-full text-left bg-white rounded-2xl border border-[#D97757]/20 overflow-hidden transition-colors hover:border-[#D97757]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D97757]/40"
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
@@ -41,10 +41,10 @@ function PackageCard({
           <p className="font-bold text-gray-800 text-base leading-tight truncate">
             {pkg.name}
           </p>
-          <p className="text-amber-600 font-semibold text-sm">{pkg.destination}</p>
+          <p className="text-[#2F6F73] font-semibold text-sm">{pkg.destination}</p>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-amber-700 font-bold text-lg">{pkg.costLabel}</p>
+          <p className="text-[#0B1F2A] font-bold text-lg">{pkg.costLabel}</p>
           <p className="text-gray-400 text-[10px]">per person</p>
         </div>
       </div>
@@ -67,7 +67,7 @@ function PackageCard({
           {pkg.highlights.map((h) => (
             <span
               key={h}
-              className="bg-amber-50 border border-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full"
+              className="bg-[#F5EFE6]/60 border border-[#D97757]/20 text-[#0B1F2A] text-[10px] px-2 py-0.5 rounded-full"
             >
               {h}
             </span>
@@ -76,7 +76,7 @@ function PackageCard({
       </div>
 
       {/* Arrow */}
-      <div className="absolute top-5 right-5 w-7 h-7 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-5 right-5 w-7 h-7 rounded-full bg-[#F5EFE6]/60 flex items-center justify-center text-[#D97757] opacity-0 group-hover:opacity-100 transition-opacity">
         <span className="text-sm">→</span>
       </div>
     </motion.button>
@@ -101,7 +101,7 @@ export default function PackageSelection() {
   return (
     <div className="fixed inset-0 bg-[#FFF9F3] overflow-y-auto">
       {/* Top bar */}
-      <div className="sticky top-0 z-20 bg-[#FFF9F3]/90 backdrop-blur-md border-b border-amber-100/60">
+      <div className="sticky top-0 z-20 bg-[#FFF9F3]/90 backdrop-blur-md border-b border-[#D97757]/15">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-3">
           <button
             onClick={() => setFlowStep("budget")}
@@ -130,7 +130,7 @@ export default function PackageSelection() {
           className="mb-8"
         >
           <h2 className="text-2xl md:text-3xl font-bold text-gray-800 leading-tight">
-            <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#D97757] to-orange-600 bg-clip-text text-transparent">
               Curated packages
             </span>{" "}
             for you
@@ -161,7 +161,7 @@ export default function PackageSelection() {
             </p>
             <button
               onClick={() => setFlowStep("budget")}
-              className="text-xs px-5 py-2.5 rounded-full font-medium bg-amber-500 text-white hover:bg-amber-600 transition-all active:scale-95"
+              className="text-xs px-5 py-2.5 rounded-full font-medium bg-[#D97757] text-white hover:bg-[#B85F44] transition-all active:scale-95"
             >
               Change Budget
             </button>
@@ -184,7 +184,7 @@ export default function PackageSelection() {
               useOnboardingStore.setState({ selectedPackage: null, selectedDestination: null });
               setFlowStep("trip-inputs");
             }}
-            className="text-xs px-5 py-2.5 rounded-full font-medium border border-amber-200 text-amber-600 hover:bg-amber-50 transition-all active:scale-95"
+            className="text-xs px-5 py-2.5 rounded-full font-medium border border-[#0B1F2A]/12 text-[#2F6F73] hover:bg-[#F5EFE6]/60 transition-all active:scale-95"
           >
             <Sparkles size={12} className="inline mr-1.5 -mt-0.5" />
             Build a custom trip with AI

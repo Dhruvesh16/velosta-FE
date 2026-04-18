@@ -37,14 +37,23 @@ export function UserProfileMenu({ isLoggedIn = true }) {
 
   return (
     <div ref={menuRef} className="relative">
-      {/* Avatar Button */}
+      {/* Name Pill Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="h-9 w-9 rounded-full bg-gradient-to-br from-[var(--color-brand-start)] to-[var(--color-brand)] flex items-center justify-center text-white font-semibold text-sm hover:shadow-md transition-shadow"
+        className="h-9 inline-flex items-center gap-2 rounded-full pl-1.5 pr-4 text-sm font-semibold text-[color:var(--color-brand-contrast)] shadow-sm hover:shadow-md transition-shadow"
+        style={{
+          background:
+            "linear-gradient(180deg, var(--color-brand-start), var(--color-brand))",
+        }}
         aria-label="User menu"
         aria-expanded={isOpen}
       >
-        {user.name ? user.name[0].toUpperCase() : "U"}
+        <span className="h-7 w-7 rounded-full bg-white/25 backdrop-blur flex items-center justify-center text-[color:var(--color-brand-contrast)] font-semibold text-xs">
+          {user.name ? user.name[0].toUpperCase() : "U"}
+        </span>
+        <span className="max-w-[140px] truncate">
+          {user.name ? user.name.split(" ")[0] : "Account"}
+        </span>
       </button>
 
       {/* Dropdown Menu */}

@@ -41,14 +41,14 @@ export default function SpatialPlannerShell() {
   return (
     <div
       className="fixed inset-0 flex flex-col overflow-hidden"
-      style={{ background: "#FAFAFA" }}
+      style={{ background: "#FBF8F3" }}
       aria-label="Velosta AI Spatial Planner"
     >
-      {/* ── Desktop: Itinerary (left) + Map (right) ──────────────── */}
+      {/* ── Desktop: Itinerary (left) + Map (right) ──────────── */}
       <div className="hidden lg:flex h-full w-full">
         {/* Itinerary panel — fixed width left side */}
         <motion.div
-          className="w-[340px] h-full border-r border-gray-200 bg-white shrink-0 flex flex-col overflow-hidden"
+          className="w-[340px] h-full border-r border-[#0B1F2A]/8 bg-[#FBF8F3] shrink-0 flex flex-col overflow-hidden"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
@@ -117,8 +117,8 @@ export default function SpatialPlannerShell() {
         <nav
           className="flex-shrink-0 flex items-center border-t"
           style={{
-            borderColor: "rgba(251,191,36,0.3)",
-            background: "rgba(255,249,243,0.97)",
+            borderColor: "rgba(11,31,42,0.08)",
+            background: "rgba(251,248,243,0.97)",
             backdropFilter: "blur(20px)",
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
           }}
@@ -140,14 +140,14 @@ export default function SpatialPlannerShell() {
                   <Icon
                     size={20}
                     style={{
-                      color: active ? "#D97706" : "rgba(107,114,128,0.7)",
+                      color: active ? "#D97757" : "rgba(11,31,42,0.5)",
                       transition: "color 0.2s",
                     }}
                   />
                   {showBadge && (
                     <span
                       className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
-                      style={{ background: "#D97706" }}
+                      style={{ background: "#D97757" }}
                       aria-hidden="true"
                     />
                   )}
@@ -155,7 +155,7 @@ export default function SpatialPlannerShell() {
                 <span
                   className="text-[10px] font-medium"
                   style={{
-                    color: active ? "#D97706" : "rgba(107,114,128,0.7)",
+                    color: active ? "#D97757" : "rgba(11,31,42,0.5)",
                     transition: "color 0.2s",
                   }}
                 >
@@ -164,7 +164,7 @@ export default function SpatialPlannerShell() {
                 {active && (
                   <motion.div
                     className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
-                    style={{ background: "#D97706" }}
+                    style={{ background: "#D97757" }}
                     layoutId="tab-indicator"
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />

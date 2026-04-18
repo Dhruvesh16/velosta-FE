@@ -65,11 +65,12 @@ const geocodeCache = new Map<string, [number, number] | null>();
 async function geocodePlace(
   placeName: string,
   regionBias?: string,
-  proximity?: [number, number]
+  proximity?: [number, number],
+  countryCode?: string
 ): Promise<[number, number] | null> {
   if (!MAPBOX_TOKEN) return null;
 
-  const cacheKey = `${placeName}|${regionBias ?? ""}|${proximity?.join(",") ?? ""}`;
+  const cacheKey = `${placeName}|${regionBias ?? ""}|${proximity?.join(",") ?? ""}|${countryCode ?? ""}`;
   if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey)!;
 
   try {
@@ -77,12 +78,18 @@ async function geocodePlace(
     const params = new URLSearchParams({
       access_token: MAPBOX_TOKEN,
       limit: "1",
+      // POIs first; landmarks; then administrative fallbacks. This biases
+      // results toward actual places-of-interest rather than generic locality
+      // matches that can land kilometres away from the intended attraction.
       types: "poi,poi.landmark,address,place,locality,neighborhood",
     });
-    // Use proximity bias — this makes Mapbox return the closest match to the destination
+    // Use proximity bias — Mapbox returns the closest match to the destination
     if (proximity) {
       params.set("proximity", `${proximity[0]},${proximity[1]}`);
     }
+    // Country bias — caller may pass an explicit ISO code (international
+    // destinations); otherwise we default to India for our primary market.
+    if (!params.has("country")) params.set("country", (countryCode ?? "in").toLowerCase());
 
     const res = await fetch(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?${params}`
@@ -144,9 +151,16 @@ export async function searchPlaces(
 export async function verifyDestinationCoords(
   name: string,
   state: string,
-  llmCoords: [number, number]
+  llmCoords: [number, number],
+  country = "India",
+  countryCode?: string
 ): Promise<[number, number]> {
-  const verified = await geocodePlace(`${name}, ${state}, India`);
+  const verified = await geocodePlace(
+    `${name}, ${state}, ${country}`,
+    undefined,
+    undefined,
+    countryCode
+  );
   return verified ?? llmCoords;
 }
 

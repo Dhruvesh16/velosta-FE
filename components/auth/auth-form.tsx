@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { authApi, persistSession, ApiError } from "@/lib/api";
 
 interface AuthFormProps {
   type: "signin" | "signup";
@@ -21,6 +22,8 @@ export function AuthForm({ type }: AuthFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams?.get("next") || "/";
 
   const [formData, setFormData] = useState({
     email: "",
@@ -81,39 +84,31 @@ export function AuthForm({ type }: AuthFormProps) {
     setLoading(true);
 
     try {
-      const endpoint =
+      const bundle =
         type === "signup"
-          ? `${process.env.NEXT_PUBLIC_URL}/api/auth/signup`
-          : `${process.env.NEXT_PUBLIC_URL}/api/auth/signin`;
-
-      const payload =
-        type === "signup"
-          ? {
+          ? await authApi.signup({
               name: formData.name,
               email: formData.email,
               password: formData.password,
-            }
-          : { email: formData.email, password: formData.password };
+            })
+          : await authApi.login({
+              email: formData.email,
+              password: formData.password,
+            });
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      persistSession(bundle);
+      setAccessToken(bundle.access_token);
+      setUser(bundle.user);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Something went wrong");
-
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("userData", JSON.stringify(data.user));
-      setAccessToken(data.accessToken);
-      setUser(data.user);
-
-      toast.success(data.message || "Authentication successful");
+      toast.success(
+        type === "nextPathnup" ? "Welcome to Velosta" : "Signed in successfully"
+      );
       router.push("/");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Request failed");
+      const msg =
+        err instanceof ApiError ? err.message : err?.message || "Request failed";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -123,30 +118,21 @@ export function AuthForm({ type }: AuthFormProps) {
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
       const token = credentialResponse.credential;
-      // return;
       if (!token) throw new Error("No Google token found");
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/auth/continue-with-google`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
-        }
-      );
+      const bundle = await authApi.google(token);
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      persistSession(bundle);
+      setAccessToken(bundle.access_token);
+      setUser(bundle.user);
 
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("userData", JSON.stringify(data.user));
-      setAccessToken(data.accessToken);
-      setUser(data.user);
       toast.success("Google sign-in successful");
-      router.push("/");
+      router.push(nextPath);
     } catch (err: any) {
       console.error("Google Sign-In Error:", err);
-      toast.error(err.message || "Google Sign-In failed");
+      const msg =
+        err instanceof ApiError ? err.message : err?.message || "Google Sign-In failed";
+      toast.error(msg);
     }
   };
 
@@ -160,24 +146,37 @@ export function AuthForm({ type }: AuthFormProps) {
       <form onSubmit={handleSubmit} className="space-y-5">
         {type === "signup" && (
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-sm font-medium">
+            <Label
+              htmlFor="name"
+              className="text-[12px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: "rgba(11,31,42,0.65)" }}
+            >
               Full Name
             </Label>
             <Input
               id="name"
               name="name"
               type="text"
-              placeholder="John Doe"
+              placeholder="Jane Doe"
               value={formData.name}
               onChange={handleChange}
-              className="h-11 rounded-lg border-gray-200"
+              className="h-12 rounded-xl text-[14px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-0"
+              style={{
+                backgroundColor: "#FBF8F3",
+                borderColor: "rgba(11,31,42,0.1)",
+                color: "#0B1F2A",
+              }}
               required
             />
           </div>
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium">
+          <Label
+            htmlFor="email"
+            className="text-[12px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: "rgba(11,31,42,0.65)" }}
+          >
             Email Address
           </Label>
           <Input
@@ -187,37 +186,82 @@ export function AuthForm({ type }: AuthFormProps) {
             placeholder="you@example.com"
             value={formData.email}
             onChange={handleChange}
-            className="h-11 rounded-lg border-gray-200"
+            className="h-12 rounded-xl text-[14px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-0"
+            style={{
+              backgroundColor: "#FBF8F3",
+              borderColor: "rgba(11,31,42,0.1)",
+              color: "#0B1F2A",
+            }}
             required
           />
         </div>
 
-        <div className="relative space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium">
-            Password
-          </Label>
-          <Input
-            id="password"
-            name="password"
-            type={showPassword ? "text" : "password"}
-            placeholder="••••••••"
-            value={formData.password}
-            onChange={handleChange}
-            className="h-11 rounded-lg border-gray-200 pr-10"
-            required
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 mt-2.5 -translate-y-1/2 text-black"
-          >
-            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-          </button>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label
+              htmlFor="password"
+              className="text-[12px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: "rgba(11,31,42,0.65)" }}
+            >
+              Password
+            </Label>
+            {type === "signin" && (
+              <a
+                href="#"
+                className="text-[11px] font-semibold transition-colors"
+                style={{ color: "#D97757" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "#B85F44")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "#D97757")
+                }
+              >
+                Forgot password?
+              </a>
+            )}
+          </div>
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={formData.password}
+              onChange={handleChange}
+              className="h-12 rounded-xl pr-12 text-[14px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-0"
+              style={{
+                backgroundColor: "#FBF8F3",
+                borderColor: "rgba(11,31,42,0.1)",
+                color: "#0B1F2A",
+              }}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 transition-colors"
+              style={{ color: "rgba(11,31,42,0.5)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.color = "#0B1F2A")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = "rgba(11,31,42,0.5)")
+              }
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
         {type === "signup" && (
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-sm font-medium">
+            <Label
+              htmlFor="confirmPassword"
+              className="text-[12px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: "rgba(11,31,42,0.65)" }}
+            >
               Confirm Password
             </Label>
             <Input
@@ -227,44 +271,60 @@ export function AuthForm({ type }: AuthFormProps) {
               placeholder="••••••••"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="h-11 rounded-lg border-gray-200"
+              className="h-12 rounded-xl text-[14px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-0"
+              style={{
+                backgroundColor: "#FBF8F3",
+                borderColor: "rgba(11,31,42,0.1)",
+                color: "#0B1F2A",
+              }}
               required
             />
-          </div>
-        )}
-
-        {type === "signin" && (
-          <div className="flex justify-end">
-            <a
-              href="#"
-              className="text-xs font-medium hover:underline"
-              style={{ color: "var(--color-brand)" }}
-            >
-              Forgot password?
-            </a>
           </div>
         )}
 
         <Button
           type="submit"
           disabled={loading}
-          className="w-full h-11 rounded-lg font-semibold text-white"
-          style={{ backgroundColor: "var(--color-brand)" }}
+          className="group mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-[14px] font-semibold text-white transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70"
+          style={{
+            backgroundColor: "#D97757",
+            boxShadow:
+              "0 14px 32px -10px rgba(217,119,87,0.55), 0 4px 10px -4px rgba(217,119,87,0.25)",
+          }}
         >
           {loading
             ? "Please wait..."
             : type === "signin"
             ? "Sign In"
             : "Create Account"}
+          {!loading && (
+            <svg
+              className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M2 8h12M9 3l5 5-5 5" />
+            </svg>
+          )}
         </Button>
 
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200"></div>
+            <div
+              className="w-full border-t"
+              style={{ borderColor: "rgba(11,31,42,0.12)" }}
+            />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-500">
+          <div className="relative flex justify-center">
+            <span
+              className="bg-white px-3 text-[10.5px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: "rgba(11,31,42,0.5)" }}
+            >
               Or continue with
             </span>
           </div>
@@ -276,17 +336,29 @@ export function AuthForm({ type }: AuthFormProps) {
             onSuccess={handleGoogleSuccess}
             onError={handleGoogleError}
             useOneTap
+            theme="outline"
+            size="large"
+            shape="pill"
           />
         </div>
 
-        <p className="text-center text-sm text-gray-600">
+        <p
+          className="mt-2 text-center text-[13px]"
+          style={{ color: "rgba(11,31,42,0.55)" }}
+        >
           {type === "signin" ? (
             <>
-              Don’t have an account?{" "}
+              Don&apos;t have an account?{" "}
               <a
                 href="/sign-up"
-                className="font-semibold hover:underline"
-                style={{ color: "var(--color-brand)" }}
+                className="font-semibold transition-colors"
+                style={{ color: "#D97757" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "#B85F44")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "#D97757")
+                }
               >
                 Sign up
               </a>
@@ -296,8 +368,14 @@ export function AuthForm({ type }: AuthFormProps) {
               Already have an account?{" "}
               <a
                 href="/sign-in"
-                className="font-semibold hover:underline"
-                style={{ color: "var(--color-brand)" }}
+                className="font-semibold transition-colors"
+                style={{ color: "#D97757" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "#B85F44")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "#D97757")
+                }
               >
                 Sign in
               </a>

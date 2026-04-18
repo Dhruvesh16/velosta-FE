@@ -88,7 +88,7 @@ export default function PlaceDetailCard({
           <div className="relative w-full h-44 bg-gray-100 shrink-0">
             {loading ? (
               <div className="w-full h-full flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-gray-200 border-t-amber-500 rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-gray-200 border-t-[#D97757] rounded-full animate-spin" />
               </div>
             ) : details?.photos.length ? (
               <>
@@ -130,8 +130,8 @@ export default function PlaceDetailCard({
                 )}
               </>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50">
-                <MapPin size={28} className="text-amber-300 mb-1" />
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#F5EFE6]/60 to-[#FBF8F3]">
+                <MapPin size={28} className="text-[#E89378] mb-1" />
                 <span className="text-[10px] text-gray-400">No photos available</span>
               </div>
             )}
@@ -159,7 +159,7 @@ export default function PlaceDetailCard({
               {pricing && (
                 <>
                   <span>·</span>
-                  <span className="text-amber-600 font-semibold">{pricing}</span>
+                  <span className="text-[#B85F44] font-semibold">{pricing}</span>
                 </>
               )}
             </div>
@@ -175,7 +175,7 @@ export default function PlaceDetailCard({
                 {details.rating && (
                   <span className="flex items-center gap-1 text-xs">
                     <span className="font-semibold text-gray-800">{details.rating}</span>
-                    <Star size={11} className="text-amber-400 fill-amber-400" />
+                    <Star size={11} className="text-[#E89378] fill-[#E89378]" />
                     {details.userRatingsTotal && (
                       <span className="text-gray-400">
                         ({details.userRatingsTotal.toLocaleString()})
@@ -192,8 +192,8 @@ export default function PlaceDetailCard({
 
             {/* AI Notes */}
             {description && (
-              <div className="bg-amber-50/70 border border-amber-100 rounded-xl px-3.5 py-2.5">
-                <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <div className="bg-[#F5EFE6]/60/70 border border-[#D97757]/20 rounded-xl px-3.5 py-2.5">
+                <p className="text-[10px] font-semibold text-[#B85F44] uppercase tracking-wider mb-1 flex items-center gap-1">
                   <Sparkles size={10} />
                   Notes from Velosta AI
                 </p>
@@ -209,7 +209,7 @@ export default function PlaceDetailCard({
                 {details.phone && (
                   <a
                     href={`tel:${details.phone}`}
-                    className="flex items-center gap-2.5 text-xs text-gray-600 hover:text-amber-600 transition-colors"
+                    className="flex items-center gap-2.5 text-xs text-gray-600 hover:text-[#B85F44] transition-colors"
                   >
                     <Phone size={12} className="text-gray-400 shrink-0" />
                     {details.phone}
@@ -220,7 +220,7 @@ export default function PlaceDetailCard({
                     href={details.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2.5 text-xs text-gray-600 hover:text-amber-600 transition-colors group"
+                    className="flex items-center gap-2.5 text-xs text-gray-600 hover:text-[#B85F44] transition-colors group"
                   >
                     <Globe size={12} className="text-gray-400 shrink-0" />
                     <span className="truncate">

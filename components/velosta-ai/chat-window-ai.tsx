@@ -2,10 +2,13 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, MapPin } from "lucide-react";
+import { Send, Sparkles, MapPin, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/app/utils/context";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
+import { generatePlannerResponse } from "@/lib/services/planner-service";
+import { ApiError } from "@/lib/api";
+import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import { ItineraryPDFExport } from "./itinerary-pdf-export";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,13 +48,13 @@ function ItineraryCard({
   return (
     <div className="space-y-4 text-sm">
       {/* Header */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
-        <MapPin size={18} className="text-amber-600 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 p-4 rounded-xl bg-[#F5EFE6]/60 border border-[#D97757]/30">
+        <MapPin size={18} className="text-[#B85F44] mt-0.5 shrink-0" />
         <div>
-          <p className="font-semibold text-amber-800 text-base">
+          <p className="font-semibold text-[#0B1F2A] text-base">
             {data.destination}
           </p>
-          <p className="text-amber-700 text-xs mt-0.5">
+          <p className="text-[#B85F44] text-xs mt-0.5">
             {data.duration} &nbsp;·&nbsp; {data.totalBudget || data.totalEstimatedCost}
           </p>
           {data.summary && (
@@ -64,9 +67,9 @@ function ItineraryCard({
 
       {/* Budget breakdown */}
       {data.budgetBreakdown && (
-        <div className="rounded-xl border border-amber-100 overflow-hidden">
-          <div className="bg-amber-50 px-4 py-2 border-b border-amber-100">
-            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+        <div className="rounded-xl border border-[#D97757]/20 overflow-hidden">
+          <div className="bg-[#F5EFE6]/60 px-4 py-2 border-b border-[#D97757]/20">
+            <p className="text-xs font-semibold text-[#B85F44] uppercase tracking-wide">
               Budget Breakdown
             </p>
           </div>
@@ -74,7 +77,7 @@ function ItineraryCard({
             {Object.entries(data.budgetBreakdown).map(([k, v]) => (
               <div key={k} className="flex justify-between text-xs bg-white rounded-lg px-3 py-2 border border-gray-100">
                 <span className="text-gray-500 capitalize">{k}</span>
-                <span className="font-semibold text-amber-700">{v as string}</span>
+                <span className="font-semibold text-[#B85F44]">{v as string}</span>
               </div>
             ))}
           </div>
@@ -85,11 +88,11 @@ function ItineraryCard({
       {Array.isArray(data.itineraryTable) && data.itineraryTable.map((day: any, i: number) => (
         <div key={i} className="rounded-xl border border-gray-200 overflow-hidden">
           {/* Day header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-600">
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#D97757] to-[#B85F44]">
             <div>
               <span className="text-white font-bold text-sm">Day {day.day || i + 1}</span>
               {day.theme && (
-                <span className="text-amber-100 text-xs ml-2">— {day.theme}</span>
+                <span className="text-[#F5EFE6] text-xs ml-2">— {day.theme}</span>
               )}
             </div>
             {day.dailyCost && (
@@ -104,7 +107,7 @@ function ItineraryCard({
             {Array.isArray(day.rows) && day.rows.map((row: any, j: number) => (
               <div key={j} className="px-4 py-3">
                 <div className="flex items-start gap-3">
-                  <span className="text-xs text-amber-600 font-medium w-16 shrink-0 pt-0.5">
+                  <span className="text-xs text-[#B85F44] font-medium w-16 shrink-0 pt-0.5">
                     {row.time || "—"}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -117,7 +120,7 @@ function ItineraryCard({
                         <span className="text-xs text-gray-400">{row.distance}</span>
                       )}
                       {row.pricing && (
-                        <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                        <span className="text-xs font-semibold text-[#B85F44] bg-[#F5EFE6]/60 px-2 py-0.5 rounded-full">
                           {row.pricing}
                         </span>
                       )}
@@ -133,22 +136,22 @@ function ItineraryCard({
             <div className="bg-gray-50 border-t border-gray-100 px-4 py-3 space-y-1.5">
               {day.meals?.breakfast && (
                 <p className="text-xs text-gray-600">
-                  <span className="font-medium text-amber-600">🍳 Breakfast:</span> {day.meals.breakfast}
+                  <span className="font-medium text-[#B85F44]">🍳 Breakfast:</span> {day.meals.breakfast}
                 </p>
               )}
               {day.meals?.lunch && (
                 <p className="text-xs text-gray-600">
-                  <span className="font-medium text-amber-600">🥗 Lunch:</span> {day.meals.lunch}
+                  <span className="font-medium text-[#B85F44]">🥗 Lunch:</span> {day.meals.lunch}
                 </p>
               )}
               {day.meals?.dinner && (
                 <p className="text-xs text-gray-600">
-                  <span className="font-medium text-amber-600">🍽️ Dinner:</span> {day.meals.dinner}
+                  <span className="font-medium text-[#B85F44]">🍽️ Dinner:</span> {day.meals.dinner}
                 </p>
               )}
               {day.accommodation && (
                 <p className="text-xs text-gray-600 pt-1 border-t border-gray-200">
-                  <span className="font-medium text-amber-600">🏨 Stay:</span> {day.accommodation}
+                  <span className="font-medium text-[#B85F44]">🏨 Stay:</span> {day.accommodation}
                 </p>
               )}
             </div>
@@ -175,8 +178,8 @@ function ItineraryCard({
 
       {/* Total cost banner */}
       {data.totalEstimatedCost && (
-        <div className="rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 p-4 text-center">
-          <p className="text-amber-100 text-xs mb-1">Total Estimated Cost</p>
+        <div className="rounded-xl bg-gradient-to-r from-[#D97757] to-[#B85F44] p-4 text-center">
+          <p className="text-[#F5EFE6] text-xs mb-1">Total Estimated Cost</p>
           <p className="text-white text-2xl font-bold">{data.totalEstimatedCost}</p>
         </div>
       )}
@@ -190,7 +193,7 @@ function ItineraryCard({
           <ul className="space-y-1.5">
             {data.localTips.map((tip: string, i: number) => (
               <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                <span className="text-amber-500 mt-0.5">✦</span>
+                <span className="text-[#D97757] mt-0.5">✦</span>
                 <span>{tip}</span>
               </li>
             ))}
@@ -266,6 +269,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSignInGate, setShowSignInGate] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<
     Array<{ role: string; content: string }>
   >([]);
@@ -345,6 +349,12 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
       const text = input.trim();
       if (!text || isLoading) return;
 
+      // Sign-in gate — every chat call requires auth
+      if (!accessToken) {
+        setShowSignInGate(true);
+        return;
+      }
+
       const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: text };
       setMessages((prev) => [...prev, userMsg]);
       setInput("");
@@ -353,32 +363,14 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
       const updatedHistory = [...conversationHistory, { role: "user", content: text }];
       setConversationHistory(updatedHistory);
 
-      // Timeout protection — abort if API takes > 45 seconds
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
-
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-              userSaid: text,
-              conversationHistory: updatedHistory,
-              currentItinerary: currentItinerary,
-              isModificationRequest: !!currentItinerary,
-            }),
-          }
-        );
-
-        const data = await res.json();
-        console.log(data, "hola");
-        if (!res.ok) throw new Error(data.error || "Request failed");
+        const data = await generatePlannerResponse({
+          userSaid: text,
+          conversationHistory: updatedHistory,
+          currentItinerary: currentItinerary,
+          isModificationRequest: !!currentItinerary,
+          destinationHint: selectedDestination ?? undefined,
+        });
 
         if (data.isTextResponse) {
           // Plain chat reply
@@ -396,14 +388,12 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
           // Itinerary generated/updated — sync with map + itinerary panel
           setCurrentItinerary(data);
 
-          // Extract trip context from itinerary data for PDF export
           const extractedTripData: TripData = {
             destination: data.destination,
             budget: data.totalEstimatedCost || data.totalBudget,
           };
           setTripData(extractedTripData);
 
-          // Fire callback to sync map + itinerary panel
           onItinerary?.(data, extractedTripData);
 
           const assistantMsg: Message = {
@@ -416,54 +406,75 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
           setMessages((prev) => [...prev, assistantMsg]);
           setConversationHistory((prev) => [
             ...prev,
-            { role: "assistant", content: `[Generated itinerary for ${data.destination}]` },
+            {
+              role: "assistant",
+              content: `[Generated itinerary for ${data.destination ?? "trip"}]`,
+            },
           ]);
 
           // Show modifications notice if any
-          if (data.modificationsApplied?.length > 0) {
+          if (data.modificationsApplied && data.modificationsApplied.length > 0) {
             setTimeout(() => {
               const modsMsg: Message = {
                 id: `a-mods-${Date.now()}`,
                 role: "assistant",
-                content: `Changes applied:\n${data.modificationsApplied.map((m: string) => `• ${m}`).join("\n")}`,
+                content: `Changes applied:\n${data.modificationsApplied!
+                  .map((m: string) => `• ${m}`)
+                  .join("\n")}`,
               };
               setMessages((prev) => [...prev, modsMsg]);
             }, 400);
           }
         } else {
-          // Fallback: unexpected response shape
-          const fallbackText = data.message || data.summary || "I received your request but couldn't process it. Could you try rephrasing?";
           setMessages((prev) => [
             ...prev,
-            { id: `a-fallback-${Date.now()}`, role: "assistant", content: fallbackText },
+            {
+              id: `a-fallback-${Date.now()}`,
+              role: "assistant",
+              content:
+                "I received your request but couldn't process it. Could you try rephrasing?",
+            },
           ]);
         }
       } catch (err: any) {
         console.error("Chat error:", err);
-        const isTimeout = err?.name === "AbortError";
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : "Unable to generate itinerary. Please try again.";
         setMessages((prev) => [
           ...prev,
           {
             id: `a-err-${Date.now()}`,
             role: "assistant",
-            content: isTimeout
-              ? "The request took too long. Please try sending your message again."
-              : err?.message?.includes("429") || err?.message?.includes("rate")
-              ? "I'm hitting a rate limit right now. Please wait a few seconds and try again."
-              : "Unable to generate itinerary. Please try again.",
+            content: message,
           },
         ]);
       } finally {
-        clearTimeout(timeout);
         setIsLoading(false);
         inputRef.current?.focus();
       }
     },
-    [input, isLoading, conversationHistory, currentItinerary, accessToken, onItinerary]
+    [
+      input,
+      isLoading,
+      conversationHistory,
+      currentItinerary,
+      accessToken,
+      onItinerary,
+      selectedDestination,
+    ]
   );
 
   return (
     <section className="flex flex-col h-full bg-[#FFF9F3]">
+      <SignInGate
+        open={showSignInGate}
+        onClose={() => setShowSignInGate(false)}
+        next="/velosta-ai"
+        title="Sign in to keep planning"
+        message="Velosta AI saved your draft itinerary — sign in to refine it in real time."
+      />
       {/* Message list */}
       <div
         ref={listRef}
@@ -481,7 +492,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
             >
               {/* Avatar for assistant */}
               {m.role === "assistant" && (
-                <div className="w-7 h-7 rounded-full shrink-0 mr-2 mt-0.5 flex items-center justify-center bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm">
+                <div className="w-7 h-7 rounded-full shrink-0 mr-2 mt-0.5 flex items-center justify-center bg-gradient-to-br from-[#E89378] to-[#B85F44] shadow-sm">
                   <Sparkles size={13} className="text-white" />
                 </div>
               )}
@@ -490,9 +501,9 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
                 className={cn(
                   "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
                   m.role === "user"
-                    ? "bg-amber-500 text-white rounded-tr-sm"
+                    ? "bg-[#D97757] text-white rounded-tr-sm"
                     : m.isItinerary
-                    ? "bg-white border border-amber-100 text-gray-900 rounded-tl-sm w-full"
+                    ? "bg-white border border-[#D97757]/20 text-gray-900 rounded-tl-sm w-full"
                     : "bg-white border border-gray-100 text-gray-800 rounded-tl-sm"
                 )}
               >
@@ -513,7 +524,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
             animate={{ opacity: 1, y: 0 }}
             className="flex justify-start"
           >
-            <div className="w-7 h-7 rounded-full shrink-0 mr-2 flex items-center justify-center bg-gradient-to-br from-amber-400 to-amber-600">
+            <div className="w-7 h-7 rounded-full shrink-0 mr-2 flex items-center justify-center bg-gradient-to-br from-[#E89378] to-[#B85F44]">
               <Sparkles size={13} className="text-white" />
             </div>
             <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
@@ -521,7 +532,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
-                    className="w-2 h-2 rounded-full bg-amber-400 animate-bounce"
+                    className="w-2 h-2 rounded-full bg-[#E89378] animate-bounce"
                     style={{ animationDelay: `${i * 0.15}s` }}
                   />
                 ))}
@@ -532,7 +543,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
       </div>
 
       {/* Input bar */}
-      <div className="shrink-0 border-t border-amber-100 bg-[#FFF9F3] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+      <div className="shrink-0 border-t border-[#D97757]/20 bg-[#FFF9F3] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
         <p className="text-[10px] text-gray-400 text-center mb-2">
           Chat history is not saved — export as PDF before leaving.
         </p>
@@ -549,14 +560,14 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
               }
             }}
             placeholder="Tell me where you want to go..."
-            className="flex-1 min-w-0 bg-white border border-amber-200 rounded-full px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+            className="flex-1 min-w-0 bg-white border border-[#D97757]/30 rounded-full px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#D97757]/15 transition-all"
             disabled={isLoading}
             aria-label="Chat with Velosta AI"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="shrink-0 w-10 h-10 rounded-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-sm"
+            className="shrink-0 w-10 h-10 rounded-full bg-[#D97757] hover:bg-[#B85F44] disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-sm"
             aria-label="Send message"
           >
             <Send size={16} />

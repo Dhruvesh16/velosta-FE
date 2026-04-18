@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "TalkToFigma": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": ["cursor-talk-to-figma-mcp@latest"]
+    }
+  }
+}

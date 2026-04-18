@@ -16,8 +16,8 @@ interface DayCardProps {
 
 // Warm amber-based palette for day badges
 const DAY_COLORS = [
-  "#D97706", "#B45309", "#92400E", "#EA580C",
-  "#F59E0B", "#C2410C", "#A16207", "#D97706",
+  "#D97757", "#B45309", "#92400E", "#EA580C",
+  "#D97757", "#C2410C", "#A16207", "#D97757",
 ];
 
 export default function DayCard({ day, dayIndex, isActive }: DayCardProps) {
@@ -44,7 +44,7 @@ export default function DayCard({ day, dayIndex, isActive }: DayCardProps) {
       {/* Day header button */}
       <button
         onClick={handleToggle}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 rounded-2xl"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D97757]/30 rounded-2xl"
         aria-expanded={expanded}
         aria-controls={`day-content-${day.id}`}
       >
@@ -116,29 +116,29 @@ export default function DayCard({ day, dayIndex, isActive }: DayCardProps) {
               {/* Meals row */}
               {day.meals && Object.values(day.meals).some(Boolean) && (
                 <div
-                  className="mt-2 mx-3 px-3 py-2.5 rounded-xl space-y-1 bg-amber-50 border border-amber-100"
+                  className="mt-2 mx-3 px-3 py-2.5 rounded-xl space-y-1 bg-[#F5EFE6]/60 border border-[#D97757]/20"
                 >
                   <div className="flex items-center gap-1.5 mb-1">
-                    <Utensils size={10} className="text-amber-500" />
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-600">
+                    <Utensils size={10} className="text-[#D97757]" />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-[#B85F44]">
                       Meals
                     </span>
                   </div>
                   {day.meals.breakfast && (
                     <p className="text-[10px] text-gray-600">
-                      <span className="text-amber-500">Breakfast · </span>
+                      <span className="text-[#D97757]">Breakfast · </span>
                       {day.meals.breakfast}
                     </p>
                   )}
                   {day.meals.lunch && (
                     <p className="text-[10px] text-gray-600">
-                      <span className="text-amber-500">Lunch · </span>
+                      <span className="text-[#D97757]">Lunch · </span>
                       {day.meals.lunch}
                     </p>
                   )}
                   {day.meals.dinner && (
                     <p className="text-[10px] text-gray-600">
-                      <span className="text-amber-500">Dinner · </span>
+                      <span className="text-[#D97757]">Dinner · </span>
                       {day.meals.dinner}
                     </p>
                   )}

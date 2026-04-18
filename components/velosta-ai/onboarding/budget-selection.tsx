@@ -321,7 +321,7 @@ export default function BudgetSelection() {
           >
             {/* Header */}
             <div className="text-center mb-6">
-              <p className="text-[10px] font-semibold tracking-[0.3em] text-amber-600 uppercase mb-1">
+              <p className="text-[10px] font-semibold tracking-[0.3em] text-[#2F6F73] uppercase mb-1">
                 Velosta
               </p>
               <h2
@@ -329,7 +329,7 @@ export default function BudgetSelection() {
               >
                 Start Your Journey
               </h2>
-              <div className="w-8 h-0.5 bg-amber-500 mx-auto mt-2.5 rounded-full" />
+              <div className="w-8 h-0.5 bg-[#D97757] mx-auto mt-2.5 rounded-full" />
             </div>
 
             {/* ── Budget ─────────────────────────────────── */}
@@ -344,14 +344,14 @@ export default function BudgetSelection() {
                   value={budgetText}
                   onChange={(e) => handleBudgetTextChange(e.target.value)}
                   onBlur={handleBudgetBlur}
-                  className="w-36 text-center text-2xl font-bold text-gray-800 bg-amber-50/60 border border-amber-200 rounded-xl px-3 py-2 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                  className="w-36 text-center text-2xl font-bold text-gray-800 bg-[#F5EFE6]/60/60 border border-[#0B1F2A]/12 rounded-xl px-3 py-2 outline-none focus:border-[#D97757]/70 focus:ring-2 focus:ring-[#D97757]/20 transition-all"
                 />
               </div>
               {/* Custom slider */}
               <div className="relative w-full h-2 rounded-full mx-auto">
-                <div className="absolute inset-0 bg-amber-100 rounded-full" />
+                <div className="absolute inset-0 bg-[#F5EFE6] rounded-full" />
                 <div
-                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-[width] duration-75"
+                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-[#E89378] to-[#D97757] rounded-full transition-[width] duration-75"
                   style={{ width: `${sliderPct}%` }}
                 />
                 <input
@@ -364,7 +364,7 @@ export default function BudgetSelection() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-amber-500 rounded-full shadow-md border-2 border-white pointer-events-none transition-[left] duration-75"
+                  className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-[#D97757] rounded-full shadow-md border-2 border-white pointer-events-none transition-[left] duration-75"
                   style={{ left: `calc(${sliderPct}% - 10px)` }}
                 />
               </div>
@@ -390,8 +390,8 @@ export default function BudgetSelection() {
                     }}
                     className={`flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl border-2 transition-all ${
                       travelerType === id
-                        ? "border-amber-500 bg-amber-50 text-amber-600"
-                        : "border-gray-200 bg-white text-gray-500 hover:border-amber-300"
+                        ? "border-[#D97757] bg-[#F5EFE6]/60 text-[#2F6F73]"
+                        : "border-gray-200 bg-white text-gray-500 hover:border-[#D97757]/40"
                     }`}
                   >
                     <Icon size={20} />
@@ -421,7 +421,7 @@ export default function BudgetSelection() {
                     onChange={(e) =>
                       setTravelerCount(Math.max(2, parseInt(e.target.value) || 2))
                     }
-                    className="w-20 text-center text-lg font-bold text-gray-800 border border-amber-200 rounded-xl px-3 py-2 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                    className="w-20 text-center text-lg font-bold text-gray-800 border border-[#0B1F2A]/12 rounded-xl px-3 py-2 outline-none focus:border-[#D97757]/70 focus:ring-2 focus:ring-[#D97757]/20"
                   />
                 </motion.div>
               )}
@@ -440,8 +440,8 @@ export default function BudgetSelection() {
                     onClick={() => toggleInterest(id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                       selectedInterests.includes(id)
-                        ? "border-amber-500 bg-amber-50 text-amber-700"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-amber-300"
+                        ? "border-[#D97757] bg-[#F5EFE6]/60 text-[#0B1F2A]"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-[#D97757]/40"
                     }`}
                   >
                     <span>{emoji}</span>
@@ -464,7 +464,7 @@ export default function BudgetSelection() {
                   type="button"
                   onClick={handleMyLocation}
                   disabled={isLocating}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-amber-400 bg-amber-50 text-amber-700 font-medium text-sm hover:bg-amber-100 transition-all disabled:opacity-60"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-[#D97757]/70 bg-[#F5EFE6]/60 text-[#0B1F2A] font-medium text-sm hover:bg-[#F5EFE6] transition-all disabled:opacity-60"
                 >
                   {isLocating ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -484,7 +484,7 @@ export default function BudgetSelection() {
                     suggestions.length > 0 && setShowSuggestions(true)
                   }
                   placeholder="e.g. Jibhi, Manali, Goa..."
-                  className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all text-center"
+                  className="w-full bg-white border border-[#0B1F2A]/12 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[#D97757]/70 focus:ring-2 focus:ring-[#D97757]/20 transition-all text-center"
                 />
                 <AnimatePresence>
                   {showSuggestions && suggestions.length > 0 && (
@@ -492,18 +492,18 @@ export default function BudgetSelection() {
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
-                      className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-amber-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto"
+                      className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-[#0B1F2A]/12 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto"
                     >
                       {suggestions.map((s, i) => (
                         <li key={i}>
                           <button
                             type="button"
                             onClick={() => handleSelectSuggestion(s)}
-                            className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors flex items-start gap-3 border-b border-gray-50 last:border-b-0"
+                            className="w-full text-left px-4 py-3 hover:bg-[#F5EFE6]/60 transition-colors flex items-start gap-3 border-b border-gray-50 last:border-b-0"
                           >
                             <MapPin
                               size={14}
-                              className="text-amber-500 mt-0.5 shrink-0"
+                              className="text-[#D97757] mt-0.5 shrink-0"
                             />
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-gray-800 truncate">
@@ -534,8 +534,8 @@ export default function BudgetSelection() {
                     onClick={() => setDuration(d)}
                     className={`w-10 h-10 rounded-full text-sm font-semibold border-2 transition-all ${
                       duration === d
-                        ? "bg-amber-500 border-amber-500 text-white shadow-md"
-                        : "bg-white border-gray-200 text-gray-600 hover:border-amber-400"
+                        ? "bg-[#D97757] border-[#D97757] text-white shadow-md"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-[#D97757]/70"
                     }`}
                   >
                     {d}
@@ -545,7 +545,7 @@ export default function BudgetSelection() {
             </div>
 
             {/* ── Summary strip ─────────────────────────── */}
-            <div className="bg-amber-50/80 rounded-xl px-4 py-3 mb-5 text-center">
+            <div className="bg-[#F5EFE6]/60/80 rounded-xl px-4 py-3 mb-5 text-center">
               <p className="text-[10px] text-gray-400 mb-0.5">Your trip</p>
               <p className="text-sm font-medium text-gray-700">
                 {selectedPlace?.name || locationText || "My Location"} ·{" "}
@@ -584,7 +584,7 @@ export default function BudgetSelection() {
                 className="flex-1 py-3.5 rounded-xl text-white font-semibold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: isReady
-                    ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                    ? "linear-gradient(135deg, #D97757, #B85F44)"
                     : "#d1d5db",
                   boxShadow: isReady
                     ? "0 8px 30px rgba(245,158,11,0.3)"

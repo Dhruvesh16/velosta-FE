@@ -23,6 +23,11 @@ import {
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
 import { DESTINATIONS, type Destination } from "@/lib/data/destinations";
+import { generatePlannerResponse } from "@/lib/services/planner-service";
+import { hydrateItineraryIntoStores } from "@/lib/services/itinerary-hydrator";
+import { ApiError } from "@/lib/api";
+import SignInGate from "@/components/velosta-ai/sign-in-gate";
+import CloudOverlay from "./cloud-overlay";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
@@ -55,7 +60,7 @@ function getBudgetFit(dest: Destination, budget: number): "perfect" | "stretch" 
 
 function getBudgetColor(fit: "perfect" | "stretch" | "over") {
   if (fit === "perfect") return "#22c55e";
-  if (fit === "stretch") return "#f59e0b";
+  if (fit === "stretch") return "#D97757";
   return "#ef4444";
 }
 
@@ -88,6 +93,8 @@ export default function ExploreMapView() {
   const [hoveredDest, setHoveredDest] = useState<Destination | null>(null);
   const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showSignInGate, setShowSignInGate] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // ── Refs ──
@@ -199,7 +206,7 @@ export default function ExploreMapView() {
             <span style="font-size:20px">${dest.emoji}</span>
             <div>
               <div style="font-weight:700;font-size:14px">${dest.name}</div>
-              <div style="font-size:11px;color:#666">${dest.state}</div>
+              <div style="font-size:11px;color:#666">${dest.state}${dest.country && dest.country !== "India" ? " · " + dest.country : ""}</div>
             </div>
           </div>
           <div style="display:flex;gap:12px;font-size:11px;color:#555;margin-bottom:4px">
@@ -275,47 +282,81 @@ export default function ExploreMapView() {
   }, [filtered, budget, mapLoaded]);
 
   // ── Build Itinerary ──
+  // Owns the entire generation lifecycle so the planner page never lands
+  // empty: hydrate context → sign-in gate → call planner → push into stores
+  // → advance to planner step.
   const handleBuildItinerary = useCallback(
     async (dest: Destination) => {
-      setIsGenerating(true);
-      setGeneratingItinerary(true);
+      // Hydrate planner store with the user's chosen context
+      setUserLocation({ name: dest.name, coordinates: dest.coordinates });
+      setStoreDuration(duration);
+
+      // Sign-in gate — generation requires auth
+      if (!accessToken) {
+        setShowSignInGate(true);
+        return;
+      }
 
       const interestStr =
         categories.length > 0 ? ` focusing on ${categories.join(", ")}` : "";
-      const autoMsg = `Plan a ${duration}-day trip to ${dest.name}, ${dest.state} with a budget of ₹${budget.toLocaleString("en-IN")} for ${tripType} traveler(s)${interestStr}. Generate the full itinerary now.`;
+      const locationStr = dest.country && dest.country !== "India"
+        ? `${dest.name}, ${dest.state}, ${dest.country}`
+        : `${dest.name}, ${dest.state}`;
+      const autoMsg = `Plan a ${duration}-day trip to ${locationStr} with a budget of ₹${budget.toLocaleString(
+        "en-IN"
+      )} for ${tripType} traveler(s)${interestStr}. Generate the full itinerary now.`;
 
+      // Stash for any downstream consumer (e.g. mobile chat panel)
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort("Request timed out"), 45000);
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-              userSaid: autoMsg,
-              conversationHistory: [],
-              currentItinerary: null,
-              isModificationRequest: false,
-            }),
-          }
-        );
-        clearTimeout(timeout);
-        const data = await res.json();
-        setGeneratedItinerary(data.itineraryTable ? data : null);
+        sessionStorage.setItem("velosta:auto-prompt", autoMsg);
+      } catch {
+        /* sessionStorage may be blocked — non-fatal */
+      }
+
+      setGenerationError(null);
+      setIsGenerating(true);
+      setGeneratingItinerary(true);
+      setGeneratedItinerary(null);
+
+      let didSucceed = false;
+      try {
+        const response = await generatePlannerResponse({
+          userSaid: autoMsg,
+          conversationHistory: [],
+          currentItinerary: null,
+          isModificationRequest: false,
+          destinationHint: dest.name,
+        });
+
+        if (!response.isTextResponse && response.itineraryTable) {
+          await hydrateItineraryIntoStores(response, {
+            destination: response.destination ?? dest.name,
+            budget: response.totalEstimatedCost || response.totalBudget,
+          });
+          setGeneratedItinerary(response);
+          didSucceed = true;
+        } else {
+          setGenerationError(
+            response.isTextResponse
+              ? response.message
+              : "Velosta AI couldn't generate an itinerary. Please try again."
+          );
+        }
       } catch (err) {
-        console.error("[PLAN] error:", err);
-        setGeneratedItinerary(null);
+        console.error("[EXPLORE-MAP] generation error:", err);
+        setGenerationError(
+          err instanceof ApiError
+            ? err.message
+            : "Could not reach Velosta AI. Please try again."
+        );
       } finally {
         setIsGenerating(false);
         setGeneratingItinerary(false);
-        setUserLocation({ name: dest.name, coordinates: dest.coordinates });
-        setStoreDuration(duration);
-        selectDestination(dest.name);
+        if (didSucceed) {
+          setSelectedDest(null);
+          // Triggers flowStep → "planner"
+          selectDestination(dest.name);
+        }
       }
     },
     [
@@ -356,25 +397,44 @@ export default function ExploreMapView() {
   // ────────────────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Loading overlay */}
+      {/* Sign-in gate — generation requires auth */}
+      <SignInGate
+        open={showSignInGate}
+        onClose={() => setShowSignInGate(false)}
+        next="/velosta-ai"
+        title="Sign in to craft your itinerary"
+        message="We have your trip details ready. Sign in and Velosta AI will build your day-by-day plan."
+      />
+
+      {/* Cinematic crafting overlay while AI works */}
+      <CloudOverlay
+        visible={isGenerating}
+        mode="crafting"
+        message="Your itinerary is being crafted"
+        sublines={[
+          "Tracing the best route through your destination\u2026",
+          "Mapping stays, food and golden-hour stops\u2026",
+          "Tuning the plan to your budget and pace\u2026",
+        ]}
+      />
+
+      {/* Inline error toast */}
       <AnimatePresence>
-        {isGenerating && (
+        {generationError && (
           <motion.div
-            className="fixed inset-0 z-[100] flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[10001] max-w-md px-4 py-3 rounded-xl bg-red-50 border border-red-200 shadow-lg"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
           >
-            <div className="text-center">
-              <Loader2 size={40} className="animate-spin text-amber-500 mx-auto mb-4" />
-              <p className={`font-serif text-xl font-bold text-gray-800`}>
-                Building your itinerary...
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Our AI is crafting the perfect trip
-              </p>
-            </div>
+            <p className="text-xs text-red-600">{generationError}</p>
+            <button
+              onClick={() => setGenerationError(null)}
+              className="absolute top-1.5 right-2 text-red-400 hover:text-red-600 text-xs"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -388,20 +448,21 @@ export default function ExploreMapView() {
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           style={{ width: 300 }}
         >
-          {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+          {/* Header — FlowChrome already shows brand; just a back affordance + section label */}
+          <div className="px-5 pt-20 pb-4 border-b border-gray-100 flex items-center gap-3">
             <button
               onClick={() => setFlowStep("budget")}
-              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-[#F5EFE6] transition-colors"
+              aria-label="Back"
             >
-              <ArrowLeft size={18} className="text-gray-600" />
+              <ArrowLeft size={18} className="text-[#0B1F2A]" />
             </button>
             <div>
-              <p className="text-[10px] tracking-[0.2em] text-amber-600 font-semibold uppercase">
-                Velosta
+              <p className="text-[10px] tracking-[0.24em] text-[#2F6F73] font-semibold uppercase">
+                Discover
               </p>
-              <h2 className={`font-serif text-lg font-bold text-gray-800`}>
-                Explore
+              <h2 className="font-serif text-[17px] font-semibold text-[#0B1F2A] leading-tight">
+                Refine your journey
               </h2>
             </div>
           </div>
@@ -419,9 +480,9 @@ export default function ExploreMapView() {
                 </span>
               </div>
               <div className="relative w-full h-2 rounded-full">
-                <div className="absolute inset-0 bg-amber-100 rounded-full" />
+                <div className="absolute inset-0 bg-[#F5EFE6] rounded-full" />
                 <div
-                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-[width] duration-75"
+                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-[#E89378] to-[#D97757] rounded-full transition-[width] duration-75"
                   style={{ width: `${sliderPct}%` }}
                 />
                 <input
@@ -434,7 +495,7 @@ export default function ExploreMapView() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-500 rounded-full shadow border-2 border-white pointer-events-none transition-[left] duration-75"
+                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-[#D97757] rounded-full shadow border-2 border-white pointer-events-none transition-[left] duration-75"
                   style={{ left: `calc(${sliderPct}% - 8px)` }}
                 />
               </div>
@@ -456,8 +517,8 @@ export default function ExploreMapView() {
                     onClick={() => setDuration(d)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       duration === d
-                        ? "bg-amber-500 border-amber-500 text-white"
-                        : "bg-white border-gray-200 text-gray-600 hover:border-amber-400"
+                        ? "bg-[#D97757] border-[#D97757] text-white"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-[#D97757]/70"
                     }`}
                   >
                     {d}d
@@ -478,8 +539,8 @@ export default function ExploreMapView() {
                     onClick={() => setTripType(tripType === id ? "" : id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       tripType === id
-                        ? "bg-amber-500 border-amber-500 text-white"
-                        : "bg-white border-gray-200 text-gray-600 hover:border-amber-400"
+                        ? "bg-[#D97757] border-[#D97757] text-white"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-[#D97757]/70"
                     }`}
                   >
                     <Icon size={13} />
@@ -501,8 +562,8 @@ export default function ExploreMapView() {
                     onClick={() => toggleCategory(id)}
                     className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       categories.includes(id)
-                        ? "bg-amber-500 border-amber-500 text-white"
-                        : "bg-white border-gray-200 text-gray-600 hover:border-amber-400"
+                        ? "bg-[#D97757] border-[#D97757] text-white"
+                        : "bg-white border-gray-200 text-gray-600 hover:border-[#D97757]/70"
                     }`}
                   >
                     <span>{emoji}</span>
@@ -515,7 +576,7 @@ export default function ExploreMapView() {
             {/* Clear Filters */}
             <button
               onClick={clearFilters}
-              className="flex items-center gap-2 text-xs text-gray-400 hover:text-amber-600 transition-colors"
+              className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#2F6F73] transition-colors"
             >
               <FilterX size={13} />
               Clear Filters
@@ -526,14 +587,14 @@ export default function ExploreMapView() {
           <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/80">
             <p className="text-xs font-semibold text-gray-600 mb-2">
               Matching destinations:{" "}
-              <span className="text-amber-600">{filtered.length}</span>
+              <span className="text-[#2F6F73]">{filtered.length}</span>
             </p>
             <div className="flex items-center gap-3 text-[10px] text-gray-400">
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Within budget
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Stretch
+                <span className="w-2.5 h-2.5 rounded-full bg-[#D97757]" /> Stretch
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Over
@@ -541,7 +602,7 @@ export default function ExploreMapView() {
             </div>
             <button
               onClick={() => setIsSatellite(!isSatellite)}
-              className="mt-2 flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-amber-600 transition-colors"
+              className="mt-2 flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-[#2F6F73] transition-colors"
             >
               <Layers size={12} />
               {isSatellite ? "Street View" : "Satellite View"}
@@ -560,70 +621,85 @@ export default function ExploreMapView() {
 
         {/* ── Right Sidebar: Destination List ────────────────────── */}
         <motion.div
-          className="h-full bg-white/95 backdrop-blur-lg border-l border-gray-200 flex flex-col z-20 shadow-lg"
+          className="h-full bg-[#FBF8F3]/95 backdrop-blur-lg border-l border-[#0B1F2A]/8 flex flex-col z-20 shadow-[0_18px_40px_-20px_rgba(11,31,42,0.18)]"
           initial={{ x: 320 }}
           animate={{ x: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          style={{ width: 300 }}
+          style={{ width: 320 }}
         >
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className={`font-serif text-lg font-bold text-gray-800`}>
-              All Destinations
+          <div className="px-6 pt-20 pb-4 border-b border-[#0B1F2A]/8">
+            <p className="text-[10px] tracking-[0.24em] text-[#2F6F73] font-semibold uppercase">
+              Destinations
+            </p>
+            <h3 className="font-serif text-[18px] font-semibold text-[#0B1F2A] leading-tight mt-1">
+              Curated for your trip
             </h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {filtered.length} places match your filters
+            <p className="text-[11.5px] text-[#0B1F2A]/55 mt-1.5">
+              {filtered.length} {filtered.length === 1 ? "place" : "places"} match your filters
             </p>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {filtered.length === 0 ? (
-              <div className="p-6 text-center">
-                <p className="text-4xl mb-3">🗺️</p>
-                <p className="text-sm font-medium text-gray-600">
-                  No destinations match
+              <div className="p-8 text-center">
+                <div
+                  className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
+                  style={{
+                    backgroundColor: "rgba(47,111,115,0.08)",
+                    border: "1px solid rgba(47,111,115,0.18)",
+                  }}
+                >
+                  <MapPin size={18} className="text-[#2F6F73]" strokeWidth={1.6} />
+                </div>
+                <p className="text-[13px] font-medium text-[#0B1F2A]">
+                  No matches yet
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Try adjusting your filters
+                <p className="text-[11.5px] text-[#0B1F2A]/50 mt-1 leading-relaxed">
+                  Try widening your budget or<br/>removing a category.
                 </p>
               </div>
             ) : (
               filtered.map((dest) => {
                 const fit = getBudgetFit(dest, budget);
                 const color = getBudgetColor(fit);
+                const active = hoveredDest?.id === dest.id;
                 return (
                   <button
                     key={dest.id}
                     onClick={() => setSelectedDest(dest)}
-                    className={`w-full text-left px-5 py-3.5 border-b border-gray-50 hover:bg-amber-50/50 transition-colors flex items-start gap-3 ${
-                      hoveredDest?.id === dest.id ? "bg-amber-50/50" : ""
-                    }`}
+                    className="group w-full text-left px-6 py-3.5 border-b border-[#0B1F2A]/5 hover:bg-[#F5EFE6]/50 transition-colors flex items-start gap-3.5"
+                    style={{
+                      backgroundColor: active ? "rgba(245,239,230,0.5)" : "transparent",
+                    }}
                   >
                     <span
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
+                      className="w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0"
                       style={{
-                        background: `${color}15`,
-                        border: `2px solid ${color}40`,
+                        background: `${color}14`,
+                        border: `1.5px solid ${color}38`,
                       }}
                     >
                       {dest.emoji}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-800 truncate">
+                      <p className="text-[13.5px] font-semibold text-[#0B1F2A] truncate">
                         {dest.name}
                       </p>
-                      <p className="text-xs text-gray-400">{dest.state}</p>
-                      <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
+                      <p className="text-[11.5px] text-[#0B1F2A]/50 mt-0.5">{dest.state}{dest.country && dest.country !== "India" ? ` · ${dest.country}` : ""}</p>
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10.5px] font-medium text-[#0B1F2A]/60">
                         <span>
-                          ₹{(dest.costMin / 1000).toFixed(0)}K–₹
-                          {(dest.costMax / 1000).toFixed(0)}K
+                          ₹{(dest.costMin / 1000).toFixed(0)}K–{(dest.costMax / 1000).toFixed(0)}K
                         </span>
-                        <span>·</span>
+                        <span className="text-[#0B1F2A]/25">·</span>
                         <span>
                           {dest.durationMin}–{dest.durationMax}d
                         </span>
                       </div>
                     </div>
-                    <ChevronRight size={14} className="text-gray-300 mt-1 shrink-0" />
+                    <ChevronRight
+                      size={14}
+                      className="text-[#0B1F2A]/25 mt-2 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-[#D97757]"
+                    />
                   </button>
                 );
               })
@@ -683,16 +759,16 @@ export default function ExploreMapView() {
                     {selectedDest.name}
                   </h2>
                   <p className="text-sm text-white/80 flex items-center gap-1 mt-0.5">
-                    <MapPin size={12} /> {selectedDest.state}
+                    <MapPin size={12} /> {selectedDest.state}{selectedDest.country && selectedDest.country !== "India" ? ` · ${selectedDest.country}` : ""}
                   </p>
 
                   <div className="flex items-center gap-4 mt-3 text-sm text-white/90">
                     <span className="flex items-center gap-1">
-                      <Clock size={14} className="text-amber-300" />
+                      <Clock size={14} className="text-[#E89378]" />
                       {selectedDest.durationMin}–{selectedDest.durationMax} days
                     </span>
                     <span className="flex items-center gap-1">
-                      <IndianRupee size={14} className="text-amber-300" />
+                      <IndianRupee size={14} className="text-[#E89378]" />
                       {selectedDest.costMin.toLocaleString("en-IN")}–
                       {selectedDest.costMax.toLocaleString("en-IN")}
                     </span>
@@ -728,7 +804,7 @@ export default function ExploreMapView() {
                     {selectedDest.highlights.map((h, i) => (
                       <span
                         key={i}
-                        className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium"
+                        className="px-3 py-1 bg-[#F5EFE6]/60 text-[#0B1F2A] rounded-full text-xs font-medium"
                       >
                         {h}
                       </span>
@@ -745,22 +821,22 @@ export default function ExploreMapView() {
                     {selectedDest.topPlaces.map((p, i) => (
                       <div
                         key={i}
-                        className="flex items-start gap-3 p-2.5 bg-gray-50 rounded-xl"
+                        className="flex items-start gap-3 p-2.5 bg-[#FBF8F3] border border-[#0B1F2A]/6 rounded-xl"
                       >
                         <span className="text-lg shrink-0">{p.emoji}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800">
+                          <p className="text-sm font-medium text-[#0B1F2A]">
                             {p.name}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="text-xs text-[#0B1F2A]/50 mt-0.5">
                             {p.desc}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-xs font-semibold text-gray-600">
+                          <p className="text-xs font-semibold text-[#0B1F2A]/80">
                             {p.cost}
                           </p>
-                          <p className="text-[10px] text-amber-500 flex items-center gap-0.5 justify-end">
+                          <p className="text-[10px] text-[#D97757] flex items-center gap-0.5 justify-end">
                             <Star size={10} fill="currentColor" /> {p.rating}
                           </p>
                         </div>
@@ -778,7 +854,7 @@ export default function ExploreMapView() {
                     {selectedDest.bestFor.map((b) => (
                       <span
                         key={b}
-                        className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium capitalize"
+                        className="px-3 py-1 bg-[#F5EFE6]/60 border border-[#0B1F2A]/6 text-[#0B1F2A]/70 rounded-full text-xs font-medium capitalize"
                       >
                         {b}
                       </span>
@@ -790,7 +866,7 @@ export default function ExploreMapView() {
                 <div className="flex items-center gap-3 pt-2">
                   <button
                     onClick={() => setSelectedDest(null)}
-                    className="px-4 py-3 rounded-xl text-gray-500 text-sm font-medium hover:bg-gray-100 transition-colors"
+                    className="px-4 py-3 rounded-xl text-[#0B1F2A]/55 text-sm font-medium hover:bg-[#F5EFE6]/60 transition-colors"
                   >
                     Other Options
                   </button>
@@ -799,8 +875,8 @@ export default function ExploreMapView() {
                     disabled={isGenerating}
                     className="flex-1 py-3 rounded-xl text-white font-semibold text-sm disabled:opacity-60"
                     style={{
-                      background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                      boxShadow: "0 8px 30px rgba(245,158,11,0.3)",
+                      background: "linear-gradient(135deg, #D97757, #B85F44)",
+                      boxShadow: "0 14px 38px -10px rgba(217,119,87,0.55)",
                     }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.97 }}

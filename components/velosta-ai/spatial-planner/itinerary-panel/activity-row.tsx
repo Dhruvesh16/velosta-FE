@@ -42,7 +42,7 @@ export default function ActivityRowItem({
       ref={setNodeRef}
       style={style}
       layout
-      className="group flex items-start gap-2 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-amber-50 transition-colors"
+      className="group flex items-start gap-2 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-[#F5EFE6]/60 transition-colors"
       onClick={() => {
         setActiveMarker(row.id);
         if (row.coordinates) {
@@ -65,8 +65,8 @@ export default function ActivityRowItem({
       {/* Time chip */}
       {row.time && (
         <div className="flex items-center gap-1 shrink-0 mt-0.5">
-          <Clock size={10} className="text-amber-400" />
-          <span className="text-[10px] font-medium tabular-nums text-amber-600">
+          <Clock size={10} className="text-[#E89378]" />
+          <span className="text-[10px] font-medium tabular-nums text-[#B85F44]">
             {row.time}
           </span>
         </div>
@@ -90,7 +90,7 @@ export default function ActivityRowItem({
             </span>
           )}
           {row.pricing && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-100">
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-[#B85F44] bg-[#F5EFE6]/60 px-1.5 py-0.5 rounded-full border border-[#D97757]/20">
               <DollarSign size={9} />
               {row.pricing}
             </span>

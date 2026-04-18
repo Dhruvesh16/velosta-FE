@@ -15,7 +15,7 @@ export default function BudgetGauge() {
     pct <= 0.7
       ? "#16A34A"
       : pct <= 0.9
-        ? "#F59E0B"
+        ? "#D97757"
         : pct <= 1.0
           ? "#EA580C"
           : "#DC2626";
@@ -24,7 +24,7 @@ export default function BudgetGauge() {
 
   return (
     <div
-      className="flex items-center gap-4 px-5 py-4 border-b border-amber-100 shrink-0 bg-white"
+      className="flex items-center gap-4 px-5 py-4 border-b border-[#D97757]/20 shrink-0 bg-white"
     >
       {/* Radial gauge */}
       <div className="relative w-20 h-20 shrink-0">

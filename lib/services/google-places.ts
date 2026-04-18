@@ -13,6 +13,8 @@ export interface PlaceDetails {
   phone?: string;
   address?: string;
   openNow?: boolean;
+  /** Precise [lng, lat] from Google Places (much more accurate than Mapbox for Indian POIs) */
+  location?: [number, number];
 }
 
 const placeCache = new Map<string, PlaceDetails | null>();
@@ -59,6 +61,10 @@ export async function fetchPlaceDetails(
       phone: data.phone,
       address: data.address,
       openNow: data.openNow,
+      location:
+        data.location && typeof data.location.lat === "number" && typeof data.location.lng === "number"
+          ? [data.location.lng, data.location.lat]
+          : undefined,
     };
 
     placeCache.set(cacheKey, details);

@@ -329,7 +329,8 @@ interface OnboardingState {
   selectedDestination: string | null;
   userLocation: UserLocation | null;
   duration: number; // trip days
-  budgetAmount: number;
+  budgetAmount: number; // ALWAYS per-person (normalized) — downstream planner expects per-person semantics
+  budgetMode: "per_person" | "total"; // user's input mode for display only
   travelerType: string;
   travelerCount: number;
   interests: string[];
@@ -346,6 +347,7 @@ interface OnboardingState {
   setUserLocation: (location: UserLocation) => void;
   setDuration: (days: number) => void;
   setBudgetAmount: (amount: number) => void;
+  setBudgetMode: (mode: "per_person" | "total") => void;
   setTravelerType: (type: string) => void;
   setTravelerCount: (count: number) => void;
   setInterests: (interests: string[]) => void;
@@ -364,6 +366,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
   userLocation: null,
   duration: 3,
   budgetAmount: 5000,
+  budgetMode: "per_person",
   travelerType: "solo",
   travelerCount: 1,
   interests: [],
@@ -393,6 +396,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
   setDuration: (days) => set({ duration: days }),
 
   setBudgetAmount: (amount) => set({ budgetAmount: amount }),
+  setBudgetMode: (mode) => set({ budgetMode: mode }),
   setTravelerType: (type) => set({ travelerType: type }),
   setTravelerCount: (count) => set({ travelerCount: count }),
   setInterests: (interests) => set({ interests }),
@@ -416,6 +420,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       userLocation: null,
       duration: 3,
       budgetAmount: 5000,
+      budgetMode: "per_person",
       travelerType: "solo",
       travelerCount: 1,
       interests: [],

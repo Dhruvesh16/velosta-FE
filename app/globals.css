@@ -38,13 +38,16 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --color-brand: oklch(0.72 0.19 45); /* vivid orange */
-  --color-brand-start: oklch(
-    0.76 0.16 55
-  ); /* lighter orange for gradient start */
-  --color-brand-contrast: oklch(0.985 0 0); /* white for text on brand */
-  --color-cream: oklch(0.985 0.02 70); /* soft warm surface */
-  --color-navy: oklch(0.26 0.05 260); /* deep navy */
+  --color-brand: #D97757;              /* Velosta coral — primary action */
+  --color-brand-start: #E89378;        /* lighter coral for gradient start */
+  --color-brand-dark: #B85F44;         /* coral hover / pressed */
+  --color-brand-contrast: #FBF8F3;     /* sandLight for text on brand */
+  --color-cream: #FBF8F3;              /* sandLight — main surface */
+  --color-sand: #F5EFE6;               /* sand — secondary surface */
+  --color-navy: #0B1F2A;               /* deep navy — primary text / dark surface */
+  --color-teal: #2F6F73;               /* muted teal — interactive highlights */
+  --color-teal-light: #3A8589;         /* teal light */
+  --color-mist: #D9E2E1;               /* mist — subtle borders */
 }
 
 .dark {
@@ -80,21 +83,24 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
-  --color-brand: oklch(0.72 0.19 45); /* vivid orange */
-  --color-brand-start: oklch(
-    0.76 0.16 55
-  ); /* lighter orange for gradient start */
-  --color-brand-contrast: oklch(0.985 0 0); /* white for text on brand */
-  --color-cream: oklch(0.985 0.02 70); /* soft warm surface */
-  --color-navy: oklch(0.26 0.05 260); /* deep navy */
+  --color-brand: #D97757;              /* Velosta coral — primary action */
+  --color-brand-start: #E89378;        /* lighter coral for gradient start */
+  --color-brand-dark: #B85F44;         /* coral hover / pressed */
+  --color-brand-contrast: #FBF8F3;     /* sandLight for text on brand */
+  --color-cream: #FBF8F3;              /* sandLight — main surface */
+  --color-sand: #F5EFE6;               /* sand — secondary surface */
+  --color-navy: #0B1F2A;               /* deep navy — primary text / dark surface */
+  --color-teal: #2F6F73;               /* muted teal — interactive highlights */
+  --color-teal-light: #3A8589;         /* teal light */
+  --color-mist: #D9E2E1;               /* mist — subtle borders */
 
   /* ── Velosta AI Spatial Planner Design Tokens ── */
-  --sp-bg-deep:        #FFF9F3;
-  --sp-bg-mid:         #FFF5E6;
-  --sp-bg-card:        rgba(255, 255, 255, 0.85);
-  --sp-border:         rgba(251, 191, 36, 0.2);
-  --sp-border-bright:  rgba(251, 191, 36, 0.35);
-  --sp-glass:          rgba(255, 255, 255, 0.85);
+  --sp-bg-deep:        #FBF8F3;
+  --sp-bg-mid:         #F5EFE6;
+  --sp-bg-card:        rgba(255, 255, 255, 0.88);
+  --sp-border:         rgba(47, 111, 115, 0.16);
+  --sp-border-bright:  rgba(47, 111, 115, 0.3);
+  --sp-glass:          rgba(251, 248, 243, 0.82);
 
   --sp-blue:           #2563EB;
   --sp-cyan:           #22D3EE;
@@ -152,13 +158,16 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-brand: oklch(0.72 0.19 45); /* vivid orange */
-  --color-brand-start: oklch(
-    0.76 0.16 55
-  ); /* lighter orange for gradient start */
-  --color-brand-contrast: oklch(0.985 0 0); /* white for text on brand */
-  --color-cream: oklch(0.985 0.02 70); /* soft warm surface */
-  --color-navy: oklch(0.26 0.05 260); /* deep navy */
+  --color-brand: #D97757;
+  --color-brand-start: #E89378;
+  --color-brand-dark: #B85F44;
+  --color-brand-contrast: #FBF8F3;
+  --color-cream: #FBF8F3;
+  --color-sand: #F5EFE6;
+  --color-navy: #0B1F2A;
+  --color-teal: #2F6F73;
+  --color-teal-light: #3A8589;
+  --color-mist: #D9E2E1;
 }
 
 @layer base {
@@ -283,5 +292,39 @@
 
 .marker-hover-pulse:hover {
   animation: markerPulse 1.5s ease-in-out infinite;
+}
+
+/* ── Premium Landing Page Animations ── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes subtle-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out both;
+}
+
+.animate-subtle-float {
+  animation: subtle-float 6s ease-in-out infinite;
 }
 

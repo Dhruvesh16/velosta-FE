@@ -17,15 +17,15 @@ function SuggestionCard({
 }) {
   return (
     <motion.div
-      className="bg-white border border-amber-100 rounded-xl p-3.5 group hover:border-amber-300 transition-colors"
+      className="bg-white border border-[#D97757]/20 rounded-xl p-3.5 group hover:border-[#D97757]/50 transition-colors"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.06, duration: 0.3 }}
       whileHover={{ y: -1 }}
     >
       <div className="flex items-start gap-3">
-        <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center shrink-0 mt-0.5">
-          <Lightbulb size={13} className="text-amber-500" />
+        <div className="w-7 h-7 rounded-lg bg-[#F5EFE6]/60 flex items-center justify-center shrink-0 mt-0.5">
+          <Lightbulb size={13} className="text-[#D97757]" />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -38,7 +38,7 @@ function SuggestionCard({
           </p>
 
           {/* Alternative */}
-          <p className="text-[10px] text-amber-600 uppercase tracking-wider font-medium mt-2 mb-0.5">
+          <p className="text-[10px] text-[#B85F44] uppercase tracking-wider font-medium mt-2 mb-0.5">
             Try this
           </p>
           <p className="text-xs text-gray-800 font-medium truncate">
@@ -65,7 +65,7 @@ function SuggestionCard({
       {/* Swap button */}
       <button
         onClick={() => onSwap(suggestion)}
-        className="mt-3 w-full flex items-center justify-center gap-1.5 text-[11px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-lg py-2 hover:bg-amber-100 transition-colors active:scale-[0.98]"
+        className="mt-3 w-full flex items-center justify-center gap-1.5 text-[11px] font-medium text-[#B85F44] bg-[#F5EFE6]/60 border border-[#D97757]/30 rounded-lg py-2 hover:bg-[#F5EFE6] transition-colors active:scale-[0.98]"
       >
         <ArrowRightLeft size={11} />
         Swap
@@ -86,24 +86,24 @@ export default function SuggestionsPanel() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2, duration: 0.3 }}
-      className="rounded-2xl border border-amber-200 overflow-hidden bg-gradient-to-b from-amber-50/50 to-white"
+      className="rounded-2xl border border-[#D97757]/30 overflow-hidden bg-gradient-to-b from-[#F5EFE6]/40 to-white"
     >
       {/* Header */}
       <button
         onClick={() => setCollapsed((v) => !v)}
-        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-amber-50/50 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-[#F5EFE6]/60/50 transition-colors"
       >
-        <Lightbulb size={14} className="text-amber-500" />
-        <span className="text-xs font-semibold text-amber-700 flex-1">
+        <Lightbulb size={14} className="text-[#D97757]" />
+        <span className="text-xs font-semibold text-[#B85F44] flex-1">
           Try Instead
         </span>
-        <span className="text-[10px] text-amber-400 bg-amber-100 px-2 py-0.5 rounded-full">
+        <span className="text-[10px] text-[#E89378] bg-[#F5EFE6] px-2 py-0.5 rounded-full">
           {suggestions.length}
         </span>
         <motion.span
           animate={{ rotate: collapsed ? -90 : 0 }}
           transition={{ duration: 0.2 }}
-          className="text-amber-400 text-xs"
+          className="text-[#E89378] text-xs"
         >
           ▼
         </motion.span>

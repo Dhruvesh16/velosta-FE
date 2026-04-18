@@ -8,12 +8,19 @@ import {
   Calendar,
   Loader2,
   AlertCircle,
+  LocateFixed,
 } from "lucide-react";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
 import { geocodeDestination, searchPlaces } from "@/lib/services/geocoding";
 import type { PlaceSuggestion } from "@/lib/services/geocoding";
+import { generatePlannerResponse } from "@/lib/services/planner-service";
+import { hydrateItineraryIntoStores } from "@/lib/services/itinerary-hydrator";
+import { ApiError } from "@/lib/api";
+import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import CloudOverlay from "./cloud-overlay";
+
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 const DURATION_OPTIONS = [
   { value: 1, label: "1 day" },
@@ -50,6 +57,8 @@ export default function TripInputs() {
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [showSignInGate, setShowSignInGate] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +105,49 @@ export default function TripInputs() {
     setError(null);
   }, []);
 
+  // Use my current location — reverse-geocode via Mapbox
+  const handleUseMyLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported in this browser.");
+      return;
+    }
+    setError(null);
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { longitude, latitude } = pos.coords;
+        let placeName = "My Location";
+        try {
+          if (MAPBOX_TOKEN) {
+            const res = await fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${MAPBOX_TOKEN}&limit=1`
+            );
+            const data = await res.json();
+            const full = data.features?.[0]?.place_name as string | undefined;
+            if (full) placeName = full.split(",").slice(0, 2).join(", ").trim();
+          }
+        } catch {
+          /* keep default name */
+        }
+        setLocationText(placeName);
+        setSelectedPlace({
+          name: placeName,
+          coordinates: [longitude, latitude],
+        });
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setIsLocating(false);
+      },
+      () => {
+        setError(
+          "Could not access your location. Please allow location access and try again."
+        );
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
   // Submit — generate itinerary directly for the chosen destination
   const handlePlanTrip = useCallback(async () => {
     if (!selectedTier) return;
@@ -118,8 +170,16 @@ export default function TripInputs() {
       return;
     }
 
-    setError(null);
+    // Persist trip context so we can resume after sign-in
     setUserLocation(destination);
+
+    // Sign-in gate — the actual generation requires auth
+    if (!accessToken) {
+      setShowSignInGate(true);
+      return;
+    }
+
+    setError(null);
     setLoadingDestinations(true);
     setGeneratingItinerary(true);
 
@@ -130,43 +190,46 @@ export default function TripInputs() {
     if (budget) autoMsg += ` with a budget of ${budget}`;
     autoMsg += `. Generate the full itinerary now.`;
 
+    let didSucceed = false;
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
+      const response = await generatePlannerResponse({
+        userSaid: autoMsg,
+        conversationHistory: [],
+        currentItinerary: null,
+        isModificationRequest: false,
+        destinationHint: destination.name,
+      });
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/velosta-ai/ai-planner`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            userSaid: autoMsg,
-            conversationHistory: [],
-            currentItinerary: null,
-            isModificationRequest: false,
-          }),
-        }
-      );
-
-      clearTimeout(timeout);
-      const data = await res.json();
-
-      if (data.itineraryTable) {
-        setGeneratedItinerary(data);
+      if (!response.isTextResponse && response.itineraryTable) {
+        // Hydrate planner-store + map-store directly so the planner page
+        // works even when ChatPanel isn't mounted (desktop layout).
+        await hydrateItineraryIntoStores(response, {
+          destination: response.destination ?? destination.name,
+          budget: response.totalEstimatedCost || response.totalBudget,
+        });
+        setGeneratedItinerary(response);
+        didSucceed = true;
       } else {
         setGeneratedItinerary(null);
+        setError(
+          response.isTextResponse
+            ? response.message
+            : "Velosta AI couldn't generate an itinerary. Please try again."
+        );
       }
     } catch (err) {
       console.error("[PLAN] error:", err);
       setGeneratedItinerary(null);
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Could not reach Velosta AI. Please try again."
+      );
     } finally {
       setGeneratingItinerary(false);
       setLoadingDestinations(false);
-      selectDestination(destination.name);
+      // Only advance to the planner step when generation succeeded
+      if (didSucceed) selectDestination(destination.name);
     }
   }, [
     selectedTier,
@@ -185,16 +248,30 @@ export default function TripInputs() {
 
   return (
     <>
-      {/* Cloud loading overlay */}
+      {/* Sign-in gate \u2014 shown when user attempts to generate without auth */}
+      <SignInGate
+        open={showSignInGate}
+        onClose={() => setShowSignInGate(false)}
+        next="/velosta-ai"
+        title="Sign in to craft your itinerary"
+        message="We have your trip details ready. Sign in and Velosta AI will build your day-by-day plan."
+      />
+
+      {/* Cloud loading overlay — "crafting" tone for itinerary generation */}
       <CloudOverlay
         visible={isLoadingDestinations}
-        mode="loading"
-        message="Planning your trip..."
+        mode="crafting"
+        message="Your itinerary is being crafted"
+        sublines={[
+          "Tracing the best route through your destination\u2026",
+          "Mapping stays, food and golden-hour stops\u2026",
+          "Tuning the plan to your budget and pace\u2026",
+        ]}
       />
 
       <div className="fixed inset-0 bg-[#FFF9F3] overflow-y-auto">
         {/* Top bar */}
-        <div className="sticky top-0 z-20 bg-[#FFF9F3]/90 backdrop-blur-md border-b border-amber-100/60">
+        <div className="sticky top-0 z-20 bg-[#FFF9F3]/90 backdrop-blur-md border-b border-[#D97757]/15">
           <div className="max-w-lg mx-auto px-6 py-4 flex items-center gap-3">
             <button
               onClick={() => setFlowStep("packages")}
@@ -224,7 +301,7 @@ export default function TripInputs() {
           >
             <h2 className="text-2xl md:text-3xl font-bold text-gray-800 leading-tight">
               Where do you want to{" "}
-              <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#D97757] to-orange-600 bg-clip-text text-transparent">
                 go
               </span>
               ?
@@ -254,8 +331,24 @@ export default function TripInputs() {
                   if (suggestions.length > 0) setShowSuggestions(true);
                 }}
                 placeholder="e.g. Jibhi, Manali, Goa..."
-                className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                className="w-full bg-white border border-[#0B1F2A]/12 rounded-xl pl-4 pr-32 py-3 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[#D97757]/70 focus:ring-2 focus:ring-[#D97757]/20 transition-all"
               />
+
+              {/* Use my location button */}
+              <button
+                type="button"
+                onClick={handleUseMyLocation}
+                disabled={isLocating}
+                aria-label="Use my current location"
+                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[11px] font-semibold text-[#B85F44] bg-[#F5EFE6]/70 hover:bg-[#F5EFE6] border border-[#D97757]/25 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLocating ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <LocateFixed size={12} />
+                )}
+                <span>{isLocating ? "Locating" : "Use my location"}</span>
+              </button>
 
               {/* Autocomplete suggestions dropdown */}
               <AnimatePresence>
@@ -265,16 +358,16 @@ export default function TripInputs() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-amber-200 rounded-xl shadow-lg overflow-hidden"
+                    className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-[#0B1F2A]/12 rounded-xl shadow-lg overflow-hidden"
                   >
                     {suggestions.map((s, i) => (
                       <li key={i}>
                         <button
                           type="button"
                           onClick={() => handleSelectSuggestion(s)}
-                          className="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors flex items-start gap-3 border-b border-gray-50 last:border-b-0"
+                          className="w-full text-left px-4 py-3 hover:bg-[#F5EFE6]/60 transition-colors flex items-start gap-3 border-b border-gray-50 last:border-b-0"
                         >
-                          <MapPin size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                          <MapPin size={14} className="text-[#D97757] mt-0.5 shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
                             <p className="text-xs text-gray-400 truncate">{s.fullName}</p>
@@ -316,8 +409,8 @@ export default function TripInputs() {
                   onClick={() => setDuration(opt.value)}
                   className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-all active:scale-95 ${
                     duration === opt.value
-                      ? "bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-200"
-                      : "bg-white border-amber-200 text-gray-600 hover:border-amber-400"
+                      ? "bg-[#D97757] border-[#D97757] text-white shadow-md shadow-[#D97757]/30"
+                      : "bg-white border-[#0B1F2A]/12 text-gray-600 hover:border-[#D97757]/70"
                   }`}
                 >
                   {opt.label}
@@ -345,7 +438,7 @@ export default function TripInputs() {
             className="w-full py-4 rounded-xl text-white font-semibold text-base transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: isReady
-                ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                ? "linear-gradient(135deg, #D97757, #B85F44)"
                 : "#d1d5db",
               boxShadow: isReady
                 ? "0 8px 30px rgba(245,158,11,0.3)"

@@ -93,7 +93,7 @@ export default function OnboardingHints() {
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
           key={hint.id}
         >
-          <div className="bg-white border border-amber-200 rounded-2xl shadow-xl p-5 max-w-xs w-[300px]">
+          <div className="bg-white border border-[#D97757]/30 rounded-2xl shadow-xl p-5 max-w-xs w-[300px]">
             {/* Close */}
             <button
               onClick={handleDismiss}
@@ -104,8 +104,8 @@ export default function OnboardingHints() {
             </button>
 
             {/* Icon */}
-            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-3">
-              <Icon size={18} className="text-amber-500" />
+            <div className="w-10 h-10 rounded-xl bg-[#F5EFE6]/60 border border-[#D97757]/30 flex items-center justify-center mb-3">
+              <Icon size={18} className="text-[#D97757]" />
             </div>
 
             {/* Content */}
@@ -125,7 +125,7 @@ export default function OnboardingHints() {
                     key={i}
                     className="w-1.5 h-1.5 rounded-full transition-colors"
                     style={{
-                      background: i === currentHint ? "#D97706" : "#e5e7eb",
+                      background: i === currentHint ? "#D97757" : "#e5e7eb",
                     }}
                   />
                 ))}
@@ -134,7 +134,7 @@ export default function OnboardingHints() {
               {/* Next/Done */}
               <button
                 onClick={handleNext}
-                className="text-xs font-medium px-4 py-1.5 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition-colors active:scale-95"
+                className="text-xs font-medium px-4 py-1.5 rounded-full bg-[#D97757] text-white hover:bg-[#B85F44] transition-colors active:scale-95"
               >
                 {currentHint < HINTS.length - 1 ? "Next" : "Got it"}
               </button>

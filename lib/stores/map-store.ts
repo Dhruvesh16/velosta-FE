@@ -14,6 +14,7 @@ interface MapState {
   setViewport: (vp: Partial<MapViewport>) => void;
   flyTo: (coords: [number, number], zoom?: number, pitch?: number) => void;
   setMarkers: (markers: MapMarker[]) => void;
+  updateMarkerCoords: (id: string, coordinates: [number, number]) => void;
   setActiveMarker: (id: string | null) => void;
   setMapReady: (ready: boolean) => void;
 }
@@ -45,6 +46,13 @@ export const useMapStore = create<MapState>((set) => ({
     }),
 
   setMarkers: (markers) => set({ markers }),
+
+  updateMarkerCoords: (id, coordinates) =>
+    set((s) => ({
+      markers: s.markers.map((m) =>
+        m.id === id ? { ...m, coordinates } : m
+      ),
+    })),
 
   setActiveMarker: (id) => set({ activeMarkerId: id }),
 

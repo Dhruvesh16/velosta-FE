@@ -13,13 +13,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(null, { status: 400 });
   }
 
+  // Skip generic activity names — these will only resolve to a random
+  // business near the bias point, polluting the marker positions.
+  const generic = /^(breakfast|lunch|dinner|brunch|snack|meal|return to|check[- ]?(in|out)|free time|rest|transfer|arrive|depart)\b|\b(at )?hotel\s*$|\bscenic\s+spot\b/i;
+  if (generic.test(name.trim()) || name.trim().length < 6) {
+    return NextResponse.json(null);
+  }
+
   try {
-    // Step 1: Text Search to find the place
+    // Step 1: Text Search to find the place. 5 km radius (location bias) is
+    // tight enough that we don't pull in same-named POIs from neighbouring
+    // cities (e.g. a "Sunny Da Dhaba" sitting on the Mumbai-Pune highway
+    // ~30 km from Lonavala town) but still covers the full urban footprint
+    // plus immediate hill-station / lake-front fringe.
     const query = destination ? `${name}, ${destination}` : name;
     const searchUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
     searchUrl.searchParams.set("query", query);
     searchUrl.searchParams.set("location", `${lat},${lng}`);
     searchUrl.searchParams.set("radius", "5000");
+    searchUrl.searchParams.set("region", "in");
     searchUrl.searchParams.set("key", GOOGLE_KEY);
 
     const searchRes = await fetch(searchUrl.toString());
@@ -37,7 +49,7 @@ export async function GET(req: NextRequest) {
     detailUrl.searchParams.set("place_id", placeId);
     detailUrl.searchParams.set(
       "fields",
-      "name,rating,user_ratings_total,types,photos,website,formatted_phone_number,formatted_address,opening_hours"
+      "name,rating,user_ratings_total,types,photos,website,formatted_phone_number,formatted_address,opening_hours,geometry"
     );
     detailUrl.searchParams.set("key", GOOGLE_KEY);
 
@@ -53,6 +65,13 @@ export async function GET(req: NextRequest) {
           `/api/places/photo?ref=${encodeURIComponent(p.photo_reference)}&maxwidth=600`
       );
 
+    // Precise location from Google (much more accurate than Mapbox geocoding for POIs)
+    const geo = result.geometry?.location ?? place.geometry?.location;
+    const location =
+      geo && typeof geo.lat === "number" && typeof geo.lng === "number"
+        ? { lat: geo.lat, lng: geo.lng }
+        : null;
+
     return NextResponse.json({
       placeId,
       name: result.name ?? name,
@@ -64,6 +83,7 @@ export async function GET(req: NextRequest) {
       phone: result.formatted_phone_number,
       address: result.formatted_address ?? place.formatted_address,
       openNow: result.opening_hours?.open_now,
+      location,
     });
   } catch (err) {
     console.error("[api/places] error:", err);

@@ -2,6 +2,7 @@
 // Controls the entry flow: landing → budget → trip-inputs → explore → planner
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type FlowStep = "landing" | "budget" | "packages" | "trip-inputs" | "explore" | "planner";
 
@@ -358,7 +359,9 @@ interface OnboardingState {
   reset: () => void;
 }
 
-export const useOnboardingStore = create<OnboardingState>((set) => ({
+export const useOnboardingStore = create<OnboardingState>()(
+  persist(
+    (set) => ({
   flowStep: "landing",
   selectedTier: null,
   selectedPackage: null,
@@ -429,5 +432,26 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
       generatedItinerary: null,
       isGeneratingItinerary: false,
     }),
-}));
+  }),
+  {
+    name: "velosta-onboarding",
+    storage: createJSONStorage(() => localStorage),
+    partialize: (state) => ({
+      flowStep: state.flowStep,
+      selectedTier: state.selectedTier,
+      selectedPackage: state.selectedPackage,
+      selectedDestination: state.selectedDestination,
+      userLocation: state.userLocation,
+      duration: state.duration,
+      budgetAmount: state.budgetAmount,
+      budgetMode: state.budgetMode,
+      travelerType: state.travelerType,
+      travelerCount: state.travelerCount,
+      interests: state.interests,
+      discoveredDestinations: state.discoveredDestinations,
+      generatedItinerary: state.generatedItinerary,
+    }),
+  }
+  )
+);
 

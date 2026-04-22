@@ -90,12 +90,12 @@ export default function FlowChrome({ currentStep, onExit }: Props) {
         />
       </div>
 
-      {/* Brand mark — top-left */}
+      {/* Brand mark — top-left. Hidden on mobile (each page owns its own header on small screens) */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-        className="pointer-events-auto fixed left-6 top-6 z-50 sm:left-10 sm:top-8"
+        className="pointer-events-auto fixed left-6 top-6 z-50 hidden md:block sm:left-10 sm:top-8"
       >
         <Link
           href="/"
@@ -201,12 +201,15 @@ export default function FlowChrome({ currentStep, onExit }: Props) {
         </div>
       </motion.div>
 
-      {/* Mobile — compact step indicator */}
+      {/* Mobile — compact step indicator. Hidden on the planner step because
+          SpatialPlannerShell renders its own bottom tab bar there. */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.9, delay: 0.5 }}
-        className="pointer-events-none fixed bottom-4 left-1/2 z-40 -translate-x-1/2 md:hidden"
+        className={`pointer-events-none fixed bottom-4 left-1/2 z-40 -translate-x-1/2 md:hidden ${
+          currentStep === "planner" || currentStep === "budget" ? "hidden" : ""
+        }`}
       >
         <div
           className="flex items-center gap-3 rounded-full px-4 py-2"

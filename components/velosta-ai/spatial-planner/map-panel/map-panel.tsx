@@ -208,7 +208,24 @@ export default function MapPanel() {
     // it doesn't shift the anchor. Without this, the marker visibly drifts
     // off its true coord when zoomed out / pitched.
     const anchorHeight = size + 9;
-    el.style.cssText = `cursor:pointer;position:relative;width:${size}px;height:${anchorHeight}px;overflow:visible;font-family:var(--font-sans, system-ui);`;
+    // CRITICAL: Mapbox writes `transform: translate(Xpx, Ypx)` to this root
+    // element every render frame to keep it pinned to the geographic coord.
+    // We MUST NOT set a `transform` here (would be overwritten and reset to
+    // the page origin briefly each frame, causing visible jitter). We only
+    // declare `will-change: transform` so the browser still GPU-promotes
+    // the layer for smooth panning/zooming.
+    el.style.cssText = `cursor:pointer;position:relative;width:${size}px;height:${anchorHeight}px;overflow:visible;font-family:var(--font-sans, system-ui);will-change:transform;`;
+    // Tag with a class so zoom listeners can scale / declutter labels.
+    // (The zoom listener targets the INNER scale wrapper below — never the
+    // root — so Mapbox's transform isn't disturbed.)
+    el.classList.add("velosta-marker");
+
+    // Scalable inner wrapper. All visual children are mounted inside this so
+    // we can resize the marker on zoom without touching the root transform.
+    const scaleWrap = document.createElement("div");
+    scaleWrap.className = "velosta-marker-scale";
+    scaleWrap.style.cssText = `position:absolute;inset:0;transform-origin:50% 100%;will-change:transform;`;
+    el.appendChild(scaleWrap);
 
     // ── Inner coin (the visible pin body) ────────────────────────────
     const inner = document.createElement("div");
@@ -263,7 +280,7 @@ export default function MapPanel() {
         }
       });
     }
-    el.appendChild(inner);
+    scaleWrap.appendChild(inner);
 
     // ── Engraved coin badge (stop number) ───────────────────────────
     const badge = document.createElement("div");
@@ -278,7 +295,7 @@ export default function MapPanel() {
       box-shadow:0 2px 5px rgba(11,31,42,0.35);
     `;
     badge.textContent = String(index + 1);
-    el.appendChild(badge);
+    scaleWrap.appendChild(badge);
 
     // ── Tether (the "stem" of the meridian) ────────────────────────
     const tether = document.createElement("div");
@@ -289,7 +306,7 @@ export default function MapPanel() {
       border-radius:1px;
       pointer-events:none;
     `;
-    el.appendChild(tether);
+    scaleWrap.appendChild(tether);
 
     // Drop dot at the tip
     const dot = document.createElement("div");
@@ -300,10 +317,15 @@ export default function MapPanel() {
       box-shadow:0 0 0 1.5px #FBF8F3, 0 2px 4px rgba(11,31,42,0.4);
       pointer-events:none;
     `;
-    el.appendChild(dot);
+    scaleWrap.appendChild(dot);
 
     // ── Editorial label plate ───────────────────────────────────────
     const labelEl = document.createElement("div");
+    // Tagged with `velosta-marker-label` so a zoom listener can hide it at
+    // low zoom levels (below ~11) — without this, the label plate visually
+    // "drifts" away from its geographic anchor when zoomed out, which reads
+    // as the marker being in the wrong place.
+    labelEl.className = "velosta-marker-label";
     labelEl.style.cssText = `
       position:absolute;top:${size + 12}px;left:50%;transform:translateX(-50%);
       white-space:nowrap;max-width:140px;
@@ -321,7 +343,7 @@ export default function MapPanel() {
       box-shadow:0 2px 6px rgba(11,31,42,0.25);
     `;
     labelEl.textContent = label;
-    el.appendChild(labelEl);
+    scaleWrap.appendChild(labelEl);
 
     // Hover interactions
     el.addEventListener("mouseenter", () => {
@@ -454,10 +476,40 @@ export default function MapPanel() {
 
     map.on("style.load", onStyleLoad);
 
+    // ── Zoom-aware marker declutter ──────────────────────────────────────
+    // At low zoom (city-or-country wide), the per-marker label plate floats
+    // far below its true geographic anchor and reads as the marker being
+    // "in the wrong place" (e.g. labels pushed into the sea around Tokyo).
+    // We hide labels and shrink pins below threshold zooms — Google-Maps
+    // style — so the visible mark always sits exactly on its coord.
+    const applyMarkerScale = () => {
+      const z = map.getZoom();
+      const showLabel = z >= 11;     // labels visible only when usefully readable
+      const compact = z < 9;         // shrink pins to a dot at country view
+      const scale = compact ? 0.55 : z < 11 ? 0.78 : 1;
+      const root = map.getContainer();
+      // Scale the INNER wrapper, never the root — Mapbox owns the root's
+      // transform and overwrites it each frame to position the marker.
+      root.querySelectorAll<HTMLElement>(".velosta-marker-scale").forEach((el) => {
+        el.style.transform = `scale(${scale})`;
+      });
+      root.querySelectorAll<HTMLElement>(".velosta-marker-label").forEach((el) => {
+        el.style.opacity = showLabel ? "1" : "0";
+        el.style.visibility = showLabel ? "visible" : "hidden";
+      });
+    };
+    map.on("zoom", applyMarkerScale);
+    map.on("zoomend", applyMarkerScale);
+    // Also run once after markers mount
+    map.on("idle", applyMarkerScale);
+
     return () => {
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
       map.off("style.load", onStyleLoad);
+      map.off("zoom", applyMarkerScale);
+      map.off("zoomend", applyMarkerScale);
+      map.off("idle", applyMarkerScale);
       map.remove();
       mapRef.current = null;
       setMapLoaded(false);

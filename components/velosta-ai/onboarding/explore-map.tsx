@@ -18,7 +18,9 @@ import {
   Users,
   Home,
   ChevronRight,
+  ChevronUp,
   IndianRupee,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
@@ -88,7 +90,6 @@ export default function ExploreMapView() {
   const [tripType, setTripType] = useState(storeTravelerType);
   const [categories, setCategories] = useState<string[]>([...storeInterests]);
   const [isSatellite, setIsSatellite] = useState(false);
-
   // ── UI state ──
   const [hoveredDest, setHoveredDest] = useState<Destination | null>(null);
   const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
@@ -96,6 +97,9 @@ export default function ExploreMapView() {
   const [showSignInGate, setShowSignInGate] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  // Mobile-only UI state
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileListExpanded, setMobileListExpanded] = useState(false);
 
   // ── Refs ──
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -224,7 +228,7 @@ export default function ExploreMapView() {
           </div>
           <div style="margin-top:4px">
             <span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600;color:white;background:${color}">
-              ${fit === "perfect" ? "✓ Within budget" : fit === "stretch" ? "~ Stretch" : "✗ Over budget"}
+              ${fit === "perfect" ? "Within budget" : fit === "stretch" ? "Stretch" : "Over budget"}
             </span>
           </div>
         </div>`
@@ -440,9 +444,9 @@ export default function ExploreMapView() {
       </AnimatePresence>
 
       <div className="fixed inset-0 flex bg-gray-100">
-        {/* ── Left Sidebar: Filters ─────────────────────────────── */}
+        {/* ── Left Sidebar: Filters (desktop only) ─────────────── */}
         <motion.div
-          className="h-full bg-white/95 backdrop-blur-lg border-r border-gray-200 flex flex-col z-20 shadow-lg"
+          className="hidden lg:flex h-full bg-white/95 backdrop-blur-lg border-r border-gray-200 flex-col z-20 shadow-lg"
           initial={{ x: -320 }}
           animate={{ x: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -619,9 +623,9 @@ export default function ExploreMapView() {
           />
         </div>
 
-        {/* ── Right Sidebar: Destination List ────────────────────── */}
+        {/* ── Right Sidebar: Destination List (desktop only) ───── */}
         <motion.div
-          className="h-full bg-[#FBF8F3]/95 backdrop-blur-lg border-l border-[#0B1F2A]/8 flex flex-col z-20 shadow-[0_18px_40px_-20px_rgba(11,31,42,0.18)]"
+          className="hidden lg:flex h-full bg-[#FBF8F3]/95 backdrop-blur-lg border-l border-[#0B1F2A]/8 flex-col z-20 shadow-[0_18px_40px_-20px_rgba(11,31,42,0.18)]"
           initial={{ x: 320 }}
           animate={{ x: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -706,6 +710,274 @@ export default function ExploreMapView() {
             )}
           </div>
         </motion.div>
+
+        {/* ══════════════════════════════════════════════════════════════
+            MOBILE UI — top bar + filters drawer + bottom destination sheet
+            ════════════════════════════════════════════════════════════ */}
+
+        {/* Mobile top bar — back · title · filter toggle */}
+        <div className="lg:hidden absolute top-0 inset-x-0 z-30 px-4 pt-4 pb-3 flex items-center justify-between bg-gradient-to-b from-white/90 via-white/70 to-transparent backdrop-blur-md">
+          <button
+            onClick={() => setFlowStep("budget")}
+            className="p-2 rounded-full bg-white/95 shadow-sm border border-[#0B1F2A]/8"
+            aria-label="Back"
+          >
+            <ArrowLeft size={16} className="text-[#0B1F2A]" />
+          </button>
+          <div className="text-center">
+            <p className="text-[9px] tracking-[0.24em] text-[#2F6F73] font-semibold uppercase">
+              Discover
+            </p>
+            <h2 className="font-serif text-[14px] font-semibold text-[#0B1F2A] leading-tight">
+              {filtered.length} {filtered.length === 1 ? "place" : "places"}
+            </h2>
+          </div>
+          <button
+            onClick={() => setMobileFiltersOpen(true)}
+            className="relative p-2 rounded-full bg-white/95 shadow-sm border border-[#0B1F2A]/8"
+            aria-label="Filters"
+          >
+            <SlidersHorizontal size={16} className="text-[#0B1F2A]" />
+            {(categories.length > 0 || tripType) && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#D97757]" />
+            )}
+          </button>
+        </div>
+
+        {/* Mobile bottom destination sheet — collapsed by default, swipe up to expand */}
+        <motion.div
+          className="lg:hidden absolute inset-x-0 bottom-0 z-20 bg-[#FBF8F3] rounded-t-3xl border-t border-[#0B1F2A]/10 shadow-[0_-12px_40px_-12px_rgba(11,31,42,0.18)] overflow-hidden flex flex-col"
+          animate={{ height: mobileListExpanded ? "78vh" : "38vh" }}
+          transition={{ type: "spring", stiffness: 240, damping: 28 }}
+        >
+          {/* Drag handle */}
+          <button
+            onClick={() => setMobileListExpanded((v) => !v)}
+            className="w-full pt-3 pb-2 flex flex-col items-center shrink-0"
+            aria-label={mobileListExpanded ? "Collapse list" : "Expand list"}
+          >
+            <span className="block w-10 h-1 rounded-full bg-[#0B1F2A]/15" />
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] tracking-[0.24em] text-[#2F6F73] font-semibold uppercase">
+                Curated for you
+              </span>
+              <ChevronUp
+                size={12}
+                className={`text-[#0B1F2A]/45 transition-transform ${mobileListExpanded ? "rotate-180" : ""}`}
+              />
+            </div>
+          </button>
+
+          <div className="flex-1 overflow-y-auto pb-4">
+            {filtered.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-[13px] font-medium text-[#0B1F2A]">No matches yet</p>
+                <p className="text-[11.5px] text-[#0B1F2A]/50 mt-1">
+                  Try widening your budget or removing a category.
+                </p>
+              </div>
+            ) : (
+              filtered.map((dest) => {
+                const fit = getBudgetFit(dest, budget);
+                const color = getBudgetColor(fit);
+                return (
+                  <button
+                    key={`m-${dest.id}`}
+                    onClick={() => setSelectedDest(dest)}
+                    className="w-full text-left px-5 py-3 border-b border-[#0B1F2A]/5 active:bg-[#F5EFE6]/60 flex items-center gap-3"
+                  >
+                    <span
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-base shrink-0"
+                      style={{
+                        background: `${color}14`,
+                        border: `1.5px solid ${color}38`,
+                      }}
+                    >
+                      {dest.emoji}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13.5px] font-semibold text-[#0B1F2A] truncate">
+                        {dest.name}
+                      </p>
+                      <p className="text-[11px] text-[#0B1F2A]/50 truncate">
+                        {dest.state} · ₹{(dest.costMin / 1000).toFixed(0)}K–
+                        {(dest.costMax / 1000).toFixed(0)}K · {dest.durationMin}–
+                        {dest.durationMax}d
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-[#0B1F2A]/30 shrink-0" />
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </motion.div>
+
+        {/* Mobile filters drawer */}
+        <AnimatePresence>
+          {mobileFiltersOpen && (
+            <>
+              <motion.div
+                className="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setMobileFiltersOpen(false)}
+              />
+              <motion.div
+                className="lg:hidden fixed top-0 bottom-0 right-0 z-50 w-[85vw] max-w-[340px] bg-white shadow-2xl flex flex-col"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", stiffness: 280, damping: 30 }}
+              >
+                <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#0B1F2A]/8">
+                  <div>
+                    <p className="text-[10px] tracking-[0.24em] text-[#2F6F73] font-semibold uppercase">
+                      Refine
+                    </p>
+                    <h2 className="font-serif text-[18px] font-semibold text-[#0B1F2A]">
+                      Filters
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setMobileFiltersOpen(false)}
+                    className="p-2 rounded-full hover:bg-[#F5EFE6]"
+                    aria-label="Close"
+                  >
+                    <X size={18} className="text-[#0B1F2A]" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                  {/* Budget */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                      Budget
+                    </label>
+                    <div className="text-center mb-2">
+                      <span className="text-xl font-bold text-gray-800">
+                        ₹{budget.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="relative w-full h-2 rounded-full">
+                      <div className="absolute inset-0 bg-[#F5EFE6] rounded-full" />
+                      <div
+                        className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-[#E89378] to-[#D97757] rounded-full"
+                        style={{ width: `${sliderPct}%` }}
+                      />
+                      <input
+                        type="range"
+                        min={1000}
+                        max={50000}
+                        step={500}
+                        value={budget}
+                        onChange={(e) => setBudget(Number(e.target.value))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-[#D97757] rounded-full shadow border-2 border-white pointer-events-none"
+                        style={{ left: `calc(${sliderPct}% - 8px)` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[9px] text-gray-400 mt-1">
+                      <span>₹1K</span>
+                      <span>₹50K</span>
+                    </div>
+                  </div>
+
+                  {/* Duration */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                      Duration
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {DURATION_OPTIONS.map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setDuration(d)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                            duration === d
+                              ? "bg-[#D97757] border-[#D97757] text-white"
+                              : "bg-white border-gray-200 text-gray-600"
+                          }`}
+                        >
+                          {d}d
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Trip Type */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                      Trip Type
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {TRAVELER_TYPES.map(({ id, label, Icon }) => (
+                        <button
+                          key={id}
+                          onClick={() => setTripType(tripType === id ? "" : id)}
+                          className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium border transition-all ${
+                            tripType === id
+                              ? "bg-[#D97757] border-[#D97757] text-white"
+                              : "bg-white border-gray-200 text-gray-600"
+                          }`}
+                        >
+                          <Icon size={14} />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Category */}
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                      Category
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {CATEGORY_OPTIONS.map(({ id, label, emoji }) => (
+                        <button
+                          key={id}
+                          onClick={() => toggleCategory(id)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                            categories.includes(id)
+                              ? "bg-[#D97757] border-[#D97757] text-white"
+                              : "bg-white border-gray-200 text-gray-600"
+                          }`}
+                        >
+                          <span>{emoji}</span>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={clearFilters}
+                    className="flex items-center gap-2 text-xs text-gray-400"
+                  >
+                    <FilterX size={13} />
+                    Clear Filters
+                  </button>
+                </div>
+
+                <div className="px-5 py-4 border-t border-[#0B1F2A]/8 bg-[#FBF8F3]">
+                  <button
+                    onClick={() => setMobileFiltersOpen(false)}
+                    className="w-full py-3 rounded-xl text-white font-semibold text-sm"
+                    style={{
+                      background: "linear-gradient(135deg, #D97757, #B85F44)",
+                    }}
+                  >
+                    Show {filtered.length} {filtered.length === 1 ? "place" : "places"}
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Detail Modal ────────────────────────────────────────── */}
@@ -783,10 +1055,10 @@ export default function ExploreMapView() {
                       style={{ background: getBudgetColor(fit) }}
                     >
                       {fit === "perfect"
-                        ? "✓ Within budget"
+                        ? "Within budget"
                         : fit === "stretch"
-                          ? "~ Stretch"
-                          : "✗ Over budget"}
+                          ? "Stretch"
+                          : "Over budget"}
                     </span>
                   );
                 })()}

@@ -308,7 +308,7 @@ export default function IntentCapture() {
         }}
       />
 
-      <div className="relative mx-auto grid min-h-screen w-full max-w-[1280px] grid-cols-1 gap-12 px-6 pt-24 pb-32 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:gap-20 lg:px-12 lg:pt-28">
+      <div className="relative mx-auto grid min-h-screen w-full max-w-[1280px] grid-cols-1 gap-12 px-6 pt-10 pb-32 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:gap-20 lg:px-12 lg:pt-28">
         {/* ── LEFT — Editorial aside ──────────────────────────────── */}
         <motion.aside
           initial={{ opacity: 0, y: 24 }}
@@ -492,7 +492,7 @@ export default function IntentCapture() {
               label={budgetMode === "per_person" ? "Budget per person" : "Total trip budget"}
               hint="Slide or type — we adapt."
             >
-              <div className="flex items-end justify-between gap-4">
+              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
                 {/*
                   Auto-sizing currency display.
                   - Font scales down (42 → 36 → 32 px) as the number gets longer
@@ -540,7 +540,7 @@ export default function IntentCapture() {
                 <div
                   role="tablist"
                   aria-label="Budget mode"
-                  className="mb-1 inline-flex shrink-0 items-center rounded-full p-0.5"
+                  className="inline-flex shrink-0 items-center self-start rounded-full p-0.5 sm:mb-1 sm:self-end"
                   style={{
                     backgroundColor: "rgba(11,31,42,0.06)",
                     border: "1px solid rgba(11,31,42,0.08)",

@@ -28,11 +28,12 @@ export async function hydrateItineraryIntoStores(
   // 1. Normalize into store
   usePlannerStore.getState().setItineraryData(data, rawTripData);
 
-  // 2. Fly to destination
+  // 2. Fly to destination (initial wide-angle approach)
+  let destCoords: [number, number] | null = null;
   if (data.destination) {
-    const destCoords = await geocodeDestination(data.destination);
+    destCoords = await geocodeDestination(data.destination);
     if (destCoords) {
-      useMapStore.getState().flyTo(destCoords, 12, 0);
+      useMapStore.getState().flyTo(destCoords, 10, 0);
     }
   }
 
@@ -53,5 +54,19 @@ export async function hydrateItineraryIntoStores(
   });
 
   // 5. Push markers to map
-  useMapStore.getState().setMarkers(itineraryToMarkers(enriched));
+  const markers = itineraryToMarkers(enriched);
+  useMapStore.getState().setMarkers(markers);
+
+  // 6. Cinematic zoom into the actual itinerary location.
+  //    Prefer the day-1 centroid (tighter, shows the trip "starting point");
+  //    fall back to the destination centre if day coords aren't available.
+  const day1Coords = enriched[0]?.coordinates;
+  const finalCenter = day1Coords ?? destCoords;
+  if (finalCenter) {
+    // Small delay so the destination flyTo animation finishes its first beat
+    // and the user perceives a deliberate zoom-in moment.
+    setTimeout(() => {
+      useMapStore.getState().flyTo(finalCenter, 12.5, 35);
+    }, 350);
+  }
 }

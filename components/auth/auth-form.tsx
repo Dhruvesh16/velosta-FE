@@ -20,6 +20,7 @@ interface AuthFormProps {
 
 export function AuthForm({ type }: AuthFormProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -101,9 +102,9 @@ export function AuthForm({ type }: AuthFormProps) {
       setUser(bundle.user);
 
       toast.success(
-        type === "nextPathnup" ? "Welcome to Velosta" : "Signed in successfully"
+        type === "signup" ? "Welcome to Velosta" : "Signed in successfully"
       );
-      router.push("/");
+      router.push(nextPath);
     } catch (err: any) {
       console.error(err);
       const msg =
@@ -264,21 +265,38 @@ export function AuthForm({ type }: AuthFormProps) {
             >
               Confirm Password
             </Label>
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              className="h-12 rounded-xl text-[14px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-0"
-              style={{
-                backgroundColor: "#FBF8F3",
-                borderColor: "rgba(11,31,42,0.1)",
-                color: "#0B1F2A",
-              }}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="h-12 rounded-xl pr-12 text-[14px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-0"
+                style={{
+                  backgroundColor: "#FBF8F3",
+                  borderColor: "rgba(11,31,42,0.1)",
+                  color: "#0B1F2A",
+                }}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 transition-colors"
+                style={{ color: "rgba(11,31,42,0.5)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "#0B1F2A")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "rgba(11,31,42,0.5)")
+                }
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
         )}
 

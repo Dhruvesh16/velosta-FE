@@ -2,6 +2,7 @@
 // Master state for the itinerary, trip data and budget tracking
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { nanoid } from "nanoid";
 import type {
   ItineraryDay,
@@ -103,7 +104,9 @@ function arrayMove<T>(arr: T[], from: number, to: number): T[] {
   return next;
 }
 
-export const usePlannerStore = create<PlannerState>((set, get) => ({
+export const usePlannerStore = create<PlannerState>()(
+  persist(
+    (set, get) => ({
   itineraryData: null,
   itinerary: [],
   tripData: {},
@@ -183,7 +186,21 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
       totalBudget: 0,
       spentBudget: 0,
     }),
-}));
+    }),
+    {
+      name: "velosta-planner",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        itineraryData: state.itineraryData,
+        itinerary: state.itinerary,
+        tripData: state.tripData,
+        activeDay: state.activeDay,
+        totalBudget: state.totalBudget,
+        spentBudget: state.spentBudget,
+      }),
+    }
+  )
+);
 
 
 

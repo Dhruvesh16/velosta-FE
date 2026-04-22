@@ -5,7 +5,7 @@ import {
   Map, FileDown, RotateCcw, MapPin, Utensils, Camera, Bed,
   Sun, Sunset, Moon, Coffee, Navigation, Copy, BedDouble, UtensilsCrossed,
   Send, Sparkles, ChevronDown, ChevronUp, Loader2, ArrowLeft, Share2, Settings,
-  MessageCircle,
+  MessageCircle, Compass, X,
 } from "lucide-react";
 import { usePlannerStore } from "@/lib/stores/planner-store";
 import { useMapStore } from "@/lib/stores/map-store";
@@ -20,7 +20,7 @@ import {
 import { generatePlannerResponse } from "@/lib/services/planner-service";
 import LocationCard from "./location-card";
 import SuggestionsPanel from "./suggestions-panel";
-import { exportItineraryPDF } from "@/lib/services/index";
+import { exportItineraryPDF, shareItinerary } from "@/lib/services/index";
 import type { ActivityRow } from "@/lib/types/planner.types";
 
 // ── Velosta Gilded Meridian palette ──────────────────────────────────────
@@ -110,6 +110,11 @@ export default function ItineraryPanel() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiExpanded, setAiExpanded] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
+  // Toast for export/share actions
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [showStartNewConfirm, setShowStartNewConfirm] = useState(false);
   const aiInputRef = useRef<HTMLInputElement>(null);  const { setMobileTab } = useUIStore();
   const { selectedPackage } = useOnboardingStore();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -137,16 +142,53 @@ export default function ItineraryPanel() {
   }, [activeMarkerId]);
 
   async function handleExportPDF() {
-    if (!itineraryData) return;
-    await exportItineraryPDF(itineraryData, tripData);
+    if (!itineraryData || isExporting) return;
+    setIsExporting(true);
+    try {
+      await exportItineraryPDF(itineraryData, tripData);
+      setActionToast("Downloaded");
+    } catch (err) {
+      console.error("[itinerary] export pdf failed", err);
+      setActionToast("Export failed");
+    } finally {
+      setIsExporting(false);
+      setTimeout(() => setActionToast(null), 1800);
+    }
   }
 
-  function handleCopyItinerary() {
-    if (!currentDay) return;
-    const text = currentDay.rows
-      .map((r, i) => `${i + 1}. ${r.time ? `[${r.time}] ` : ""}${r.activity}${r.description ? ` — ${r.description}` : ""}`)
-      .join("\n");
-    navigator.clipboard.writeText(`Day ${currentDay.day}: ${currentDay.theme}\n\n${text}`);
+  function handleStartNew() {
+    // Wipe planner + map + onboarding state, then return to landing.
+    // Persisted localStorage keys are overwritten by these resets.
+    try {
+      usePlannerStore.getState().clearItinerary();
+      useMapStore.getState().setMarkers([]);
+      useMapStore.getState().flyTo([77.5946, 12.9716], 2, 0);
+      useOnboardingStore.getState().reset();
+    } catch (err) {
+      console.warn("[itinerary] start-new reset failed", err);
+    }
+    setShowStartNewConfirm(false);
+  }
+
+  async function handleShare() {
+    if (!itineraryData || isSharing) return;
+    setIsSharing(true);
+    try {
+      const result = await shareItinerary(itineraryData, tripData);
+      const label =
+        result === "shared"
+          ? "Shared"
+          : result === "downloaded"
+          ? "Downloaded"
+          : "Copied to clipboard";
+      setActionToast(label);
+    } catch (err) {
+      console.error("[itinerary] share failed", err);
+      setActionToast("Share failed");
+    } finally {
+      setIsSharing(false);
+      setTimeout(() => setActionToast(null), 1800);
+    }
   }
 
   // ── AI Refine Handler ──
@@ -366,8 +408,8 @@ export default function ItineraryPanel() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#FBF8F3]">
-      {/* ── Top utility bar (sits below FlowChrome brand mark zone) ── */}
-      <div className="shrink-0 pt-[68px] px-5 pb-2 flex items-center justify-between">
+      {/* ── Top utility bar (extra top padding on desktop to clear FlowChrome brand mark) ── */}
+      <div className="shrink-0 pt-3 md:pt-[68px] px-5 pb-2 flex items-center justify-between">
         <button
           onClick={() => useOnboardingStore.getState().setFlowStep("explore")}
           className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0B1F2A]/55 hover:text-[#0B1F2A] transition-colors"
@@ -378,18 +420,39 @@ export default function ItineraryPanel() {
         </button>
         <div className="flex items-center gap-0.5">
           <button
-            onClick={handleExportPDF}
-            className="p-1.5 rounded-md hover:bg-[#0B1F2A]/5 transition-colors text-[#0B1F2A]/45 hover:text-[#0B1F2A]/85"
-            title="Export PDF"
+            onClick={() => setShowStartNewConfirm(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#D97757]/40 bg-gradient-to-r from-[#D97757]/8 to-[#B85F44]/8 hover:from-[#D97757]/15 hover:to-[#B85F44]/15 transition-all text-[10px] font-semibold uppercase tracking-[0.18em] text-[#B85F44] mr-1"
+            title="Begin a fresh journey"
+            aria-label="Start a new journey"
           >
-            <FileDown size={13} strokeWidth={1.8} />
+            <Compass size={11} strokeWidth={2.2} />
+            <span>New&nbsp;Journey</span>
           </button>
           <button
-            onClick={handleCopyItinerary}
-            className="p-1.5 rounded-md hover:bg-[#0B1F2A]/5 transition-colors text-[#0B1F2A]/45 hover:text-[#0B1F2A]/85"
-            title="Share"
+            onClick={handleExportPDF}
+            disabled={isExporting || !itineraryData}
+            className="p-1.5 rounded-md hover:bg-[#0B1F2A]/5 transition-colors text-[#0B1F2A]/45 hover:text-[#0B1F2A]/85 disabled:opacity-40"
+            title="Download PDF"
+            aria-label="Download PDF"
           >
-            <Share2 size={13} strokeWidth={1.8} />
+            {isExporting ? (
+              <Loader2 size={13} strokeWidth={1.8} className="animate-spin" />
+            ) : (
+              <FileDown size={13} strokeWidth={1.8} />
+            )}
+          </button>
+          <button
+            onClick={handleShare}
+            disabled={isSharing || !itineraryData}
+            className="p-1.5 rounded-md hover:bg-[#0B1F2A]/5 transition-colors text-[#0B1F2A]/45 hover:text-[#0B1F2A]/85 disabled:opacity-40"
+            title="Share itinerary"
+            aria-label="Share itinerary"
+          >
+            {isSharing ? (
+              <Loader2 size={13} strokeWidth={1.8} className="animate-spin" />
+            ) : (
+              <Share2 size={13} strokeWidth={1.8} />
+            )}
           </button>
         </div>
       </div>
@@ -695,6 +758,117 @@ export default function ItineraryPanel() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Action toast — small, centered, auto-dismisses */}
+      <AnimatePresence>
+        {actionToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-[12px] font-medium text-white shadow-lg pointer-events-none"
+            style={{ background: "rgba(11,31,42,0.92)", backdropFilter: "blur(8px)" }}
+            role="status"
+            aria-live="polite"
+          >
+            {actionToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Start New Journey · confirm dialog ───────────────────────── */}
+      <AnimatePresence>
+        {showStartNewConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-5"
+            style={{ background: "rgba(11,31,42,0.55)", backdropFilter: "blur(6px)" }}
+            onClick={() => setShowStartNewConfirm(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-new-title"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.97 }}
+              transition={{ type: "spring", damping: 22, stiffness: 280 }}
+              className="relative w-full max-w-[420px] rounded-3xl bg-[#FBF8F3] border border-[#0B1F2A]/8 shadow-[0_30px_80px_-20px_rgba(11,31,42,0.55)] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Editorial wash */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    "radial-gradient(120% 80% at 50% 0%, rgba(217,119,87,0.14) 0%, transparent 55%), radial-gradient(100% 70% at 50% 100%, rgba(47,111,115,0.10) 0%, transparent 55%)",
+                }}
+              />
+
+              <button
+                onClick={() => setShowStartNewConfirm(false)}
+                className="absolute top-3 right-3 p-1.5 rounded-full text-[#0B1F2A]/45 hover:text-[#0B1F2A] hover:bg-[#0B1F2A]/5 transition-colors"
+                aria-label="Close"
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
+
+              <div className="relative px-7 pt-9 pb-7 text-center">
+                {/* Compass mark */}
+                <div className="mx-auto mb-5 w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 30% 30%, rgba(217,119,87,0.22), rgba(47,111,115,0.10) 65%, transparent)",
+                    border: "1px solid rgba(11,31,42,0.08)",
+                  }}
+                >
+                  <Compass size={26} className="text-[#B85F44]" strokeWidth={1.6} />
+                </div>
+
+                <p className="text-[9.5px] font-semibold uppercase tracking-[0.32em] text-[#2F6F73] mb-2">
+                  A new horizon
+                </p>
+                <h2 id="start-new-title" className="font-serif text-[22px] leading-[1.18] text-[#0B1F2A]">
+                  Begin a <span className="italic text-[#D97757]">fresh</span> journey?
+                </h2>
+                <p className="text-[12.5px] leading-relaxed text-[#0B1F2A]/55 mt-3 max-w-[320px] mx-auto">
+                  Your current itinerary &mdash; <span className="font-medium text-[#0B1F2A]/75">{destination || "this trip"}</span> &mdash; will fold away. Don't worry, you can always plan another. The next chapter is waiting to be written.
+                </p>
+
+                <div className="mt-6 flex flex-col sm:flex-row gap-2.5 justify-center">
+                  <button
+                    onClick={() => setShowStartNewConfirm(false)}
+                    className="px-5 py-2.5 rounded-full text-[12px] font-semibold text-[#0B1F2A]/70 hover:text-[#0B1F2A] bg-white border border-[#0B1F2A]/12 hover:bg-[#0B1F2A]/3 transition-all"
+                  >
+                    Keep this trip
+                  </button>
+                  <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleStartNew}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-[12px] font-semibold text-white"
+                    style={{
+                      background: "linear-gradient(135deg, #D97757, #B85F44)",
+                      boxShadow: "0 12px 30px -10px rgba(217,119,87,0.55)",
+                    }}
+                  >
+                    <Sparkles size={13} strokeWidth={2.2} />
+                    Start anew
+                  </motion.button>
+                </div>
+
+                <p className="text-[10px] text-[#0B1F2A]/35 mt-5 tracking-wide italic">
+                  &ldquo;Every journey begins with a single, deliberate step.&rdquo;
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

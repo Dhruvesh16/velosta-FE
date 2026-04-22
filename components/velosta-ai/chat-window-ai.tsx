@@ -73,11 +73,11 @@ function ItineraryCard({
               Budget Breakdown
             </p>
           </div>
-          <div className="p-3 grid grid-cols-2 gap-2">
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
             {Object.entries(data.budgetBreakdown).map(([k, v]) => (
-              <div key={k} className="flex justify-between text-xs bg-white rounded-lg px-3 py-2 border border-gray-100">
-                <span className="text-gray-500 capitalize">{k}</span>
-                <span className="font-semibold text-[#B85F44]">{v as string}</span>
+              <div key={k} className="flex items-center justify-between gap-3 text-xs bg-white rounded-lg px-3 py-2 border border-gray-100 min-w-0">
+                <span className="text-gray-500 capitalize truncate">{k}</span>
+                <span className="font-semibold text-[#B85F44] whitespace-nowrap">{v as string}</span>
               </div>
             ))}
           </div>

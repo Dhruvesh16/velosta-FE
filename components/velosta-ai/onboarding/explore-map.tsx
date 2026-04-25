@@ -25,7 +25,7 @@ import {
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
 import { DESTINATIONS, type Destination } from "@/lib/data/destinations";
-import { generatePlannerResponse } from "@/lib/services/planner-service";
+import { generatePlannerStreamAsync } from "@/lib/services/planner-service";
 import { hydrateItineraryIntoStores } from "@/lib/services/itinerary-hydrator";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
@@ -74,8 +74,11 @@ export default function ExploreMapView() {
     budgetAmount,
     duration: storeDuration,
     travelerType: storeTravelerType,
+    travelerCount: storeTravelerCount,
     interests: storeInterests,
     userLocation,
+    customDestination,
+    setCustomDestination,
     setGeneratedItinerary,
     setGeneratingItinerary,
     selectDestination,
@@ -88,12 +91,14 @@ export default function ExploreMapView() {
   const [budget, setBudget] = useState(budgetAmount);
   const [duration, setDuration] = useState(storeDuration);
   const [tripType, setTripType] = useState(storeTravelerType);
+  const [travelerCount, setTravelerCount] = useState(storeTravelerCount);
   const [categories, setCategories] = useState<string[]>([...storeInterests]);
   const [isSatellite, setIsSatellite] = useState(false);
   // ── UI state ──
   const [hoveredDest, setHoveredDest] = useState<Destination | null>(null);
   const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [streamBuffer, setStreamBuffer] = useState<string | undefined>(undefined);
   const [showSignInGate, setShowSignInGate] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -290,7 +295,7 @@ export default function ExploreMapView() {
   // empty: hydrate context → sign-in gate → call planner → push into stores
   // → advance to planner step.
   const handleBuildItinerary = useCallback(
-    async (dest: Destination) => {
+    async (dest: Destination, locationOverride?: string) => {
       // Hydrate planner store with the user's chosen context
       setUserLocation({ name: dest.name, coordinates: dest.coordinates });
       setStoreDuration(duration);
@@ -303,12 +308,16 @@ export default function ExploreMapView() {
 
       const interestStr =
         categories.length > 0 ? ` focusing on ${categories.join(", ")}` : "";
-      const locationStr = dest.country && dest.country !== "India"
-        ? `${dest.name}, ${dest.state}, ${dest.country}`
-        : `${dest.name}, ${dest.state}`;
+      const locationStr = locationOverride
+        ?? (dest.country && dest.country !== "India"
+          ? `${dest.name}, ${dest.state}, ${dest.country}`
+          : `${dest.name}, ${dest.state}`);
+      const originStr = userLocation?.name
+        ? ` Starting from ${userLocation.name} — Day 1 must include travel from ${userLocation.name} to ${dest.name} with the transport mode (flight/train/bus/road) and estimated cost.`
+        : "";
       const autoMsg = `Plan a ${duration}-day trip to ${locationStr} with a budget of ₹${budget.toLocaleString(
         "en-IN"
-      )} for ${tripType} traveler(s)${interestStr}. Generate the full itinerary now.`;
+      )} for ${travelerCount} ${tripType} traveler(s)${interestStr}.${originStr} Generate the full itinerary now.`;
 
       // Stash for any downstream consumer (e.g. mobile chat panel)
       try {
@@ -321,16 +330,20 @@ export default function ExploreMapView() {
       setIsGenerating(true);
       setGeneratingItinerary(true);
       setGeneratedItinerary(null);
+      setStreamBuffer("");
 
       let didSucceed = false;
       try {
-        const response = await generatePlannerResponse({
-          userSaid: autoMsg,
-          conversationHistory: [],
-          currentItinerary: null,
-          isModificationRequest: false,
-          destinationHint: dest.name,
-        });
+        const response = await generatePlannerStreamAsync(
+          {
+            userSaid: autoMsg,
+            conversationHistory: [],
+            currentItinerary: null,
+            isModificationRequest: false,
+            destinationHint: dest.name,
+          },
+          (token) => setStreamBuffer((prev) => (prev ?? "") + token)
+        );
 
         if (!response.isTextResponse && response.itineraryTable) {
           await hydrateItineraryIntoStores(response, {
@@ -356,6 +369,7 @@ export default function ExploreMapView() {
       } finally {
         setIsGenerating(false);
         setGeneratingItinerary(false);
+        setStreamBuffer(undefined);
         if (didSucceed) {
           setSelectedDest(null);
           // Triggers flowStep → "planner"
@@ -367,7 +381,9 @@ export default function ExploreMapView() {
       budget,
       duration,
       tripType,
+      travelerCount,
       categories,
+      userLocation,
       accessToken,
       setGeneratedItinerary,
       setGeneratingItinerary,
@@ -376,6 +392,42 @@ export default function ExploreMapView() {
       selectDestination,
     ]
   );
+
+  // ── Auto-build for custom destination from intent form ──────────
+  useEffect(() => {
+    if (!customDestination || !mapLoaded || isGenerating) return;
+    // Parse fullName (e.g. "Goa, India" or "Manali, Himachal Pradesh, India")
+    const parts = customDestination.fullName.split(",").map((p) => p.trim());
+    const syntheticDest: Destination = {
+      id: "custom-intent",
+      name: customDestination.name,
+      state: parts[1] ?? "",
+      country: parts[2],
+      coordinates: customDestination.coordinates,
+      emoji: "📍",
+      durationMin: 1,
+      durationMax: 30,
+      costMin: 0,
+      costMax: 10_000_000,
+      highlights: [],
+      topPlaces: [],
+      bestFor: [],
+      categories: [],
+    };
+    // Clear before calling so we don't re-trigger on re-render
+    setCustomDestination(null);
+    handleBuildItinerary(syntheticDest, customDestination.fullName);
+  }, [customDestination, mapLoaded, isGenerating, handleBuildItinerary, setCustomDestination]);
+
+  // ── Dismiss destination card + popup when generation starts ──────────────
+  useEffect(() => {
+    if (!isGenerating) return;
+    setSelectedDest(null);
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
+  }, [isGenerating]);
 
   const clearFilters = () => {
     setBudget(budgetAmount);
@@ -415,6 +467,7 @@ export default function ExploreMapView() {
         visible={isGenerating}
         mode="crafting"
         message="Your itinerary is being crafted"
+        liveTokenBuffer={streamBuffer}
         sublines={[
           "Tracing the best route through your destination\u2026",
           "Mapping stays, food and golden-hour stops\u2026",

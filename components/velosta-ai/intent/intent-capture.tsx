@@ -89,6 +89,7 @@ export default function IntentCapture() {
     setTravelerType: setStoreTravelerType,
     setTravelerCount: setStoreTravelerCount,
     setInterests: setStoreInterests,
+    setCustomDestination,
   } = useOnboardingStore();
 
   /* ── Form state ───────────────────────────────── */
@@ -99,21 +100,29 @@ export default function IntentCapture() {
   const [travelerCount, setTravelerCount] = useState(1);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [duration, setDuration] = useState(3);
+  // Origin ("Starting from")
   const [locationText, setLocationText] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<{
     name: string;
     coordinates: [number, number];
   } | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  // Destination ("Where to?")
+  const [destText, setDestText] = useState("");
+  const [selectedDest, setSelectedDest] = useState<PlaceSuggestion | null>(null);
+  const [destSuggestions, setDestSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [showDestSuggestions, setShowDestSuggestions] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const destDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
+  const destWrapperRef = useRef<HTMLDivElement>(null);
 
-  /* ── Outside click closes suggestion popover ─────────────────────── */
+  /* ── Outside click closes suggestion popovers ───────────────────────── */
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (
@@ -122,10 +131,23 @@ export default function IntentCapture() {
       ) {
         setShowSuggestions(false);
       }
+      if (
+        destWrapperRef.current &&
+        !destWrapperRef.current.contains(e.target as Node)
+      ) {
+        setShowDestSuggestions(false);
+      }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  /* ── Auto-sync traveler count when type changes ─────────────────────── */
+  useEffect(() => {
+    if (travelerType === "solo") setTravelerCount(1);
+    else if (travelerType === "couple") setTravelerCount((c) => (c < 2 ? 2 : c));
+    else setTravelerCount((c) => (c < 2 ? 3 : c));
+  }, [travelerType]);
 
   /* ── Budget helpers ─────────────────────────────────────────────── */
   // Slider is capped at 50k for ergonomic dragging — beyond that the slider
@@ -146,8 +168,10 @@ export default function IntentCapture() {
   };
 
   const handleBudgetTextChange = (text: string) => {
-    setBudgetText(text);
-    const num = parseInt(text.replace(/[^0-9]/g, ""), 10);
+    // Allow digits and commas only — block letters/symbols at input time
+    const filtered = text.replace(/[^0-9,]/g, "");
+    setBudgetText(filtered);
+    const num = parseInt(filtered.replace(/[^0-9]/g, ""), 10);
     if (!isNaN(num) && num >= typedMin && num <= typedMax) setBudget(num);
   };
 
@@ -228,6 +252,30 @@ export default function IntentCapture() {
     setError(null);
   }, []);
 
+  /* ── Destination autocomplete ───────────────────────────────────── */
+  const handleDestChange = useCallback((value: string) => {
+    setDestText(value);
+    setSelectedDest(null);
+    if (destDebounceRef.current) clearTimeout(destDebounceRef.current);
+    if (value.trim().length < 2) {
+      setDestSuggestions([]);
+      setShowDestSuggestions(false);
+      return;
+    }
+    destDebounceRef.current = setTimeout(async () => {
+      const results = await searchPlaces(value);
+      setDestSuggestions(results);
+      setShowDestSuggestions(results.length > 0);
+    }, 300);
+  }, []);
+
+  const handleSelectDestSuggestion = useCallback((s: PlaceSuggestion) => {
+    setDestText(s.name);
+    setSelectedDest(s);
+    setDestSuggestions([]);
+    setShowDestSuggestions(false);
+  }, []);
+
   /* ── Interests ──────────────────────────────────────────────────── */
   const toggleInterest = (id: string) => {
     setSelectedInterests((prev) =>
@@ -270,10 +318,23 @@ export default function IntentCapture() {
     setStoreTravelerType(travelerType);
     setStoreTravelerCount(travelerCount);
     setStoreInterests(selectedInterests);
+
+    // Store custom destination if picked — explore-map will auto-build for it
+    if (selectedDest) {
+      setCustomDestination({
+        name: selectedDest.name,
+        fullName: selectedDest.fullName,
+        coordinates: selectedDest.coordinates,
+      });
+    } else {
+      setCustomDestination(null);
+    }
+
     setFlowStep("explore");
   }, [
     selectedPlace,
     locationText,
+    selectedDest,
     budget,
     duration,
     travelerType,
@@ -287,6 +348,7 @@ export default function IntentCapture() {
     setStoreTravelerType,
     setStoreTravelerCount,
     setStoreInterests,
+    setCustomDestination,
     setFlowStep,
   ]);
 
@@ -703,6 +765,56 @@ export default function IntentCapture() {
                   );
                 })}
               </div>
+
+              {/* How many people — stepper (hidden for solo) */}
+              {travelerType !== "solo" && (
+                <div className="mt-3 flex items-center gap-3">
+                  <span
+                    className="text-[12px] font-medium"
+                    style={{ color: "rgba(11,31,42,0.6)" }}
+                  >
+                    How many people?
+                  </span>
+                  <div
+                    className="flex items-center gap-0 rounded-full overflow-hidden"
+                    style={{
+                      border: "1px solid rgba(11,31,42,0.12)",
+                      backgroundColor: C.sandLight,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTravelerCount((c) =>
+                          Math.max(travelerType === "couple" ? 2 : 2, c - 1)
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center text-[16px] font-semibold transition-colors hover:bg-black/5"
+                      style={{ color: C.navy }}
+                      aria-label="Decrease"
+                    >
+                      −
+                    </button>
+                    <span
+                      className="min-w-[28px] text-center text-[13px] font-semibold tabular-nums"
+                      style={{ color: C.navy }}
+                    >
+                      {travelerCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTravelerCount((c) => Math.min(20, c + 1))
+                      }
+                      className="flex h-8 w-8 items-center justify-center text-[16px] font-semibold transition-colors hover:bg-black/5"
+                      style={{ color: C.navy }}
+                      aria-label="Increase"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
             </Field>
 
             {/* ── Interests ──────────────────────────────────── */}
@@ -728,6 +840,78 @@ export default function IntentCapture() {
                     </button>
                   );
                 })}
+              </div>
+            </Field>
+
+            {/* ── Destination (optional) ────────────────────── */}
+            <Field label="Where do you want to go?" hint="Optional · skips discovery">
+              <div ref={destWrapperRef} className="relative">
+                <div className="relative">
+                  <MapPin
+                    size={15}
+                    strokeWidth={1.8}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2"
+                    style={{ color: selectedDest ? C.coral : "rgba(11,31,42,0.45)" }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="e.g. Goa, Manali, Udaipur…"
+                    value={destText}
+                    onChange={(e) => handleDestChange(e.target.value)}
+                    className="h-11 w-full rounded-xl pl-9 pr-3 text-[13.5px] outline-none transition-colors focus:border-[color:var(--color-brand)]"
+                    style={{
+                      backgroundColor: C.sandLight,
+                      border: `1px solid ${selectedDest ? C.coral : "rgba(11,31,42,0.1)"}`,
+                      color: C.navy,
+                    }}
+                  />
+                  {selectedDest && (
+                    <button
+                      type="button"
+                      onClick={() => { setDestText(""); setSelectedDest(null); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
+                      aria-label="Clear destination"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {showDestSuggestions && destSuggestions.length > 0 && (
+                  <div
+                    className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-xl"
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      border: "1px solid rgba(11,31,42,0.08)",
+                      boxShadow: "0 18px 32px -12px rgba(11,31,42,0.16)",
+                    }}
+                  >
+                    {destSuggestions.map((s, i) => (
+                      <button
+                        key={`${s.name}-${i}`}
+                        type="button"
+                        onClick={() => handleSelectDestSuggestion(s)}
+                        className="flex w-full items-start gap-2.5 border-b px-4 py-2.5 text-left text-[13px] transition-colors last:border-b-0 hover:bg-[#FBF8F3]"
+                        style={{
+                          borderColor: "rgba(11,31,42,0.05)",
+                          color: C.navy,
+                        }}
+                      >
+                        <MapPin
+                          size={13}
+                          strokeWidth={1.8}
+                          className="mt-0.5 shrink-0"
+                          style={{ color: C.coral }}
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{s.name}</span>
+                          {s.fullName !== s.name && (
+                            <span className="text-[11px] opacity-50">{s.fullName}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </Field>
 

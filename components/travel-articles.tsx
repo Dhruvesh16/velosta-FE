@@ -165,14 +165,14 @@ export default function TravelArticles() {
           How Not To Travel
         </h2>
         {/* <div className="flex items-center gap-3">
-          <a href="/travel-blogs/new-blog">
+          <a href="/how-not-travel/new-blog">
             <Button className="rounded-full bg-[color:var(--color-brand)] text-white hover:opacity-90">
               Write a post
             </Button>
           </a>
         </div> */}
         <a
-          href="/travel-blogs"
+          href="/how-not-travel"
           className="text-sm font-medium text-[var(--color-navy)]/70 hover:text-[var(--color-navy)]"
         >
           See all

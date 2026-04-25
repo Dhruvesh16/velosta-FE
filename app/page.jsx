@@ -88,64 +88,7 @@ const featuredTrips = [
   },
 ];
 
-const testimonials = [
-  {
-    quote:
-      "Velosta turned our honeymoon from stressful planning into pure excitement. Every detail felt personally curated for us.",
-    name: "Maya R.",
-    trip: "Santorini Getaway",
-    place: "Oia, Greece",
-    chapter: "Chapter One",
-    badge: "Honeymoon",
-    rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
-    image:
-      "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?auto=format&fit=crop&w=1400&q=80",
-  },
-  {
-    quote:
-      "The planner suggested experiences we would never have discovered ourselves. Best trip we have taken in years.",
-    name: "Daniel K.",
-    trip: "Japan Spring Route",
-    place: "Kyoto, Japan",
-    chapter: "Chapter Two",
-    badge: "Spring · Solo",
-    rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
-    image:
-      "https://images.unsplash.com/photo-1492571350019-22de08371fd3?auto=format&fit=crop&w=1400&q=80",
-  },
-  {
-    quote:
-      "It felt like having a private travel concierge — fast, elegant, and surprisingly accurate.",
-    name: "Sophia T.",
-    trip: "Swiss + Italy Circuit",
-    place: "Lauterbrunnen, Switzerland",
-    chapter: "Chapter Three",
-    badge: "Alpine Route",
-    rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200&q=80",
-    image:
-      "https://images.unsplash.com/photo-1527668752968-14dc70a27c95?auto=format&fit=crop&w=1400&q=80",
-  },
-  {
-    quote:
-      "Every morning felt unhurried, every evening surprised us. The itinerary breathed with our pace.",
-    name: "Aarav P.",
-    trip: "Amalfi Coast Escape",
-    place: "Positano, Italy",
-    chapter: "Chapter Four",
-    badge: "Coastal",
-    rating: 5,
-    avatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80",
-    image:
-      "https://images.unsplash.com/photo-1533165850316-2d465091eaec?auto=format&fit=crop&w=1400&q=80",
-  },
-];
+
 
 const itineraryItems = [
   {
@@ -162,42 +105,6 @@ const itineraryItems = [
     time: "Evening",
     activity: "Chef-led dinner + hidden viewpoint",
     meta: "Designed around your time and taste",
-  },
-];
-
-/* ── Popular Destinations (compact 4-up grid) ── */
-const popularDestinations = [
-  {
-    name: "Lake Como",
-    region: "Lombardy, Italy",
-    days: "5 days",
-    price: "$1,290",
-    image: "https://images.unsplash.com/photo-1531572753322-ad063cecc140?auto=format&fit=crop&w=900&q=80",
-    tag: "Lakeside",
-  },
-  {
-    name: "Lofoten Islands",
-    region: "Northern Norway",
-    days: "6 days",
-    price: "$1,640",
-    image: "https://images.unsplash.com/photo-1520769945061-0a448c463865?auto=format&fit=crop&w=900&q=80",
-    tag: "Arctic",
-  },
-  {
-    name: "Marrakech",
-    region: "Morocco",
-    days: "4 days",
-    price: "$890",
-    image: "https://images.unsplash.com/photo-1597212618440-806262de4f6b?auto=format&fit=crop&w=900&q=80",
-    tag: "Medina",
-  },
-  {
-    name: "Patagonia",
-    region: "Chile · Argentina",
-    days: "8 days",
-    price: "$2,310",
-    image: "https://images.unsplash.com/photo-1518002171953-a080ee817e1f?auto=format&fit=crop&w=900&q=80",
-    tag: "Trek",
   },
 ];
 
@@ -252,7 +159,23 @@ export default function Page() {
   const featuredRef = useRef(null);
   const { user, accessToken, setUser, setAccessToken } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [storyPosts, setStoryPosts] = useState([]);
+  const [hnttPosts, setHnttPosts] = useState([]);
   const menuRef = useRef(null);
+
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_URL || "";
+    async function fetchPosts() {
+      try {
+        const res = await fetch(`${base}/api/travel-blog/all-blogs`);
+        if (!res.ok) return;
+        const all = await res.json();
+        setStoryPosts(all.filter((p) => p.tags?.includes("_story")).slice(0, 4));
+        setHnttPosts(all.filter((p) => !p.tags?.includes("_story")).slice(0, 3));
+      } catch (_) {}
+    }
+    fetchPosts();
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -324,7 +247,8 @@ export default function Page() {
                 { href: "#explore", label: "Explore" },
                 { href: "#journeys", label: "Journeys" },
                 { href: "#planner", label: "Planner" },
-                { href: "/travel-blogs", label: "Stories" },
+                { href: "/stories", label: "Stories" },
+                { href: "/how-not-travel", label: "How Not to Travel" },
               ].map((l) => (
                 <Link
                   key={l.href}
@@ -1057,118 +981,6 @@ export default function Page() {
         </div>
       </section>
 
-      {/* ────────── Popular Destinations — Compact Editorial Grid ────────── */}
-      <section
-        className="relative py-28 sm:py-36"
-        style={{ backgroundColor: c.sandLight }}
-      >
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-6">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-80px" }}
-            variants={sectionReveal}
-            className="mb-14 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
-          >
-            <div className="max-w-2xl">
-              <p
-                className="mb-4 text-[11px] font-semibold uppercase tracking-[0.28em]"
-                style={{ color: c.teal }}
-              >
-                Popular Destinations
-              </p>
-              <h2
-                className={`${playfair.className} text-[clamp(1.85rem,4vw,3rem)] leading-[1.05] tracking-[-0.018em]`}
-                style={{ color: c.navy }}
-              >
-                Vacations to make your experience{" "}
-                <span style={{ fontStyle: "italic", color: c.teal }}>
-                  enjoyable
-                </span>
-                .
-              </h2>
-            </div>
-            <Link
-              href="#"
-              className="group inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium"
-              style={{ color: c.navy }}
-            >
-              Explore all
-              <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </Link>
-          </motion.div>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={stagger}
-            className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            {popularDestinations.map((d) => (
-              <motion.article
-                key={d.name}
-                variants={fadeUp}
-                whileHover={{ y: -6 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="group cursor-pointer overflow-hidden rounded-2xl bg-white"
-                style={{
-                  boxShadow:
-                    "0 16px 36px -22px rgba(11,31,42,0.22), 0 4px 12px -6px rgba(11,31,42,0.06)",
-                }}
-              >
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  <img
-                    src={d.image}
-                    alt={d.name}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-[1100ms] ease-out group-hover:scale-[1.06]"
-                  />
-                  <span
-                    className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-[0.18em]"
-                    style={{
-                      backgroundColor: "rgba(245,239,230,0.92)",
-                      color: c.teal,
-                      backdropFilter: "blur(8px)",
-                    }}
-                  >
-                    {d.tag}
-                  </span>
-                </div>
-                <div className="p-5">
-                  <p
-                    className="text-[10.5px] font-medium uppercase tracking-[0.22em]"
-                    style={{ color: c.teal }}
-                  >
-                    {d.region}
-                  </p>
-                  <h3
-                    className={`${playfair.className} mt-1.5 text-[19px] leading-[1.2] tracking-[-0.01em]`}
-                    style={{ color: c.navy }}
-                  >
-                    {d.name}
-                  </h3>
-                  <div className="mt-4 flex items-baseline justify-between border-t pt-4" style={{ borderColor: "rgba(11,31,42,0.08)" }}>
-                    <span
-                      className="text-[12px]"
-                      style={{ color: "rgba(11,31,42,0.5)" }}
-                    >
-                      {d.days}
-                    </span>
-                    <span
-                      className="text-[14px] font-semibold tracking-tight"
-                      style={{ color: c.coral }}
-                    >
-                      {d.price}
-                    </span>
-                  </div>
-                </div>
-              </motion.article>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
       {/* ────────── Why Choose Velosta — Value Trio + Portrait ────────── */}
       <section
         className="relative overflow-hidden py-28 sm:py-36"
@@ -1709,137 +1521,104 @@ export default function Page() {
               section ::-webkit-scrollbar { display: none; }
             `}</style>
 
-            {testimonials.map((t, i) => {
-              // Slight rotation variance per card — feels human, not systematic
-              const rotations = [-1.8, 1.2, -0.6, 1.6];
-              const rotate = rotations[i % rotations.length];
-              return (
-                <motion.article
-                  key={t.name}
-                  whileHover={{
-                    y: -10,
-                    rotate: rotate * 0.3,
-                    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
-                  }}
-                  initial={{ rotate }}
-                  animate={{ rotate }}
-                  className="group relative shrink-0 snap-start overflow-hidden rounded-[14px]"
-                  style={{
-                    width: "clamp(320px, 28vw, 400px)",
-                    aspectRatio: "3 / 4",
-                    boxShadow:
-                      "0 30px 60px -25px rgba(11,31,42,0.4), 0 12px 28px -12px rgba(11,31,42,0.2)",
-                    transformOrigin: "center bottom",
-                  }}
-                >
-                  {/* Destination image — slightly blurred for depth */}
-                  <div
-                    className="absolute inset-0 transition-transform duration-[1400ms] ease-out group-hover:scale-[1.06]"
-                    style={{
-                      backgroundImage: `url(${t.image})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      filter: "blur(1.5px) saturate(1.05)",
-                    }}
-                  />
-                  {/* Navy gradient overlay */}
-                  <div
-                    aria-hidden
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        "linear-gradient(180deg, rgba(11,31,42,0.15) 0%, rgba(11,31,42,0.35) 45%, rgba(11,31,42,0.85) 100%)",
-                    }}
-                  />
-
-                  {/* Top — badge */}
-                  <div className="absolute left-5 top-5 right-5 flex items-start justify-between">
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5"
+            {storyPosts.length === 0 ? (
+              <div className="mx-auto flex max-w-7xl items-center justify-center rounded-2xl px-6 py-20" style={{ backgroundColor: "rgba(11,31,42,0.03)", border: "1px dashed rgba(11,31,42,0.12)" }}>
+                <div className="text-center">
+                  <p className={`${playfair.className} text-[20px] italic`} style={{ color: "rgba(11,31,42,0.4)" }}>No stories yet</p>
+                  <p className="mt-3 text-sm" style={{ color: "rgba(11,31,42,0.4)" }}>Be the first to share a travel story with the community.</p>
+                  <Link href="/stories" className="mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white" style={{ backgroundColor: c.teal }}>
+                    Browse stories
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                {storyPosts.map((post, i) => {
+                  const rotations = [-1.8, 1.2, -0.6, 1.6];
+                  const rotate = rotations[i % rotations.length];
+                  const firstTag = post.tags?.find((tag) => tag !== "_story") || "";
+                  return (
+                    <motion.article
+                      key={post.id}
+                      whileHover={{
+                        y: -10,
+                        rotate: rotate * 0.3,
+                        transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+                      }}
+                      initial={{ rotate }}
+                      animate={{ rotate }}
+                      className="group relative shrink-0 snap-start overflow-hidden rounded-[14px]"
                       style={{
-                        background: "rgba(245,239,230,0.92)",
-                        backdropFilter: "blur(10px)",
-                        boxShadow: "0 6px 16px -6px rgba(11,31,42,0.25)",
+                        width: "clamp(320px, 28vw, 400px)",
+                        aspectRatio: "3 / 4",
+                        boxShadow: "0 30px 60px -25px rgba(11,31,42,0.4), 0 12px 28px -12px rgba(11,31,42,0.2)",
+                        transformOrigin: "center bottom",
                       }}
                     >
-                      <MapPin className="h-2.5 w-2.5" style={{ color: c.teal }} />
-                      <span
-                        className="text-[9px] font-semibold uppercase tracking-[0.22em]"
-                        style={{ color: c.navy }}
-                      >
-                        {t.place}
-                      </span>
-                    </span>
-                    <span
-                      className="rounded-full px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.2em]"
-                      style={{
-                        background: "rgba(47,111,115,0.85)",
-                        color: c.sand,
-                        backdropFilter: "blur(8px)",
-                      }}
-                    >
-                      {t.badge}
-                    </span>
-                  </div>
-
-                  {/* Bottom — quote + author */}
-                  <div className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
-                    {/* Rating — subtle dots */}
-                    <div className="mb-4 flex items-center gap-1.5">
-                      {Array.from({ length: t.rating }).map((_, idx) => (
-                        <span
-                          key={idx}
-                          className="block h-1 w-1 rounded-full"
-                          style={{ backgroundColor: c.tealLight }}
-                        />
-                      ))}
-                    </div>
-
-                    <p
-                      className={`${playfair.className} text-[17px] leading-[1.4] tracking-[-0.005em] sm:text-[18px]`}
-                      style={{ color: "rgba(245,239,230,0.96)" }}
-                    >
-                      &ldquo;{t.quote}&rdquo;
-                    </p>
-
-                    {/* Author row */}
-                    <div className="mt-6 flex items-center gap-3">
                       <div
-                        className="h-10 w-10 shrink-0 overflow-hidden rounded-full"
+                        className="absolute inset-0 transition-transform duration-[1400ms] ease-out group-hover:scale-[1.06]"
                         style={{
-                          border: "1.5px solid rgba(245,239,230,0.35)",
-                          boxShadow: "0 4px 12px rgba(11,31,42,0.3)",
+                          backgroundImage: `url(${post.coverImage || "/travel-blog-image.jpg"})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                          filter: "blur(1.5px) saturate(1.05)",
                         }}
-                      >
-                        <img
-                          src={t.avatar}
-                          alt={t.name}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className="text-[11px] font-semibold uppercase tracking-[0.2em]"
-                          style={{ color: "rgba(245,239,230,0.95)" }}
+                      />
+                      <div
+                        aria-hidden
+                        className="absolute inset-0"
+                        style={{
+                          background: "linear-gradient(180deg, rgba(11,31,42,0.15) 0%, rgba(11,31,42,0.35) 45%, rgba(11,31,42,0.85) 100%)",
+                        }}
+                      />
+                      <div className="absolute left-5 top-5 right-5 flex items-start justify-between">
+                        {firstTag ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5"
+                            style={{ background: "rgba(245,239,230,0.92)", backdropFilter: "blur(10px)", boxShadow: "0 6px 16px -6px rgba(11,31,42,0.25)" }}
+                          >
+                            <MapPin className="h-2.5 w-2.5" style={{ color: c.teal }} />
+                            <span className="text-[9px] font-semibold uppercase tracking-[0.22em]" style={{ color: c.navy }}>{firstTag}</span>
+                          </span>
+                        ) : <span />}
+                        <span
+                          className="rounded-full px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.2em]"
+                          style={{ background: "rgba(47,111,115,0.85)", color: c.sand, backdropFilter: "blur(8px)" }}
                         >
-                          {t.name}
-                        </p>
-                        <p
-                          className={`${playfair.className} mt-0.5 truncate text-[12px] italic`}
-                          style={{ color: "rgba(245,239,230,0.55)" }}
-                        >
-                          {t.trip}
-                        </p>
+                          Story
+                        </span>
                       </div>
-                    </div>
-                  </div>
-                </motion.article>
-              );
-            })}
-
-            {/* Tail spacer so last card can snap-center */}
-            <div aria-hidden className="shrink-0" style={{ width: "6vw" }} />
+                      <div className="absolute inset-x-0 bottom-0 p-6 sm:p-7">
+                        <p
+                          className={`${playfair.className} text-[17px] leading-[1.4] tracking-[-0.005em] sm:text-[18px]`}
+                          style={{ color: "rgba(245,239,230,0.96)" }}
+                        >
+                          &ldquo;{post.summary || post.title}&rdquo;
+                        </p>
+                        <div className="mt-6 flex items-center gap-3">
+                          <div
+                            className="h-10 w-10 shrink-0 overflow-hidden rounded-full"
+                            style={{ border: "1.5px solid rgba(245,239,230,0.35)", boxShadow: "0 4px 12px rgba(11,31,42,0.3)" }}
+                          >
+                            <img src={post.authorAvatar || "/travel-blog-image.jpg"} alt={post.authorName} loading="lazy" className="h-full w-full object-cover" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: "rgba(245,239,230,0.95)" }}>{post.authorName}</p>
+                            <p className={`${playfair.className} mt-0.5 truncate text-[12px] italic`} style={{ color: "rgba(245,239,230,0.55)" }}>
+                              {new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                            </p>
+                          </div>
+                          <Link href={`/stories/${post.id}`} className="text-[10px] font-semibold uppercase tracking-[0.18em] transition-opacity hover:opacity-75" style={{ color: "rgba(245,239,230,0.7)" }}>
+                            Read →
+                          </Link>
+                        </div>
+                      </div>
+                    </motion.article>
+                  );
+                })}
+                <div aria-hidden className="shrink-0" style={{ width: "6vw" }} />
+              </>
+            )}
           </div>
 
           {/* Scroll hint — desktop only */}
@@ -1862,6 +1641,169 @@ export default function Page() {
             </div>
           </div>
         </motion.div>
+      </section>
+
+      {/* ────────── How Not to Travel — Editorial Grid ────────── */}
+      <section
+        className="relative overflow-hidden py-28 sm:py-36"
+        style={{ backgroundColor: c.sandLight }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-0 top-40 h-[420px] w-[420px] rounded-full"
+          style={{
+            background: "radial-gradient(circle, rgba(217,119,87,0.07) 0%, rgba(217,119,87,0) 70%)",
+            filter: "blur(50px)",
+          }}
+        />
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-16 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"
+          >
+            <div>
+              <p
+                className="mb-5 text-[11px] font-medium uppercase tracking-[0.32em]"
+                style={{ color: c.coral }}
+              >
+                Community · Real Stories
+              </p>
+              <h2
+                className={`${playfair.className} text-[clamp(2.25rem,5vw,4.25rem)] leading-[1] tracking-[-0.02em]`}
+                style={{ color: c.navy }}
+              >
+                How{" "}
+                <span style={{ fontStyle: "italic", color: "rgba(11,31,42,0.7)" }}>
+                  not to travel
+                </span>
+              </h2>
+              <p
+                className="mt-4 max-w-md text-[14px] leading-[1.7]"
+                style={{ color: "rgba(11,31,42,0.6)" }}
+              >
+                Real scams, mishaps, and lessons learned — shared by travellers so you
+                don&apos;t have to learn the hard way.
+              </p>
+            </div>
+            <Link
+              href="/how-not-travel"
+              className="group inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium"
+              style={{ color: c.navy }}
+            >
+              See all posts
+              <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
+          </motion.div>
+
+          {hnttPosts.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center rounded-3xl py-20"
+              style={{ backgroundColor: "rgba(11,31,42,0.03)", border: "1px dashed rgba(11,31,42,0.12)" }}
+            >
+              <p
+                className={`${playfair.className} text-[20px] italic`}
+                style={{ color: "rgba(11,31,42,0.4)" }}
+              >
+                No posts yet — be the first to share
+              </p>
+              <Link
+                href="/how-not-travel/new-blog"
+                className="mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white"
+                style={{ backgroundColor: c.teal }}
+              >
+                Write a post <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          ) : (
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-60px" }}
+              variants={stagger}
+              className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {hnttPosts.map((post) => (
+                <motion.article
+                  key={post.id}
+                  variants={fadeUp}
+                  whileHover={{ y: -6 }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  className="group cursor-pointer overflow-hidden rounded-2xl bg-white"
+                  style={{
+                    boxShadow: "0 16px 36px -22px rgba(11,31,42,0.18), 0 4px 12px -6px rgba(11,31,42,0.06)",
+                  }}
+                >
+                  <Link
+                    href={`/how-not-travel/${post.id}`}
+                    className="relative block overflow-hidden"
+                    style={{ aspectRatio: "16/9" }}
+                  >
+                    <img
+                      src={post.coverImage || "/travel-blog-image.jpg"}
+                      alt={post.title}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-[1100ms] ease-out group-hover:scale-[1.06]"
+                    />
+                    {post.tags?.find((t) => t !== "_hntt") && (
+                      <span
+                        className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-[0.18em]"
+                        style={{ backgroundColor: "rgba(245,239,230,0.92)", color: c.teal, backdropFilter: "blur(8px)" }}
+                      >
+                        {post.tags.find((t) => t !== "_hntt")}
+                      </span>
+                    )}
+                  </Link>
+                  <div className="p-5">
+                    <p
+                      className="text-[10.5px] font-medium uppercase tracking-[0.22em]"
+                      style={{ color: c.coral }}
+                    >
+                      {new Date(post.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                    <h3
+                      className={`${playfair.className} mt-2 line-clamp-2 text-[18px] leading-[1.25] tracking-[-0.01em]`}
+                      style={{ color: c.navy }}
+                    >
+                      <Link href={`/how-not-travel/${post.id}`} className="group-hover:underline group-hover:decoration-dotted">
+                        {post.title}
+                      </Link>
+                    </h3>
+                    {post.summary && (
+                      <p
+                        className="mt-2 line-clamp-2 text-[13px] leading-[1.6]"
+                        style={{ color: "rgba(11,31,42,0.55)" }}
+                      >
+                        {post.summary}
+                      </p>
+                    )}
+                    <div
+                      className="mt-4 flex items-center justify-between border-t pt-4"
+                      style={{ borderColor: "rgba(11,31,42,0.08)" }}
+                    >
+                      <span className="text-[12px]" style={{ color: "rgba(11,31,42,0.5)" }}>
+                        {post.authorName}
+                      </span>
+                      <Link
+                        href={`/how-not-travel/${post.id}`}
+                        className="inline-flex items-center gap-1 text-[12px] font-semibold"
+                        style={{ color: c.coral }}
+                      >
+                        Read <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  </div>
+                </motion.article>
+              ))}
+            </motion.div>
+          )}
+        </div>
       </section>
 
       {/* ────────── Footer — Deep Navy ────────── */}

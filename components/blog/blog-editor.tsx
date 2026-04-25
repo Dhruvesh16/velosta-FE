@@ -65,7 +65,23 @@ const TAG_SUGGESTIONS = [
   "best-time-to-visit",
 ];
 
-export default function BlogEditor() {
+type BlogEditorProps = {
+  category?: string;
+  redirectAfterPublish?: string;
+  heading?: string;
+  subheading?: string;
+  accentVar?: string;
+  contextLabel?: string;
+};
+
+export default function BlogEditor({
+  category,
+  redirectAfterPublish = "/how-not-travel",
+  heading = "Write Your Story",
+  subheading = "Premium editor with inline images & rich formatting",
+  accentVar = "--editor-accent",
+  contextLabel,
+}: BlogEditorProps = {}) {
   const router = useRouter();
   const { toast } = useToast();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -212,6 +228,13 @@ export default function BlogEditor() {
       const token = localStorage.getItem("accessToken"); // adjust based on your auth
       if (!token) throw new Error("You must be logged in to publish");
 
+      const payload = {
+        ...draft,
+        tags: category
+          ? [...new Set([...draft.tags, category])]
+          : draft.tags,
+      };
+
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/create-blog`,
         {
@@ -220,7 +243,7 @@ export default function BlogEditor() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(draft),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -239,8 +262,8 @@ export default function BlogEditor() {
         variant: "default",
       });
 
-      // Redirect to the blog page
-      router.push(`/travel-blogs`);
+      // Redirect to the appropriate listing page
+      router.push(redirectAfterPublish);
     } catch (e: any) {
       console.log("Error Status:", e.status); // ✅ will log 401, 413, etc.
       console.log("Error Message:", e.message);
@@ -272,6 +295,7 @@ export default function BlogEditor() {
 
   return (
     <section
+      style={{ ['--editor-accent' as string]: `var(${accentVar})` }}
       className={`mx-auto ${
         fullscreen ? "max-w-full px-8" : "max-w-6xl px-4"
       } py-10 transition-all`}
@@ -279,11 +303,19 @@ export default function BlogEditor() {
       {/* Top toolbar */}
       <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
+          {contextLabel && (
+            <span
+              className="mb-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white"
+              style={{ background: `var(--editor-accent)` }}
+            >
+              {contextLabel}
+            </span>
+          )}
           <h1 className="text-3xl font-bold text-[color:var(--color-navy)]">
-            Write Your Story
+            {heading}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Premium editor with inline images & rich formatting
+            {subheading}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -312,7 +344,7 @@ export default function BlogEditor() {
           <Button
             disabled={!canSubmit || submitting}
             onClick={submit}
-            className="gap-2 rounded-full bg-[color:var(--color-brand)] text-white hover:opacity-90"
+            className="gap-2 rounded-full bg-[color:var(--editor-accent)] text-white hover:opacity-90"
           >
             <Save className="size-4" />
             {submitting ? "Publishing…" : "Publish"}
@@ -322,10 +354,10 @@ export default function BlogEditor() {
 
       {!preview ? (
         <div className="space-y-6">
-          <div className="flex gap-3 rounded-lg border border-[color:var(--color-brand)]/20 bg-gradient-to-r from-[color:var(--color-brand)]/5 to-transparent p-4">
-            <Lightbulb className="size-5 flex-shrink-0 text-[color:var(--color-brand)]" />
+          <div className="flex gap-3 rounded-lg border border-[color:var(--editor-accent)]/20 bg-gradient-to-r from-[color:var(--editor-accent)]/5 to-transparent p-4">
+            <Lightbulb className="size-5 flex-shrink-0 text-[color:var(--editor-accent)]" />
             <div>
-              <p className="text-xs font-semibold text-[color:var(--color-brand)]">
+              <p className="text-xs font-semibold text-[color:var(--editor-accent)]">
                 💡 Writing Tip
               </p>
               <p className="mt-1 text-sm text-foreground">
@@ -393,8 +425,8 @@ export default function BlogEditor() {
                 onDrop={handleDrop}
                 className={`rounded-xl border-2 border-dashed p-10 text-center transition-all ${
                   dragActive
-                    ? "border-[color:var(--color-brand)] bg-[color:var(--color-brand)]/10 scale-105"
-                    : "border-border hover:border-[color:var(--color-brand)]/50"
+                    ? "border-[color:var(--editor-accent)] bg-[color:var(--editor-accent)]/10 scale-105"
+                    : "border-border hover:border-[color:var(--editor-accent)]/50"
                 }`}
               >
                 <Upload className="mx-auto size-10 text-muted-foreground" />
@@ -403,7 +435,7 @@ export default function BlogEditor() {
                 </p>
                 <p className="text-sm text-muted-foreground">or</p>
                 <label className="mt-3 inline-block">
-                  <span className="cursor-pointer rounded-full bg-[color:var(--color-brand)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity">
+                  <span className="cursor-pointer rounded-full bg-[color:var(--editor-accent)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity">
                     Browse files
                   </span>
                   <input
@@ -587,7 +619,7 @@ export default function BlogEditor() {
                 </div>
               </div>
 
-              <div className="border-t bg-gradient-to-r from-[color:var(--color-brand)]/5 to-transparent px-3 py-2">
+              <div className="border-t bg-gradient-to-r from-[color:var(--editor-accent)]/5 to-transparent px-3 py-2">
                 <p className="text-xs text-muted-foreground">
                   💡 <strong>Pro Tip:</strong> Use the formatting tools to make
                   your content engaging and easy to read
@@ -600,7 +632,7 @@ export default function BlogEditor() {
               ref={editorRef}
               contentEditable
               onInput={updateContent}
-              className="w-full rounded-b-xl border border-t-0 bg-white p-6 leading-relaxed shadow-inner focus:outline-none focus:ring-2 focus:ring-[color:var(--color-brand)]/20 prose prose-sm max-w-none"
+              className="w-full rounded-b-xl border border-t-0 bg-white p-6 leading-relaxed shadow-inner focus:outline-none focus:ring-2 focus:ring-[color:var(--editor-accent)]/20 prose prose-sm max-w-none"
               style={{
                 minHeight: fullscreen ? "calc(100vh - 500px)" : "450px",
               }}
@@ -619,7 +651,7 @@ Share your experiences, tips, and make it engaging!"
               <span className="flex items-center gap-4">
                 <span>{wordCount} words</span>
                 <span>•</span>
-                <span className="text-[color:var(--color-brand)] font-medium">
+                <span className="text-[color:var(--editor-accent)] font-medium">
                   WYSIWYG Editor
                 </span>
               </span>
@@ -680,7 +712,7 @@ Share your experiences, tips, and make it engaging!"
                         onClick={() => {
                           setDraft((d) => ({ ...d, tags: [...d.tags, t] }));
                         }}
-                        className="rounded-full bg-gradient-to-r from-gray-100 to-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 transition-all hover:from-[color:var(--color-brand)]/10 hover:to-[color:var(--color-brand)]/5 hover:text-[color:var(--color-brand)] hover:shadow-sm"
+                        className="rounded-full bg-gradient-to-r from-gray-100 to-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 transition-all hover:from-[color:var(--editor-accent)]/10 hover:to-[color:var(--editor-accent)]/5 hover:text-[color:var(--editor-accent)] hover:shadow-sm"
                       >
                         + {t}
                       </button>

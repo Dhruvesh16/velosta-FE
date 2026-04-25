@@ -13,7 +13,14 @@ export default function NewTravelBlogPage() {
       <ProtectedRoute>
         <Navbar />
         <div className="mt-30">
-          <BlogEditor />
+          <BlogEditor
+            category="_hntt"
+            redirectAfterPublish="/how-not-travel"
+            heading="Share a Travel Mishap"
+            subheading="Warn fellow travellers — your honest story about what went wrong could save someone else's trip."
+            accentVar="--color-teal"
+            contextLabel="How Not to Travel"
+          />
         </div>
         <Footer />
       </ProtectedRoute>

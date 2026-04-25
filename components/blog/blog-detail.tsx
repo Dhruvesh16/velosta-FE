@@ -104,7 +104,7 @@ export function BlogDetail({ blog }: BlogDetailProps) {
 
       // small delay so toast is visible
       setTimeout(() => {
-        router.push("/travel-blogs");
+        router.push("/how-not-travel");
       }, 500);
     } catch (err) {
       console.error("delete error:", err);

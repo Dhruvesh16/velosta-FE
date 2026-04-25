@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
+// Server-side only — do NOT use NEXT_PUBLIC_ prefix here
+const GOOGLE_KEY = process.env.GOOGLE_MAPS_KEY ?? "";
 
 /**
  * Proxies Google Places photo requests to avoid CORS/referrer issues.

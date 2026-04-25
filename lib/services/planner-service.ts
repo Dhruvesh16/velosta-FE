@@ -1,7 +1,8 @@
 // ── Planner Service ───────────────────────────────────────────────────────────
 // Single source of truth for talking to the BE planner microservice.
 //
-// BE endpoint: POST /api/planner/generate
+// BE endpoint: POST /api/planner/generate          → full JSON (cached aware)
+//              POST /api/planner/generate-stream   → SSE token stream
 // Returns (after envelope unwrap): { itinerary: <model JSON>, cached: boolean }
 //
 // The model returns one of two shapes (see BE prompts.py):
@@ -9,6 +10,15 @@
 //   2. { isTextResponse: false, destination, itineraryTable: [...], ... }
 
 import { api } from "@/lib/api";
+
+const _API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  "http://localhost:8000";
+
+function _readToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("accessToken");
+}
 
 export interface ItineraryRow {
   time?: string;
@@ -95,4 +105,102 @@ export async function generatePlannerResponse(
   }
 
   return inner;
+}
+
+// ── Streaming variant ────────────────────────────────────────────────────────
+
+/**
+ * Stream itinerary generation via SSE.
+ *
+ * onToken  — called with each raw JSON chunk as it arrives
+ * onDone   — called once with the final parsed PlannerResponse
+ * onError  — called on network / parse failure
+ *
+ * Returns an AbortController; call .abort() to cancel mid-stream.
+ */
+export function generatePlannerStream(
+  req: PlannerRequest,
+  callbacks: {
+    onToken: (token: string) => void;
+    onDone: (result: PlannerResponse) => void;
+    onError: (err: Error) => void;
+  }
+): AbortController {
+  const ac = new AbortController();
+
+  (async () => {
+    const token = _readToken();
+    try {
+      const res = await fetch(`${_API_BASE}/api/planner/generate-stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          userSaid: req.userSaid,
+          conversationHistory: req.conversationHistory ?? [],
+          currentItinerary: req.currentItinerary ?? null,
+          isModificationRequest: req.isModificationRequest ?? false,
+          destinationHint: req.destinationHint,
+        }),
+        signal: ac.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        throw new Error(`Stream request failed: ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        // SSE events are delimited by double newline
+        const events = buf.split("\n\n");
+        buf = events.pop() ?? "";
+
+        for (const evt of events) {
+          const line = evt.trim();
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6);
+          if (payload === "[DONE]") continue;
+          try {
+            const msg = JSON.parse(payload) as { type: string; text?: string; itinerary?: unknown };
+            if (msg.type === "token" && msg.text) {
+              callbacks.onToken(msg.text);
+            } else if (msg.type === "done" && msg.itinerary) {
+              callbacks.onDone(msg.itinerary as PlannerResponse);
+            }
+          } catch {
+            /* ignore malformed SSE frames */
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  })();
+
+  return ac;
+}
+
+/**
+ * Promise wrapper around generatePlannerStream for use with async/await.
+ * onToken is called for each raw chunk (for live UI updates).
+ * Resolves with the final PlannerResponse or rejects on error.
+ */
+export function generatePlannerStreamAsync(
+  req: PlannerRequest,
+  onToken: (token: string) => void
+): Promise<PlannerResponse> {
+  return new Promise((resolve, reject) => {
+    generatePlannerStream(req, { onToken, onDone: resolve, onError: reject });
+  });
 }

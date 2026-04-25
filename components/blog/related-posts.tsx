@@ -51,7 +51,7 @@ export function RelatedPosts({ currentBlogId }: RelatedPostsProps) {
 
         <div className="grid gap-6 md:grid-cols-3">
           {mockRelatedPosts.map((post) => (
-            <Link key={post.id} href={`/travel-blogs/${post.id}`}>
+            <Link key={post.id} href={`/how-not-travel/${post.id}`}>
               <article className="group rounded-2xl border border-border bg-background transition hover:shadow-lg">
                 <div className="relative h-48 overflow-hidden rounded-t-2xl">
                   <img

@@ -43,8 +43,16 @@ const SKIP_PATTERNS = [
   /\bsleep\b/i,
 ];
 
+// Extracted venue names that are too generic to geocode reliably — they would
+// match arbitrary nearby POIs instead of real specific places.
+const GENERIC_VENUE_RE = /^(resort|hotel|lodge|inn|homestay|guesthouse|guest\s+house|hostel|(local\s+)?(restaurant|cafe|cafeteria|dhaba|shack|bar|pub|eatery|diner|canteen|caterer)|beach\s+(shack|cafe|bar|restaurant|hut)|local\s+village|village|market)$/i;
+
 function shouldSkipGeocoding(name: string): boolean {
   return SKIP_PATTERNS.some((p) => p.test(name));
+}
+
+function isGenericVenue(venue: string): boolean {
+  return GENERIC_VENUE_RE.test(venue.trim());
 }
 
 // ── Extract the venue from prose like "Sunrise at Triveni Ghat" ──────────────
@@ -153,7 +161,11 @@ async function geocodePlaceWithCountry(
     const params = new URLSearchParams({
       access_token: MAPBOX_TOKEN,
       limit: "1",
-      types: "place,locality,region,country,poi.landmark",
+      // Include `district` — Mapbox classifies Indian Union Territories (e.g.
+      // Andaman & Nicobar Islands, Lakshadweep) as `district`, not `region`.
+      // Without this, querying "Andaman Islands" returns null, causing the
+      // enrichment pipeline to fall back to unverified LLM coordinates.
+      types: "country,region,district,place,locality,neighborhood,poi.landmark",
     });
     const cc = countryCode?.toLowerCase();
     if (cc) params.set("country", cc);
@@ -268,6 +280,15 @@ export async function resolveDestination(
     return inHit;
   }
 
+  // 4. Try appending ", India" — island territories and lesser-known Indian
+  //    destinations like "Andaman Islands" or "Lakshadweep" are sometimes
+  //    found only when the country context is embedded in the query string.
+  const withIndia = await geocodePlaceWithCountry(`${raw}, India`, "in");
+  if (withIndia) {
+    destCountryCache.set(raw, withIndia.country ?? "in");
+    return withIndia;
+  }
+
   destCountryCache.set(raw, null);
   return null;
 }
@@ -358,10 +379,14 @@ export async function enrichItineraryWithCoordinates(
   // a fuzzy POI from India just because Mapbox got biased.
   const destCountry = resolved.country ?? undefined;
 
-  // Multi-city / road-trip itineraries ("Manali to Leh") need a wider net.
+  // Multi-city / road-trip itineraries ("Manali to Leh") and archipelago /
+  // island-chain destinations ("Andaman Islands", "Lakshadweep") need a
+  // wider net. Islands can span 200+ km from the destination centroid while
+  // still being part of the same trip — 60 km would discard valid results.
   const isMultiStop = /\b(?:to|via|and|&|\+|-|–|—)\b/i.test(destination);
-  const hardRadiusKm = isMultiStop ? 400 : 60;
-  const softRadiusKm = isMultiStop ? 400 : 80;
+  const isIslandOrRegion = /\b(islands?|archipelago|atolls?|lakshadweep|andaman|maldives|nicobar)\b/i.test(destination);
+  const hardRadiusKm = (isMultiStop || isIslandOrRegion) ? 500 : 250;
+  const softRadiusKm = (isMultiStop || isIslandOrRegion) ? 500 : 250;
 
   const enriched = [...days];
 
@@ -377,6 +402,10 @@ export async function enrichItineraryWithCoordinates(
           if (shouldSkipGeocoding(row.activity)) return null;
 
           const venue = extractVenueName(row.activity);
+          // Skip generic venue names — geocoding "Resort" or "Local Shack"
+          // returns a random nearby POI, polluting marker positions.
+          if (isGenericVenue(venue)) return null;
+
           // Only trust the LLM coord as a proximity hint if it is plausibly
           // inside the destination AND in the same country (a Tokyo trip
           // should never be biased by an Indian-coords-leak from the LLM).

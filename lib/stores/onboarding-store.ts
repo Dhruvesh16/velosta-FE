@@ -323,11 +323,18 @@ export const TRAVEL_PACKAGES: TravelPackage[] = [
   },
 ];
 
+export interface CustomDestination {
+  name: string;
+  fullName: string;
+  coordinates: [number, number];
+}
+
 interface OnboardingState {
   flowStep: FlowStep;
   selectedTier: BudgetTier | null;
   selectedPackage: TravelPackage | null;
   selectedDestination: string | null;
+  customDestination: CustomDestination | null;
   userLocation: UserLocation | null;
   duration: number; // trip days
   budgetAmount: number; // ALWAYS per-person (normalized) — downstream planner expects per-person semantics
@@ -345,6 +352,7 @@ interface OnboardingState {
   selectTier: (tier: BudgetTier) => void;
   selectPackage: (pkg: TravelPackage) => void;
   selectDestination: (destination: string) => void;
+  setCustomDestination: (dest: CustomDestination | null) => void;
   setUserLocation: (location: UserLocation) => void;
   setDuration: (days: number) => void;
   setBudgetAmount: (amount: number) => void;
@@ -366,6 +374,7 @@ export const useOnboardingStore = create<OnboardingState>()(
   selectedTier: null,
   selectedPackage: null,
   selectedDestination: null,
+  customDestination: null,
   userLocation: null,
   duration: 3,
   budgetAmount: 5000,
@@ -394,6 +403,8 @@ export const useOnboardingStore = create<OnboardingState>()(
   selectDestination: (destination) =>
     set({ selectedDestination: destination, flowStep: "planner" }),
 
+  setCustomDestination: (dest) => set({ customDestination: dest }),
+
   setUserLocation: (location) => set({ userLocation: location }),
 
   setDuration: (days) => set({ duration: days }),
@@ -420,6 +431,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       selectedTier: null,
       selectedPackage: null,
       selectedDestination: null,
+      customDestination: null,
       userLocation: null,
       duration: 3,
       budgetAmount: 5000,

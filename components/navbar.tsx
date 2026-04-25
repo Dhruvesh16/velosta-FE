@@ -1,8 +1,8 @@
 "use client";
-import velostaLogo from "../public/VelostaLogo.png";
+import { Playfair_Display } from "next/font/google";
+const playfair = Playfair_Display({ subsets: ["latin"] });
 import Link from "next/link";
-import Image from "next/image";
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,22 +25,23 @@ import { UserProfileMenu } from "./user-profile-menu";
 
 function BrandMark() {
   return (
-    <Link href="/" className="flex items-center gap-3">
-      <Image
-        height={100}
-        width={100}
-        alt="logo"
-        className="rounded-xl h-14 w-14"
-        src={velostaLogo}
-      />
+    <Link
+      href="/"
+      className={`${playfair.className} text-[22px] tracking-tight`}
+      style={{ color: "var(--color-navy)" }}
+    >
+      Velosta
     </Link>
   );
 }
 
 const navLinks = [
-  { href: "/velosta-ai", label: "Velosta AI" },
-  { href: "/expense-tracker", label: "Expense Tracker" },
-  { href: "/travel-blogs", label: "HowNotToTravel" },
+  { href: "/#explore", label: "Explore" },
+  { href: "/#journeys", label: "Journeys" },
+  { href: "/#planner", label: "Planner" },
+  { href: "/velosta-ai", label: "Trip Planner" },
+  { href: "/stories", label: "Stories" },
+  { href: "/how-not-travel", label: "How Not to Travel" },
 ];
 type NavbarProps = {
   className?: string;
@@ -59,7 +60,10 @@ export default function Navbar({ className = "" }: NavbarProps) {
       {/* container */}
       <div className={` ${className ? className : "mx-auto"}  max-w-6xl px-6`}>
         {/* bar */}
-        <div className="mt-4 flex items-center justify-between rounded-full border border-black/5 bg-white/80 px-5 py-2.5 shadow-sm backdrop-blur-md">
+        <div
+          className="mt-4 flex items-center justify-between rounded-full border px-5 py-2.5 shadow-sm backdrop-blur-md"
+          style={{ backgroundColor: "rgba(245,239,230,0.72)", borderColor: "rgba(11,31,42,0.06)" }}
+        >
           {/* left: brand */}
           <div className="flex items-center gap-4">
             <BrandMark />
@@ -70,7 +74,10 @@ export default function Navbar({ className = "" }: NavbarProps) {
                 <Link
                   key={l.href}
                   href={l.href}
-                  className="text-sm font-medium text-neutral-700 hover:text-neutral-900"
+                  className="text-[13px] font-medium tracking-wide transition-colors duration-300"
+                  style={{ color: "rgba(11,31,42,0.5)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-navy)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(11,31,42,0.5)")}
                   onClick={() =>
                     l.label === "Destinations"
                       ? setDestinationsOpen(true)

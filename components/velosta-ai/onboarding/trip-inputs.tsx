@@ -14,7 +14,7 @@ import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
 import { geocodeDestination, searchPlaces } from "@/lib/services/geocoding";
 import type { PlaceSuggestion } from "@/lib/services/geocoding";
-import { generatePlannerResponse } from "@/lib/services/planner-service";
+import { generatePlannerStreamAsync } from "@/lib/services/planner-service";
 import { hydrateItineraryIntoStores } from "@/lib/services/itinerary-hydrator";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
@@ -46,6 +46,9 @@ export default function TripInputs() {
     setGeneratedItinerary,
     setGeneratingItinerary,
     selectDestination,
+    userLocation: storeOrigin,
+    travelerType,
+    travelerCount,
   } = useOnboardingStore();
   const { accessToken } = useUser();
 
@@ -59,6 +62,7 @@ export default function TripInputs() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [showSignInGate, setShowSignInGate] = useState(false);
+  const [streamBuffer, setStreamBuffer] = useState<string | undefined>(undefined);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -182,23 +186,30 @@ export default function TripInputs() {
     setError(null);
     setLoadingDestinations(true);
     setGeneratingItinerary(true);
+    setStreamBuffer("");
 
     const days = duration ?? 3;
     const budget = selectedTier.range ?? "";
 
+    const originStr = storeOrigin?.name
+      ? ` Starting from ${storeOrigin.name} — Day 1 must include travel from ${storeOrigin.name} to ${destination.name} with the transport mode (flight/train/bus/road) and estimated cost.`
+      : "";
     let autoMsg = `Plan a ${days}-day trip to ${destination.name}`;
     if (budget) autoMsg += ` with a budget of ${budget}`;
-    autoMsg += `. Generate the full itinerary now.`;
+    autoMsg += ` for ${travelerCount} ${travelerType} traveler(s).${originStr} Generate the full itinerary now.`;
 
     let didSucceed = false;
     try {
-      const response = await generatePlannerResponse({
-        userSaid: autoMsg,
-        conversationHistory: [],
-        currentItinerary: null,
-        isModificationRequest: false,
-        destinationHint: destination.name,
-      });
+      const response = await generatePlannerStreamAsync(
+        {
+          userSaid: autoMsg,
+          conversationHistory: [],
+          currentItinerary: null,
+          isModificationRequest: false,
+          destinationHint: destination.name,
+        },
+        (token) => setStreamBuffer((prev) => (prev ?? "") + token)
+      );
 
       if (!response.isTextResponse && response.itineraryTable) {
         // Hydrate planner-store + map-store directly so the planner page
@@ -228,6 +239,7 @@ export default function TripInputs() {
     } finally {
       setGeneratingItinerary(false);
       setLoadingDestinations(false);
+      setStreamBuffer(undefined);
       // Only advance to the planner step when generation succeeded
       if (didSucceed) selectDestination(destination.name);
     }
@@ -262,6 +274,7 @@ export default function TripInputs() {
         visible={isLoadingDestinations}
         mode="crafting"
         message="Your itinerary is being crafted"
+        liveTokenBuffer={streamBuffer}
         sublines={[
           "Tracing the best route through your destination\u2026",
           "Mapping stays, food and golden-hour stops\u2026",

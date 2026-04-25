@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useUser } from "@/app/utils/context";
-import { PenLine, AlertTriangle, Heart, Calendar } from "lucide-react";
+import { PenLine, Compass, Heart, Calendar } from "lucide-react";
 import authorAvatar from "../../public/icons/people.png";
 
 const STORY_TAG = "_story";
@@ -47,16 +47,57 @@ function SkeletonCard() {
   );
 }
 
-function PostCard({ post }: { post: BlogPost }) {
+function EmptyState({ isSignedIn }: { isSignedIn: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div
+        className="mb-6 flex h-20 w-20 items-center justify-center rounded-full"
+        style={{ background: "var(--color-sand)" }}
+      >
+        <Compass className="h-9 w-9 text-[var(--color-brand)]" />
+      </div>
+      <h3 className="text-2xl font-semibold text-[var(--color-navy)]">
+        No stories yet
+      </h3>
+      <p className="mt-2 max-w-sm text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>
+        Be the first to share a travel journey and inspire others in our community.
+      </p>
+      <div className="mt-6">
+        {isSignedIn ? (
+          <Link
+            href="/stories/new"
+            className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:opacity-90 hover:-translate-y-0.5"
+            style={{
+              background: "linear-gradient(90deg, var(--color-brand-start) 0%, var(--color-brand) 100%)",
+            }}
+          >
+            <PenLine className="h-4 w-4" />
+            Write a Story
+          </Link>
+        ) : (
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center gap-2 rounded-full border-2 border-[var(--color-brand)] px-6 py-3 text-sm font-semibold text-[var(--color-brand)] transition-all hover:bg-[var(--color-brand)]/10"
+          >
+            Sign in to share
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StoryCard({ post }: { post: BlogPost }) {
   const displayName = getRandomName(post.id);
+  const visibleTags = post.tags.filter((t) => t !== STORY_TAG);
   const readingMins = Math.max(
     1,
     Math.ceil(post.content.replace(/<[^>]*>/g, "").split(/\s+/).length / 200)
   );
 
   return (
-    <article className="group flex flex-col rounded-2xl overflow-hidden bg-white border border-[var(--color-mist)] shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-[var(--color-teal)]/20">
-      <Link href={`/how-not-travel/${post.id}`} className="block overflow-hidden relative">
+    <article className="group flex flex-col rounded-2xl overflow-hidden bg-white border border-[var(--color-mist)] shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-[var(--color-brand)]/20">
+      <Link href={`/stories/${post.id}`} className="block overflow-hidden relative">
         <Image
           src={post.coverImage || "/travel-blog-image.jpg"}
           alt={post.title}
@@ -64,9 +105,9 @@ function PostCard({ post }: { post: BlogPost }) {
           height={360}
           className="h-52 w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        {post.tags[0] && (
+        {visibleTags[0] && (
           <span className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[var(--color-navy)] shadow-sm backdrop-blur">
-            {post.tags[0]}
+            {visibleTags[0]}
           </span>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -106,8 +147,8 @@ function PostCard({ post }: { post: BlogPost }) {
           )}
         </div>
 
-        <h3 className="text-[17px] font-bold leading-snug text-[var(--color-navy)] mb-2 line-clamp-2 group-hover:text-[var(--color-teal)] transition-colors">
-          <Link href={`/how-not-travel/${post.id}`}>{post.title}</Link>
+        <h3 className="text-[17px] font-bold leading-snug text-[var(--color-navy)] mb-2 line-clamp-2 group-hover:text-[var(--color-brand)] transition-colors">
+          <Link href={`/stories/${post.id}`}>{post.title}</Link>
         </h3>
 
         {post.summary && (
@@ -117,10 +158,10 @@ function PostCard({ post }: { post: BlogPost }) {
         )}
 
         <Link
-          href={`/how-not-travel/${post.id}`}
-          className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-teal)] hover:gap-2.5 transition-all"
+          href={`/stories/${post.id}`}
+          className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-brand)] hover:gap-2.5 transition-all"
         >
-          Read post
+          Read story
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
@@ -130,28 +171,13 @@ function PostCard({ post }: { post: BlogPost }) {
   );
 }
 
-export default function BlogList() {
+export default function StoriesList() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showMyPosts, setShowMyPosts] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { accessToken } = useUser();
-  const isSignedIn = !!accessToken;
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        setCurrentUserId(payload.id);
-      } catch (err) {
-        console.error("Failed to decode token:", err);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    async function fetchBlogs() {
+    async function fetchStories() {
       setLoading(true);
       try {
         const token = localStorage.getItem("accessToken");
@@ -166,27 +192,19 @@ export default function BlogList() {
               : { "Content-Type": "application/json" },
           }
         );
-        if (!res.ok) throw new Error("Failed to fetch blogs");
+        if (!res.ok) throw new Error("Failed to fetch stories");
         const data: BlogPost[] = await res.json();
-        setPosts(data.filter((p) => !p.tags?.includes(STORY_TAG)));
+        setPosts(data.filter((p) => p.tags?.includes(STORY_TAG)));
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     }
-    fetchBlogs();
+    fetchStories();
   }, []);
 
-  const filtered = useMemo(() => {
-    let result = posts;
-    if (showMyPosts && currentUserId) {
-      result = result.filter((p) =>
-        p.authorId ? p.authorId === currentUserId : p.id.includes(currentUserId)
-      );
-    }
-    return result;
-  }, [posts, showMyPosts, currentUserId]);
+  const isSignedIn = !!accessToken;
 
   return (
     <>
@@ -194,57 +212,57 @@ export default function BlogList() {
       <div
         className="relative w-full overflow-hidden"
         style={{
-          background: "linear-gradient(135deg, var(--color-sand) 0%, var(--color-cream) 55%, #e8eeee 100%)",
+          background: "linear-gradient(135deg, var(--color-sand) 0%, var(--color-cream) 55%, #e8f0ef 100%)",
         }}
       >
         <div
-          className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-15"
-          style={{ background: "var(--color-teal)" }}
+          className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-20"
+          style={{ background: "var(--color-brand)" }}
         />
         <div
-          className="pointer-events-none absolute bottom-0 left-1/4 h-48 w-48 rounded-full opacity-10"
-          style={{ background: "var(--color-brand)" }}
+          className="pointer-events-none absolute -bottom-10 left-1/3 h-40 w-40 rounded-full opacity-10"
+          style={{ background: "var(--color-teal)" }}
         />
 
         <div className="relative mx-auto max-w-6xl px-6 py-16">
           <div
             className="mb-5 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider"
-            style={{ background: "rgba(47,111,115,0.12)", color: "var(--color-teal)" }}
+            style={{ background: "rgba(217,119,87,0.12)", color: "var(--color-brand)" }}
           >
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Community Wall
+            <Compass className="h-3.5 w-3.5" />
+            Community Stories
           </div>
 
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
               <h1 className="text-4xl font-semibold leading-tight text-[var(--color-navy)] md:text-5xl">
-                How{" "}
-                <span className="italic font-normal text-[var(--color-teal)]">not</span>{" "}
-                to travel
+                Stories{" "}
+                <span className="italic font-normal text-[var(--color-brand)]">from</span>{" "}
+                the road
               </h1>
               <p className="mt-3 max-w-md text-base" style={{ color: "rgba(11,31,42,0.6)" }}>
-                Real scams, mishaps, and lessons learned. Shared by travelers
-                so you don&apos;t have to learn the hard way.
+                Real journeys, real memories. Read travel experiences shared by
+                our community or tell your own.
               </p>
             </div>
 
             {isSignedIn ? (
               <Link
-                href="/how-not-travel/new-blog"
+                href="/stories/new"
                 className="inline-flex shrink-0 items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:opacity-90 hover:-translate-y-0.5"
                 style={{
                   background: "linear-gradient(90deg, var(--color-brand-start) 0%, var(--color-brand) 100%)",
                 }}
               >
                 <PenLine className="h-4 w-4" />
-                Write a post
+                Share Your Story
               </Link>
             ) : (
               <Link
                 href="/sign-in"
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border-2 border-[var(--color-teal)] px-6 py-3 text-sm font-semibold text-[var(--color-teal)] transition-all hover:bg-[var(--color-teal)]/10"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border-2 border-[var(--color-brand)] px-6 py-3 text-sm font-semibold text-[var(--color-brand)] transition-all hover:bg-[var(--color-brand)]/10"
               >
-                Sign in to post
+                Sign in to share
               </Link>
             )}
           </div>
@@ -257,87 +275,32 @@ export default function BlogList() {
           preserveAspectRatio="none"
           fill="var(--color-cream)"
         >
-          <path d="M0,16 C360,48 1080,0 1440,16 L1440,48 L0,48 Z" />
+          <path d="M0,32 C360,48 1080,0 1440,32 L1440,48 L0,48 Z" />
         </svg>
       </div>
 
-      {/* ── Content ── */}
+      {/* ── Stories grid ── */}
       <div className="min-h-[40vh]" style={{ background: "var(--color-cream)" }}>
         <div className="mx-auto max-w-6xl px-6 py-12">
-
-          {/* Filter tabs */}
-          <div className="mb-8 flex items-center gap-2">
-            <button
-              onClick={() => setShowMyPosts(false)}
-              className="rounded-full px-5 py-2 text-sm font-semibold transition-all"
-              style={
-                !showMyPosts
-                  ? { background: "var(--color-navy)", color: "var(--color-cream)" }
-                  : { background: "transparent", color: "rgba(11,31,42,0.6)", border: "1.5px solid var(--color-mist)" }
-              }
-            >
-              All Posts
-            </button>
-            <button
-              onClick={() => setShowMyPosts(true)}
-              disabled={!currentUserId}
-              className="rounded-full px-5 py-2 text-sm font-semibold transition-all disabled:opacity-40"
-              style={
-                showMyPosts
-                  ? { background: "var(--color-navy)", color: "var(--color-cream)" }
-                  : { background: "transparent", color: "rgba(11,31,42,0.6)", border: "1.5px solid var(--color-mist)" }
-              }
-            >
-              My Posts
-            </button>
-          </div>
-
           {loading ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[1, 2, 3].map((i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div
-                className="mb-6 flex h-20 w-20 items-center justify-center rounded-full"
-                style={{ background: "var(--color-sand)" }}
-              >
-                <AlertTriangle className="h-9 w-9 text-[var(--color-teal)]" />
-              </div>
-              <h3 className="text-2xl font-semibold text-[var(--color-navy)]">
-                {showMyPosts ? "No posts from you yet" : "No posts yet"}
-              </h3>
-              <p className="mt-2 max-w-sm text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>
-                {showMyPosts
-                  ? "You haven't written any posts yet — share your first travel mishap!"
-                  : "Be the first to share a travel lesson with the community."}
-              </p>
-              {isSignedIn && (
-                <Link
-                  href="/how-not-travel/new-blog"
-                  className="mt-6 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:opacity-90"
-                  style={{
-                    background: "linear-gradient(90deg, var(--color-brand-start) 0%, var(--color-brand) 100%)",
-                  }}
-                >
-                  <PenLine className="h-4 w-4" />
-                  Write a post
-                </Link>
-              )}
-            </div>
+          ) : posts.length === 0 ? (
+            <EmptyState isSignedIn={isSignedIn} />
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((p) => (
-                <PostCard key={p.id} post={p} />
+              {posts.map((p) => (
+                <StoryCard key={p.id} post={p} />
               ))}
             </div>
           )}
 
-          {filtered.length > 0 && (
+          {posts.length > 0 && (
             <p className="mt-10 text-center text-sm" style={{ color: "rgba(11,31,42,0.4)" }}>
-              Posts are community-contributed travel experiences and tips.
+              Stories are personal travel experiences shared by our community.
             </p>
           )}
         </div>

@@ -1,4 +1,3 @@
-import ProtectedRoute from "@/app/utils/protected-routes";
 import { BlogComments } from "@/components/blog/blog-comments";
 import { BlogDetail } from "@/components/blog/blog-detail";
 import { RelatedPosts } from "@/components/blog/related-posts";
@@ -11,7 +10,7 @@ type Props = {
   params: { id: string };
 };
 
-export default async function BlogPage({ params }: Props) {
+export default async function StoryPage({ params }: Props) {
   const { id } = await params;
 
   const res = await fetch(
@@ -25,26 +24,29 @@ export default async function BlogPage({ params }: Props) {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-[color:var(--color-navy)]">
-            Blog not found
+            Story not found
           </h1>
           <Link
-            href="/travel-blogs"
+            href="/stories"
             className="mt-4 inline-block text-[color:var(--color-brand)]"
           >
-            Back to blogs
+            Back to Stories
           </Link>
         </div>
       </div>
     );
   }
+
   return (
     <main>
       <Navbar />
-
-      <BlogDetail blog={blog} />
-      {/* <BlogComments blogId={blog.id} /> */}
-      {/* <RelatedPosts currentBlogId={blog.id} /> */}
-
+      <div className="mt-24">
+        <BlogDetail blog={blog} />
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          <BlogComments blogId={id} />
+        </div>
+        <RelatedPosts currentPostId={id} />
+      </div>
       <Footer />
     </main>
   );

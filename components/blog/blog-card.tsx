@@ -124,7 +124,7 @@ export function BlogCard({
             className="text-[17px] font-bold leading-6 text-[var(--color-navy)] mb-2"
           >
             <Link
-              href={`/travel-blogs/${post.id}`}
+              href={`/how-not-travel/${post.id}`}
               className="hover:text-[#DA880F] transition-colors"
             >
               {post.title}
@@ -137,7 +137,7 @@ export function BlogCard({
             </p>
           )}
 
-          <Link href={`/travel-blogs/${post.id}`} className="block">
+          <Link href={`/how-not-travel/${post.id}`} className="block">
             <Button
               variant="outline"
               className="w-full text-[14px] font-semibold border-2 hover:bg-[#DA880F] hover:text-white hover:border-[#DA880F] transition-all"

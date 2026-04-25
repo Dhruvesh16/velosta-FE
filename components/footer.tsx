@@ -53,7 +53,7 @@ export default function Footer() {
               </li>
               <li>
                 <a
-                  href="/travel-blogs"
+                  href="/how-not-travel"
                   className="hover:text-[var(--color-navy)]"
                 >
                   How Not To Travel

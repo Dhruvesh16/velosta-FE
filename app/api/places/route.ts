@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "";
+// Server-side only — do NOT use NEXT_PUBLIC_ prefix here
+const GOOGLE_KEY = process.env.GOOGLE_MAPS_KEY ?? "";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -21,17 +22,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Step 1: Text Search to find the place. 5 km radius (location bias) is
-    // tight enough that we don't pull in same-named POIs from neighbouring
-    // cities (e.g. a "Sunny Da Dhaba" sitting on the Mumbai-Pune highway
-    // ~30 km from Lonavala town) but still covers the full urban footprint
-    // plus immediate hill-station / lake-front fringe.
+    // Step 1: Text Search to find the place. 25 km radius gives enough
+    // coverage for island-hopping itineraries (e.g. Havelock Island is
+    // ~37 km from Port Blair) without pulling POIs from neighboring cities.
     const query = destination ? `${name}, ${destination}` : name;
     const searchUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
     searchUrl.searchParams.set("query", query);
     searchUrl.searchParams.set("location", `${lat},${lng}`);
-    searchUrl.searchParams.set("radius", "5000");
-    searchUrl.searchParams.set("region", "in");
+    searchUrl.searchParams.set("radius", "25000");
     searchUrl.searchParams.set("key", GOOGLE_KEY);
 
     const searchRes = await fetch(searchUrl.toString());

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, Share2, Bookmark, Trash2 } from "lucide-react";
+import { Heart, Share2, Bookmark, Trash2, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -9,6 +9,16 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import authorAvatar from "../../public/icons/people.png";
@@ -49,6 +59,10 @@ export function BlogDetail({ blog }: BlogDetailProps) {
   const [likeCount, setLikeCount] = useState(blog.likes);
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
   const { user } = useUser();
 
   const handleLike = () => {
@@ -114,6 +128,72 @@ export function BlogDetail({ blog }: BlogDetailProps) {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReport = async () => {
+    if (!reportReason) {
+      toast.warning("Please select a reason for reporting.", {
+        position: "bottom-right",
+        autoClose: 2500,
+      });
+      return;
+    }
+    if (!user) {
+      toast.warning("You must be signed in to report a post.", {
+        position: "bottom-right",
+        autoClose: 2500,
+      });
+      return;
+    }
+    try {
+      setReportLoading(true);
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("accessToken")
+          : null;
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/${blog.id}/report`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+          body: JSON.stringify({
+            reason: reportReason,
+            description: reportDescription.trim() || null,
+          }),
+        }
+      );
+
+      if (res.status === 409) {
+        toast.info("You have already reported this post.", {
+          position: "bottom-right",
+          autoClose: 3000,
+        });
+        setReportDialogOpen(false);
+        return;
+      }
+
+      if (!res.ok) throw new Error("Failed to submit report");
+
+      toast.success("Report submitted. Our team will review it.", {
+        position: "bottom-right",
+        autoClose: 3000,
+      });
+      setReportDialogOpen(false);
+      setReportReason("");
+      setReportDescription("");
+    } catch (err) {
+      console.error("report error:", err);
+      toast.error("Something went wrong while submitting the report.", {
+        position: "bottom-right",
+        autoClose: 2500,
+      });
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -206,6 +286,24 @@ export function BlogDetail({ blog }: BlogDetailProps) {
                   <Bookmark className="h-5 w-5" />
                 </Button>
 
+                {user && user.id !== blog.authorId && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setReportDialogOpen(true)}
+                        className="text-muted-foreground hover:text-red-500"
+                      >
+                        <Flag className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">Report this post</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
                 {user?.id === blog.authorId && (
                   // AlertDialog wraps the dialog pieces. Tooltip wraps the trigger (the actual Button DOM node).
                   <AlertDialog
@@ -278,6 +376,95 @@ export function BlogDetail({ blog }: BlogDetailProps) {
           </div>
         </div>
       </article>
+
+      {/* ── Report Post Dialog ─────────────────────────────────────── */}
+      <Dialog
+        open={reportDialogOpen}
+        onOpenChange={(open) => {
+          setReportDialogOpen(open);
+          if (!open) {
+            setReportReason("");
+            setReportDescription("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[color:var(--color-navy)]">
+              Report this post
+            </DialogTitle>
+            <DialogDescription>
+              Help us keep Velosta safe. Select a reason and we will review this
+              post.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Reason</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "misleading", label: "Misleading" },
+                  { value: "sexual_content", label: "Sexual content" },
+                  { value: "hate_speech", label: "Hate speech" },
+                  { value: "spam", label: "Spam" },
+                  { value: "violence", label: "Violence" },
+                  { value: "misinformation", label: "Misinformation" },
+                  { value: "other", label: "Other" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setReportReason(opt.value)}
+                    className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
+                      reportReason === opt.value
+                        ? "border-[color:var(--color-brand)] bg-[color:var(--color-cream)] text-[color:var(--color-brand)] font-medium"
+                        : "border-border hover:border-[color:var(--color-brand)]/50 hover:bg-muted/50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="report-desc" className="text-sm font-medium">
+                Additional details{" "}
+                <span className="text-muted-foreground font-normal">
+                  (optional)
+                </span>
+              </Label>
+              <Textarea
+                id="report-desc"
+                placeholder="Tell us more about the issue..."
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                maxLength={1000}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setReportDialogOpen(false)}
+              disabled={reportLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReport}
+              disabled={reportLoading || !reportReason}
+              className="bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand)]/90 text-white"
+            >
+              {reportLoading ? "Submitting..." : "Submit report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

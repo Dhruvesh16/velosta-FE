@@ -421,7 +421,6 @@ export default function Page() {
               >
                 velosta
               </span>
-              <Sparkles className="h-4 w-4" style={{ color: c.coral }} />
             </motion.div>
 
             {/* Coral divider */}

@@ -193,7 +193,8 @@ export default function StoriesList() {
           }
         );
         if (!res.ok) throw new Error("Failed to fetch stories");
-        const data: BlogPost[] = await res.json();
+        const json = await res.json();
+        const data: BlogPost[] = Array.isArray(json) ? json : (json.data ?? []);
         setPosts(data.filter((p) => p.tags?.includes(STORY_TAG)));
       } catch (err) {
         console.error(err);

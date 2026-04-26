@@ -135,7 +135,8 @@ export default function TravelArticles() {
 
         if (!res.ok) throw new Error("Failed to fetch blogs");
 
-        const data: BlogPost[] = await res.json();
+        const json = await res.json();
+        const data: BlogPost[] = Array.isArray(json) ? json : (json.data ?? []);
         setPosts(data);
       } catch (err) {
         console.error(err);

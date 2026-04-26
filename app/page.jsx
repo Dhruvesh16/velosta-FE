@@ -177,7 +177,8 @@ export default function Page() {
       try {
         const res = await fetch(`${base}/api/travel-blog/all-blogs`);
         if (!res.ok) return;
-        const all = await res.json();
+        const json = await res.json();
+        const all = Array.isArray(json) ? json : (json.data ?? []);
         setStoryPosts(all.filter((p) => p.tags?.includes("_story")).slice(0, 4));
         setHnttPosts(all.filter((p) => !p.tags?.includes("_story")).slice(0, 3));
       } catch (_) {}

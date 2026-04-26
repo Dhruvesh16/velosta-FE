@@ -41,7 +41,7 @@ const navLinks = [
   { href: "/velosta-ai", label: "Velosta AI" },
   { href: "/how-not-travel", label: "How Not to Travel" },
   { href: "/stories", label: "Stories" },
-  { href: "/cost-splitter", label: "Expense Tracker" },
+  { href: "/expense-tracker", label: "Expense Tracker" },
 ];
 type NavbarProps = {
   className?: string;

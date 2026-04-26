@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Playfair_Display } from "next/font/google";
 import {
   Plus,
@@ -15,6 +14,7 @@ import {
   X,
   Mail,
   Sparkles,
+  ChevronDown,
 } from "lucide-react";
 import { useUser } from "@/app/utils/context";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Navbar from "@/components/navbar";
 
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -46,6 +53,8 @@ type Expense = {
   payerId: string;
   amount: number;
   description: string;
+  /** Member IDs who share this expense. Empty means ALL members. */
+  splitWith: string[];
   createdAt: string;
 };
 
@@ -93,15 +102,27 @@ const uid = () =>
 type Settlement = { from: string; to: string; amount: number };
 
 function computeBalances(trip: Trip): Record<string, number> {
-  const n = trip.members.length;
-  if (n === 0) return {};
-  const total = trip.expenses.reduce((s, e) => s + e.amount, 0);
-  const equalShare = total / n;
   const balances: Record<string, number> = {};
-  trip.members.forEach((m) => (balances[m.id] = -equalShare));
+  trip.members.forEach((m) => (balances[m.id] = 0));
+
   trip.expenses.forEach((e) => {
+    // Determine who splits this expense (default: all members)
+    const splitters =
+      e.splitWith && e.splitWith.length > 0
+        ? e.splitWith.filter((id) => balances[id] !== undefined)
+        : trip.members.map((m) => m.id);
+
+    if (splitters.length === 0) return;
+    const share = e.amount / splitters.length;
+
+    // Payer is credited the full amount
     balances[e.payerId] = (balances[e.payerId] ?? 0) + e.amount;
+    // Each splitter is debited their share
+    splitters.forEach((id) => {
+      balances[id] = (balances[id] ?? 0) - share;
+    });
   });
+
   // Round to 2 decimals
   Object.keys(balances).forEach((k) => {
     balances[k] = Math.round(balances[k] * 100) / 100;
@@ -139,7 +160,7 @@ function computeSettlements(trip: Trip): Settlement[] {
 /* ──────────────────────────────────────────────────────────── */
 export default function CostSplitterPage() {
   const router = useRouter();
-  const { accessToken, loading } = useUser();
+  const { accessToken, loading, user } = useUser();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -148,7 +169,7 @@ export default function CostSplitterPage() {
   // Auth gate
   useEffect(() => {
     if (!loading && !accessToken) {
-      router.push("/sign-in?redirect=/cost-splitter");
+      router.push("/sign-in?redirect=/expense-tracker");
     }
   }, [loading, accessToken, router]);
 
@@ -175,10 +196,16 @@ export default function CostSplitterPage() {
   };
 
   const handleCreateTrip = (name: string) => {
+    // Auto-add the creator as the first member
+    const creatorMember: Member | null =
+      user?.name
+        ? { id: uid(), name: user.name, email: user.email ?? "" }
+        : null;
+
     const trip: Trip = {
       id: uid(),
       name: name.trim(),
-      members: [],
+      members: creatorMember ? [creatorMember] : [],
       expenses: [],
       createdAt: new Date().toISOString(),
     };
@@ -442,7 +469,7 @@ function TripWorkspace({
     onUpdate((t) => ({ ...t, members: t.members.filter((m) => m.id !== memberId) }));
   };
 
-  const addExpense = (payerId: string, amount: number, description: string) => {
+  const addExpense = (payerId: string, amount: number, description: string, splitWith: string[]) => {
     onUpdate((t) => ({
       ...t,
       expenses: [
@@ -451,6 +478,7 @@ function TripWorkspace({
           payerId,
           amount,
           description: description.trim(),
+          splitWith,
           createdAt: new Date().toISOString(),
         },
         ...t.expenses,
@@ -566,7 +594,7 @@ function TripWorkspace({
       {/* Expenses */}
       <Card
         title="Expenses"
-        subtitle="Each expense is split equally across everyone on the trip."
+        subtitle="Each expense splits among the selected members."
         action={
           <Button
             onClick={() => setAddExpenseOpen(true)}
@@ -609,6 +637,10 @@ function TripWorkspace({
                       <span style={{ color: "var(--color-navy)", fontWeight: 500 }}>
                         {payer?.name ?? "Unknown"}
                       </span>
+                      {" · "}
+                      {e.splitWith?.length > 0 && e.splitWith.length < trip.members.length
+                        ? `Split with ${e.splitWith.length} member${e.splitWith.length !== 1 ? "s" : ""}`
+                        : "Split with everyone"}
                       {" · "}
                       {new Date(e.createdAt).toLocaleDateString("en-IN", {
                         day: "numeric",
@@ -1054,11 +1086,14 @@ function AddExpenseDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   members: Member[];
-  onAdd: (payerId: string, amount: number, description: string) => void;
+  onAdd: (payerId: string, amount: number, description: string, splitWith: string[]) => void;
 }) {
   const [payerId, setPayerId] = useState<string>("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [splitWith, setSplitWith] = useState<string[]>([]);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const splitRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1066,9 +1101,40 @@ function AddExpenseDialog({
       setPayerId(members[0]?.id ?? "");
       setAmount("");
       setDescription("");
+      setSplitWith(members.map((m) => m.id));
       setError(null);
     }
   }, [open, members]);
+
+  useEffect(() => {
+    if (!splitOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (splitRef.current && !splitRef.current.contains(e.target as Node)) {
+        setSplitOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [splitOpen]);
+
+  const allSelected = splitWith.length === members.length;
+
+  const toggleAll = () => {
+    setSplitWith(allSelected ? [] : members.map((m) => m.id));
+  };
+
+  const toggleMember = (id: string) => {
+    setSplitWith((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const splitLabel =
+    splitWith.length === 0
+      ? "No one selected"
+      : allSelected
+      ? "All members"
+      : `${splitWith.length} of ${members.length} members`;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1086,7 +1152,11 @@ function AddExpenseDialog({
       setError("Add a short description (e.g. ‘Dinner at Olive’).");
       return;
     }
-    onAdd(payerId, Math.round(amt * 100) / 100, description);
+    if (splitWith.length === 0) {
+      setError("Select at least one person to split with.");
+      return;
+    }
+    onAdd(payerId, Math.round(amt * 100) / 100, description, splitWith);
   };
 
   return (
@@ -1104,36 +1174,36 @@ function AddExpenseDialog({
               Log an expense
             </DialogTitle>
             <DialogDescription className="text-[13px]" style={{ color: "rgba(11,31,42,0.6)" }}>
-              Pick who paid and how much. We&rsquo;ll split it evenly across everyone.
+              Pick who paid, how much, and who shares it.
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 pb-2 space-y-4">
-            {/* Payer selector */}
+            {/* Payer selector — Select dropdown */}
             <div>
               <Label className="text-[12px] font-semibold" style={{ color: "var(--color-navy)" }}>
                 Paid by
               </Label>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {members.map((m) => {
-                  const active = m.id === payerId;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setPayerId(m.id)}
-                      className="inline-flex items-center gap-2 px-3 h-9 rounded-full text-[12.5px] font-semibold transition-all"
-                      style={{
-                        background: active ? "var(--color-navy)" : "white",
-                        color: active ? "var(--color-cream)" : "var(--color-navy)",
-                        border: `1px solid ${active ? "var(--color-navy)" : "var(--color-mist)"}`,
-                      }}
-                    >
-                      <Avatar name={m.name} small />
-                      <span className="truncate max-w-[110px]">{m.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <Select value={payerId} onValueChange={setPayerId}>
+                <SelectTrigger
+                  className="mt-2 h-11 rounded-xl bg-white text-[13px]"
+                  style={{ borderColor: "var(--color-mist)", color: "var(--color-navy)" }}
+                >
+                  <SelectValue placeholder="Select payer…" />
+                </SelectTrigger>
+                <SelectContent
+                  className="rounded-xl"
+                  style={{ background: "var(--color-cream)", borderColor: "var(--color-mist)" }}
+                >
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-[13px] cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <Avatar name={m.name} small />
+                        <span>{m.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Amount */}
@@ -1168,6 +1238,91 @@ function AddExpenseDialog({
                 className="mt-2 h-11 rounded-xl bg-white"
                 style={{ borderColor: "var(--color-mist)" }}
               />
+            </div>
+
+            {/* Split by — custom multi-select */}
+            <div ref={splitRef} className="relative">
+              <Label className="text-[12px] font-semibold" style={{ color: "var(--color-navy)" }}>
+                Split by
+              </Label>
+              <button
+                type="button"
+                onClick={() => setSplitOpen((v) => !v)}
+                className="mt-2 w-full h-11 rounded-xl bg-white px-3 flex items-center justify-between text-[13px]"
+                style={{
+                  border: `1px solid ${splitOpen ? "var(--color-navy)" : "var(--color-mist)"}`,
+                  color: splitWith.length === 0 ? "rgba(11,31,42,0.4)" : "var(--color-navy)",
+                }}
+              >
+                <span>{splitLabel}</span>
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 transition-transform"
+                  style={{
+                    color: "rgba(11,31,42,0.4)",
+                    transform: splitOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                />
+              </button>
+              {splitOpen && (
+                <div
+                  className="absolute z-50 mt-1 w-full rounded-xl shadow-lg py-1"
+                  style={{
+                    background: "var(--color-cream)",
+                    border: "1px solid var(--color-mist)",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={toggleAll}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/60 transition-colors text-[13px] font-semibold"
+                    style={{ color: "var(--color-navy)" }}
+                  >
+                    <span
+                      className="h-4 w-4 rounded flex items-center justify-center shrink-0 border"
+                      style={{
+                        background: allSelected ? "var(--color-navy)" : "white",
+                        borderColor: allSelected ? "var(--color-navy)" : "var(--color-mist)",
+                      }}
+                    >
+                      {allSelected && (
+                        <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5">
+                          <path d="M1 4l3 3 5-6" stroke="var(--color-cream)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                    All members
+                  </button>
+                  <div className="my-1 border-t" style={{ borderColor: "var(--color-mist)" }} />
+                  {members.map((m) => {
+                    const checked = splitWith.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => toggleMember(m.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/60 transition-colors text-[13px]"
+                        style={{ color: "var(--color-navy)" }}
+                      >
+                        <span
+                          className="h-4 w-4 rounded flex items-center justify-center shrink-0 border"
+                          style={{
+                            background: checked ? "var(--color-navy)" : "white",
+                            borderColor: checked ? "var(--color-navy)" : "var(--color-mist)",
+                          }}
+                        >
+                          {checked && (
+                            <svg viewBox="0 0 10 8" fill="none" className="h-2.5 w-2.5">
+                              <path d="M1 4l3 3 5-6" stroke="var(--color-cream)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </span>
+                        <Avatar name={m.name} small />
+                        <span className="truncate">{m.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {error && (

@@ -322,7 +322,7 @@ export default function Page() {
             <motion.div variants={heroChild} className="mt-10">
               <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
                 <Link
-                  href="/velosta-ai"
+                  href="/plan"
                   className="group inline-flex items-center gap-2.5 rounded-full px-8 py-3.5 text-[14px] font-semibold"
                   style={{
                     backgroundColor: c.navy,
@@ -872,7 +872,7 @@ export default function Page() {
                 className="inline-block"
               >
                 <Link
-                  href="/velosta-ai"
+                  href="/plan"
                   className="group inline-flex items-center gap-3 rounded-full px-9 py-4 text-[13px] font-semibold tracking-[0.06em]"
                   style={{
                     backgroundColor: c.coral,
@@ -1628,7 +1628,7 @@ export default function Page() {
         className="fixed inset-x-0 bottom-0 z-50 p-3 md:hidden"
       >
         <Link
-          href="/velosta-ai"
+          href="/plan"
           className="flex h-14 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold"
           style={{
             backgroundColor: c.coral,

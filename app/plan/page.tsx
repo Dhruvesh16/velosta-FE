@@ -1,0 +1,386 @@
+"use client";
+
+/**
+ * /plan — Conversational Intro
+ * ─────────────────────────────────────────────────────────────────
+ * Sits between the homepage "Plan My Trip" CTA and the full Velosta AI
+ * spatial planner at /velosta-ai. Greets the user by name, captures an
+ * optional free-form intent, and warms them into the planner experience.
+ *
+ * Design language: Velosta Gilded Meridian — sand surfaces, navy text,
+ * coral signature accent, subtle ambient glow. Fully responsive.
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { Playfair_Display, Dancing_Script } from "next/font/google";
+import { Sparkles, ArrowRight, MapPin, Compass, Send } from "lucide-react";
+import { useUser } from "@/app/utils/context";
+
+const playfair = Playfair_Display({ subsets: ["latin"], weight: ["500", "600", "700"] });
+const dancing = Dancing_Script({ subsets: ["latin"], weight: ["500", "600"] });
+
+const C = {
+  navy: "#0B1F2A",
+  sand: "#F5EFE6",
+  sandLight: "#FBF8F3",
+  teal: "#2F6F73",
+  coral: "#D97757",
+  coralStart: "#E89378",
+  coralDark: "#B85F44",
+  mist: "#D9E2E1",
+};
+
+// Conversational prompts the AI rotates through in the input placeholder
+const PROMPT_HINTS = [
+  "A misty 3-day escape to Coorg with my partner…",
+  "Two weeks across Rajasthan on a moderate budget…",
+  "Backpacking through the North-East in October…",
+  "A solo wellness retreat in Rishikesh…",
+  "Family trip to Andaman with snorkelling included…",
+];
+
+export default function PlanIntroPage() {
+  const router = useRouter();
+  const { user } = useUser();
+
+  const firstName = useMemo(() => {
+    if (!user?.name) return null;
+    return user.name.trim().split(/\s+/)[0];
+  }, [user]);
+
+  const greeting = useMemo(() => buildGreeting(firstName), [firstName]);
+
+  // Typewriter effect for AI bubble — feels like a real conversation
+  const [typed, setTyped] = useState("");
+  const [showInput, setShowInput] = useState(false);
+  const [intent, setIntent] = useState("");
+  const [hintIdx, setHintIdx] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let i = 0;
+    const id = window.setInterval(() => {
+      i += 2;
+      setTyped(greeting.slice(0, i));
+      if (i >= greeting.length) {
+        window.clearInterval(id);
+        // small breath, then reveal the input row
+        window.setTimeout(() => setShowInput(true), 220);
+      }
+    }, 22);
+    return () => window.clearInterval(id);
+  }, [greeting]);
+
+  // Cycle the placeholder so it feels alive
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setHintIdx((p) => (p + 1) % PROMPT_HINTS.length);
+    }, 4200);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const goToPlanner = () => {
+    if (submitting) return;
+    setSubmitting(true);
+    const trimmed = intent.trim();
+    if (trimmed && typeof window !== "undefined") {
+      // Stash the free-form intent so the planner can pick it up if/when
+      // the intent-capture step is wired to read from sessionStorage.
+      try {
+        window.sessionStorage.setItem("velosta:planIntent", trimmed);
+      } catch {
+        /* sessionStorage may be unavailable (private mode) — non-fatal */
+      }
+    }
+    // Tiny delay so the press animation is visible before navigation
+    window.setTimeout(() => router.push("/velosta-ai"), 180);
+  };
+
+  return (
+    <main
+      className="relative min-h-dscreen w-full overflow-hidden flex flex-col"
+      style={{
+        background:
+          "linear-gradient(180deg, #FBF8F3 0%, #F5EFE6 55%, #EFEAE0 100%)",
+        color: C.navy,
+      }}
+    >
+      {/* ── Ambient washes — subtle Velosta atmosphere ──────────────────── */}
+      <AmbientField />
+
+      {/* ── Top bar: brand + Skip ───────────────────────────────────────── */}
+      <header className="relative z-20 flex items-center justify-between px-5 sm:px-8 lg:px-12 pt-6 sm:pt-8">
+        <Link
+          href="/"
+          className={`${playfair.className} text-[22px] tracking-tight font-semibold`}
+          style={{ color: C.navy }}
+        >
+          velosta
+        </Link>
+
+        <Link
+          href="/velosta-ai"
+          className="text-[12px] sm:text-[13px] font-medium tracking-wide transition-colors duration-200"
+          style={{ color: "rgba(11,31,42,0.55)" }}
+        >
+          Skip intro <span aria-hidden="true">→</span>
+        </Link>
+      </header>
+
+      {/* ── Conversation stage ──────────────────────────────────────────── */}
+      <section className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 lg:px-12 py-10 sm:py-14">
+        <div className="w-full max-w-2xl">
+          {/* Eyebrow */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-2 mb-6 sm:mb-8"
+          >
+            <span
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full"
+              style={{ background: "rgba(217,119,87,0.12)" }}
+            >
+              <Sparkles className="h-3 w-3" style={{ color: C.coral }} />
+            </span>
+            <span
+              className="text-[10.5px] sm:text-[11px] font-semibold uppercase tracking-[0.28em]"
+              style={{ color: C.teal }}
+            >
+              Velosta AI
+            </span>
+          </motion.div>
+
+          {/* AI bubble */}
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
+            className="flex items-start gap-3 sm:gap-4"
+          >
+            {/* Avatar */}
+            <div
+              className="shrink-0 h-10 w-10 sm:h-11 sm:w-11 rounded-full flex items-center justify-center shadow-sm"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--color-brand-start, #E89378), var(--color-brand, #D97757))",
+              }}
+              aria-hidden="true"
+            >
+              <Compass className="h-5 w-5 text-white" strokeWidth={2.2} />
+            </div>
+
+            {/* Bubble */}
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-[10.5px] font-medium tracking-[0.18em] uppercase mb-2"
+                style={{ color: "rgba(11,31,42,0.45)" }}
+              >
+                Your guide
+              </p>
+              <div
+                className="relative rounded-2xl rounded-tl-sm px-5 py-4 sm:px-6 sm:py-5 shadow-[0_8px_24px_-12px_rgba(11,31,42,0.18)]"
+                style={{
+                  background: "rgba(255,255,255,0.78)",
+                  backdropFilter: "blur(10px)",
+                  border: "1px solid rgba(217,119,87,0.18)",
+                }}
+              >
+                <p
+                  className={`${playfair.className} text-[clamp(1.5rem,4.6vw,2.25rem)] leading-[1.18] tracking-tight`}
+                  style={{ color: C.navy }}
+                >
+                  {typed}
+                  {typed.length < greeting.length && (
+                    <span
+                      className="inline-block w-[2px] h-[0.9em] ml-1 align-middle"
+                      style={{
+                        background: C.coral,
+                        animation: "velosta-caret 1s steps(1) infinite",
+                      }}
+                    />
+                  )}
+                </p>
+                <p
+                  className={`${dancing.className} mt-3 sm:mt-4 text-[15px] sm:text-[17px]`}
+                  style={{ color: "rgba(11,31,42,0.5)" }}
+                >
+                  Tell me a little, or jump straight in — I&apos;ll handle the rest.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* User input row + CTA */}
+          <AnimatePresence>
+            {showInput && (
+              <motion.div
+                key="input"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="mt-7 sm:mt-9 ml-0 sm:ml-[calc(2.75rem+1rem)]"
+              >
+                {/* Input pill */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    goToPlanner();
+                  }}
+                  className="relative"
+                >
+                  <div
+                    className="flex items-center gap-2 rounded-full pl-5 pr-2 py-2 shadow-[0_4px_18px_-10px_rgba(11,31,42,0.25)] focus-within:shadow-[0_6px_22px_-10px_rgba(217,119,87,0.45)] transition-all duration-300"
+                    style={{
+                      background: "rgba(255,255,255,0.95)",
+                      border: "1px solid rgba(11,31,42,0.08)",
+                    }}
+                  >
+                    <MapPin
+                      className="h-4 w-4 shrink-0"
+                      style={{ color: C.teal }}
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="text"
+                      value={intent}
+                      onChange={(e) => setIntent(e.target.value)}
+                      placeholder={PROMPT_HINTS[hintIdx]}
+                      aria-label="Describe your dream trip"
+                      maxLength={240}
+                      className="flex-1 min-w-0 bg-transparent outline-none text-[14px] sm:text-[15px] placeholder:transition-opacity placeholder:duration-300"
+                      style={{
+                        color: C.navy,
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Continue to planner"
+                      className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-white shadow-md active:scale-95 transition-transform"
+                      style={{
+                        background: `linear-gradient(135deg, ${C.coralStart}, ${C.coral})`,
+                      }}
+                    >
+                      <Send className="h-4 w-4" strokeWidth={2.4} />
+                    </button>
+                  </div>
+                </form>
+
+                {/* Divider word */}
+                <div className="flex items-center gap-3 my-6 sm:my-7">
+                  <div
+                    className="flex-1 h-px"
+                    style={{ background: "rgba(11,31,42,0.10)" }}
+                  />
+                  <span
+                    className="text-[10.5px] font-semibold uppercase tracking-[0.24em]"
+                    style={{ color: "rgba(11,31,42,0.40)" }}
+                  >
+                    or
+                  </span>
+                  <div
+                    className="flex-1 h-px"
+                    style={{ background: "rgba(11,31,42,0.10)" }}
+                  />
+                </div>
+
+                {/* Primary CTA */}
+                <motion.button
+                  type="button"
+                  onClick={goToPlanner}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  disabled={submitting}
+                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-full px-7 sm:px-9 py-3.5 sm:py-4 text-[14px] sm:text-[15px] font-semibold disabled:opacity-70"
+                  style={{
+                    background: C.navy,
+                    color: "#fff",
+                    boxShadow: "0 14px 32px -10px rgba(11,31,42,0.4)",
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Start generating my itinerary
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                </motion.button>
+
+                {/* Trust line */}
+                <p
+                  className="mt-5 text-[12px] sm:text-[12.5px] leading-relaxed max-w-md"
+                  style={{ color: "rgba(11,31,42,0.55)" }}
+                >
+                  No card. No sign-up walls. Just an AI travel partner that builds a
+                  complete, personalised itinerary in under 90 seconds.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </section>
+
+      {/* Local keyframes for the typewriter caret */}
+      <style jsx global>{`
+        @keyframes velosta-caret {
+          0%, 50% { opacity: 1; }
+          50.01%, 100% { opacity: 0; }
+        }
+      `}</style>
+    </main>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Helpers
+ * ────────────────────────────────────────────────────────────── */
+
+function buildGreeting(firstName: string | null): string {
+  const hour = new Date().getHours();
+  const partOfDay =
+    hour < 5 ? "Up late" :
+    hour < 12 ? "Good morning" :
+    hour < 17 ? "Good afternoon" :
+    hour < 21 ? "Good evening" :
+    "Up late";
+
+  const name = firstName ? `, ${firstName}` : " there";
+  return `${partOfDay}${name} — where shall we wander next?`;
+}
+
+/**
+ * Soft ambient gradient orbs that sit behind the conversation, giving the
+ * page an atmospheric quality without competing for attention.
+ */
+function AmbientField() {
+  return (
+    <>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-32 -right-24 h-[420px] w-[420px] rounded-full blur-3xl opacity-50"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(217,119,87,0.30), transparent 65%)",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 -left-20 h-[460px] w-[460px] rounded-full blur-3xl opacity-50"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(47,111,115,0.22), transparent 65%)",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 h-[260px] w-[260px] rounded-full blur-3xl opacity-30"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(232,147,120,0.35), transparent 70%)",
+        }}
+      />
+    </>
+  );
+}

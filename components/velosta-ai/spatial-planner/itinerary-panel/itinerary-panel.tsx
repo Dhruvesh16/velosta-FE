@@ -5,7 +5,7 @@ import {
   Map, FileDown, RotateCcw, MapPin, Utensils, Camera, Bed,
   Sun, Sunset, Moon, Coffee, Navigation, Copy, BedDouble, UtensilsCrossed,
   Send, Sparkles, ChevronDown, ChevronUp, Loader2, ArrowLeft, Share2, Settings,
-  MessageCircle, Compass, X,
+  MessageCircle, Compass, X, ExternalLink,
 } from "lucide-react";
 import { usePlannerStore } from "@/lib/stores/planner-store";
 import { useMapStore } from "@/lib/stores/map-store";
@@ -17,11 +17,32 @@ import {
   enrichItineraryWithCoordinates,
   itineraryToMarkers,
 } from "@/lib/services/geocoding";
-import { generatePlannerResponse } from "@/lib/services/planner-service";
+import { generatePlannerStreamAsync } from "@/lib/services/planner-service";
 import LocationCard from "./location-card";
 import SuggestionsPanel from "./suggestions-panel";
 import { exportItineraryPDF, shareItinerary } from "@/lib/services/index";
 import type { ActivityRow } from "@/lib/types/planner.types";
+
+// ── Google Maps navigation helper ────────────────────────────────────────
+function buildGoogleMapsUrl(rows: ActivityRow[], destination: string): string {
+  const stops = rows.map((r) =>
+    r.coordinates
+      ? `${r.coordinates[1]},${r.coordinates[0]}` // Mapbox [lng,lat] → Google "lat,lng"
+      : encodeURIComponent(`${r.activity}, ${destination}`)
+  );
+  if (stops.length === 0)
+    return `https://www.google.com/maps/search/${encodeURIComponent(destination)}`;
+  if (stops.length === 1)
+    return `https://www.google.com/maps/search/${stops[0]}`;
+  const url = new URL("https://www.google.com/maps/dir/");
+  url.searchParams.set("api", "1");
+  url.searchParams.set("origin", stops[0]);
+  url.searchParams.set("destination", stops[stops.length - 1]);
+  const waypoints = stops.slice(1, -1).join("|");
+  if (waypoints) url.searchParams.set("waypoints", waypoints);
+  url.searchParams.set("travelmode", "driving");
+  return url.toString();
+}
 
 // ── Velosta Gilded Meridian palette ──────────────────────────────────────
 // Amber → terracotta → teal → charcoal → muted gold → deep amber → moss → indigo-night.
@@ -110,6 +131,8 @@ export default function ItineraryPanel() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiExpanded, setAiExpanded] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [aiStreamText, setAiStreamText] = useState("");
+  const streamAccRef = useRef("");
   // Toast for export/share actions
   const [actionToast, setActionToast] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -191,36 +214,41 @@ export default function ItineraryPanel() {
     }
   }
 
-  // ── AI Refine Handler ──
-  const handleAiSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      const text = aiInput.trim();
+  // ── AI Refine Handler (streaming) ──
+  const submitAi = useCallback(
+    async (text: string) => {
       if (!text || aiLoading || !itineraryData) return;
-
       setAiInput("");
       setAiLoading(true);
       setAiMessage(null);
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000);
+      setAiStreamText("");
+      streamAccRef.current = "";
 
       try {
-        const data = await generatePlannerResponse({
-          userSaid: text,
-          conversationHistory: [
-            { role: "assistant", content: `[Current itinerary for ${itineraryData.destination}]` },
-            { role: "user", content: text },
-          ],
-          currentItinerary: itineraryData,
-          isModificationRequest: true,
-        });
-        clearTimeout(timeout);
+        const data = await generatePlannerStreamAsync(
+          {
+            userSaid: text,
+            conversationHistory: [
+              { role: "assistant", content: `[Current itinerary for ${itineraryData.destination}]` },
+              { role: "user", content: text },
+            ],
+            currentItinerary: itineraryData,
+            isModificationRequest: true,
+          },
+          (token) => {
+            streamAccRef.current += token;
+            // Show tokens only when they look like natural-language text, not raw JSON
+            if (!streamAccRef.current.trimStart().startsWith("{")) {
+              setAiStreamText(streamAccRef.current);
+            }
+          }
+        );
+
+        setAiStreamText("");
 
         if (data.isTextResponse) {
           setAiMessage(data.message);
         } else if (data.itineraryTable) {
-          // Sync updated itinerary
           const extractedTripData = {
             destination: data.destination,
             budget: data.totalEstimatedCost || data.totalBudget,
@@ -241,14 +269,14 @@ export default function ItineraryPanel() {
           }));
           setMarkers(itineraryToMarkers(enriched));
 
-          setAiMessage(data.summary || "Itinerary updated!");
-          if (data.modificationsApplied?.length > 0) {
-            setAiMessage(
-              `Changes applied:\n${data.modificationsApplied.map((m: string) => `• ${m}`).join("\n")}`
-            );
-          }
+          setAiMessage(
+            data.modificationsApplied?.length > 0
+              ? `Changes applied:\n${data.modificationsApplied.map((m: string) => `• ${m}`).join("\n")}`
+              : data.summary || "Itinerary updated!"
+          );
         }
       } catch (err: any) {
+        setAiStreamText("");
         setAiMessage(
           err.name === "AbortError"
             ? "Request timed out. Try again."
@@ -258,7 +286,15 @@ export default function ItineraryPanel() {
         setAiLoading(false);
       }
     },
-    [aiInput, aiLoading, itineraryData, accessToken, flyTo, setMarkers]
+    [aiLoading, itineraryData, flyTo, setMarkers]
+  );
+
+  const handleAiSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      submitAi(aiInput.trim());
+    },
+    [aiInput, submitAi]
   );
 
   // ── Empty state ──────────────────────────────────────────────────────────
@@ -557,6 +593,23 @@ export default function ItineraryPanel() {
             >
               {currentDay.rows.length} {currentDay.rows.length === 1 ? "Stop" : "Stops"}
             </span>
+            {currentDay.rows.length > 0 && (
+              <a
+                href={buildGoogleMapsUrl(currentDay.rows, itineraryData?.destination ?? "")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[9.5px] font-semibold transition-all hover:opacity-75 active:scale-95"
+                style={{
+                  background: "rgba(66,133,244,0.10)",
+                  color: "#4285F4",
+                  border: "1px solid rgba(66,133,244,0.22)",
+                }}
+                title="Navigate all stops in Google Maps"
+              >
+                <ExternalLink size={9} strokeWidth={2.2} />
+                Maps
+              </a>
+            )}
           </div>
         </div>
       )}
@@ -703,10 +756,20 @@ export default function ItineraryPanel() {
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              {aiMessage && (
+              {(aiStreamText || aiMessage || (aiLoading && !aiStreamText)) && (
                 <div className="px-4 pb-2">
                   <div className="text-[11px] text-[#0B1F2A]/75 bg-[#F5EFE6]/70 border border-[#D97757]/20 rounded-lg px-3 py-2 whitespace-pre-line leading-relaxed">
-                    {aiMessage}
+                    {aiStreamText || aiMessage}
+                    {aiLoading && aiStreamText && (
+                      <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-[#D97757] animate-pulse rounded-sm align-middle" />
+                    )}
+                    {aiLoading && !aiStreamText && (
+                      <span className="flex items-center gap-1 text-[#0B1F2A]/40">
+                        <span className="animate-bounce" style={{ animationDelay: "0ms" }}>●</span>
+                        <span className="animate-bounce" style={{ animationDelay: "120ms" }}>●</span>
+                        <span className="animate-bounce" style={{ animationDelay: "240ms" }}>●</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -715,10 +778,7 @@ export default function ItineraryPanel() {
                 {["Add a sunset viewpoint", "Swap restaurants", "Optimize my budget", "Suggest hidden gems"].map((s) => (
                   <button
                     key={s}
-                    onClick={() => {
-                      setAiInput(s);
-                      aiInputRef.current?.focus();
-                    }}
+                    onClick={() => submitAi(s)}
                     className="text-[10px] px-2.5 py-1 rounded-full border border-[#0B1F2A]/12 bg-white/60 text-[#0B1F2A]/65 hover:border-[#D97757] hover:text-[#B85F44] hover:bg-white transition-all"
                   >
                     {s}

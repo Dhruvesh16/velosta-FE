@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { usePlannerStore } from "@/lib/stores/planner-store";
@@ -35,9 +36,23 @@ const STEP_TRANSITION = {
 };
 
 export default function PlanPage() {
-  const { flowStep, selectedTier, selectedDestination } = useOnboardingStore();
+  const searchParams = useSearchParams();
+  const { flowStep, selectedTier, selectedDestination, setFlowStep } = useOnboardingStore();
   const { setTripData, itineraryData } = usePlannerStore();
   const { markers } = useMapStore();
+
+  // When coming from /plan with a typed intent, skip onboarding and go straight to planner
+  useEffect(() => {
+    if (searchParams?.get("fromPlan") !== "1") return;
+    let hasIntent = false;
+    try {
+      hasIntent = !!window.sessionStorage.getItem("velosta:planIntent");
+    } catch { /* ignore */ }
+    if (hasIntent) {
+      setFlowStep("planner");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Pre-seed trip context (destination + budget) when entering planner.
   // NOTE: We intentionally DO NOT seed map markers from any static package.

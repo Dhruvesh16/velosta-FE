@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Playfair_Display, Dancing_Script } from "next/font/google";
-import { Sparkles, ArrowRight, MapPin, Compass, Send } from "lucide-react";
+import { Sparkles, ArrowRight, MapPin, Compass, Send, X } from "lucide-react";
 import { useUser } from "@/app/utils/context";
 
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["500", "600", "700"] });
@@ -45,7 +45,7 @@ const PROMPT_HINTS = [
 
 export default function PlanIntroPage() {
   const router = useRouter();
-  const { user } = useUser();
+  const { user, accessToken, loading: authLoading } = useUser();
 
   const firstName = useMemo(() => {
     if (!user?.name) return null;
@@ -60,6 +60,7 @@ export default function PlanIntroPage() {
   const [intent, setIntent] = useState("");
   const [hintIdx, setHintIdx] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [showSignIn, setShowSignIn] = useState(false);
 
   useEffect(() => {
     let i = 0;
@@ -84,20 +85,26 @@ export default function PlanIntroPage() {
   }, []);
 
   const goToPlanner = () => {
-    if (submitting) return;
+    if (submitting || authLoading) return;
+
+    // Gate: must be signed in
+    if (!accessToken) {
+      setShowSignIn(true);
+      return;
+    }
+
     setSubmitting(true);
     const trimmed = intent.trim();
     if (trimmed && typeof window !== "undefined") {
-      // Stash the free-form intent so the planner can pick it up if/when
-      // the intent-capture step is wired to read from sessionStorage.
       try {
         window.sessionStorage.setItem("velosta:planIntent", trimmed);
       } catch {
         /* sessionStorage may be unavailable (private mode) — non-fatal */
       }
     }
-    // Tiny delay so the press animation is visible before navigation
-    window.setTimeout(() => router.push("/velosta-ai"), 180);
+    // If user typed intent, skip onboarding and go straight to planner
+    const dest = trimmed ? "/velosta-ai?fromPlan=1" : "/velosta-ai";
+    window.setTimeout(() => router.push(dest), 180);
   };
 
   return (
@@ -329,6 +336,98 @@ export default function PlanIntroPage() {
           50.01%, 100% { opacity: 0; }
         }
       `}</style>
+
+      {/* ── Sign-in gate modal ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSignIn && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="fixed inset-0 z-50"
+              style={{ background: "rgba(11,31,42,0.55)", backdropFilter: "blur(6px)" }}
+              onClick={() => setShowSignIn(false)}
+            />
+
+            {/* Card */}
+            <motion.div
+              key="modal"
+              initial={{ opacity: 0, y: 32, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.97 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed z-50 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 bottom-8 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-sm rounded-3xl px-7 py-8"
+              style={{
+                background: "rgba(251,248,243,0.98)",
+                border: "1px solid rgba(217,119,87,0.18)",
+                boxShadow: "0 32px 64px -16px rgba(11,31,42,0.35)",
+              }}
+            >
+              {/* Close */}
+              <button
+                onClick={() => setShowSignIn(false)}
+                aria-label="Close"
+                className="absolute top-4 right-4 h-7 w-7 rounded-full flex items-center justify-center transition-colors"
+                style={{ background: "rgba(11,31,42,0.06)", color: C.navy }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+
+              {/* Icon */}
+              <div
+                className="mx-auto mb-5 h-12 w-12 rounded-full flex items-center justify-center shadow-md"
+                style={{
+                  background: "linear-gradient(135deg, #E89378, #D97757)",
+                }}
+              >
+                <Compass className="h-6 w-6 text-white" strokeWidth={2} />
+              </div>
+
+              {/* Copy */}
+              <h2
+                className={`${playfair.className} text-center text-[1.35rem] leading-snug tracking-tight mb-2`}
+                style={{ color: C.navy }}
+              >
+                Sign in to start planning
+              </h2>
+              <p
+                className="text-center text-[13px] leading-relaxed mb-7"
+                style={{ color: "rgba(11,31,42,0.55)" }}
+              >
+                Your itinerary is queued and ready — sign in to generate it instantly.
+              </p>
+
+              {/* Actions */}
+              <div className="flex flex-col gap-3">
+                <Link
+                  href={`/sign-in?next=/plan`}
+                  className="w-full inline-flex items-center justify-center rounded-full px-6 py-3 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{
+                    background: `linear-gradient(135deg, ${C.coralStart}, ${C.coral})`,
+                    boxShadow: "0 8px 20px -8px rgba(217,119,87,0.55)",
+                  }}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href={`/sign-up?next=/plan`}
+                  className="w-full inline-flex items-center justify-center rounded-full px-6 py-3 text-[14px] font-semibold transition-colors"
+                  style={{
+                    background: "rgba(11,31,42,0.06)",
+                    color: C.navy,
+                  }}
+                >
+                  Create an account
+                </Link>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

@@ -280,6 +280,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
   const { accessToken, user } = useUser();
   const { selectedDestination, selectedTier, duration, userLocation, generatedItinerary, setGeneratedItinerary } = useOnboardingStore();
   const autoSentRef = useRef(false);
+  const autoIntentSentRef = useRef(false);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -342,11 +343,9 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
     setGeneratedItinerary(null);
   }, [generatedItinerary, selectedDestination, onItinerary, setGeneratedItinerary]);
 
-  // Send message handler
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      const text = input.trim();
+  // Core send logic — reused by handleSubmit and auto-send
+  const sendText = useCallback(
+    async (text: string) => {
       if (!text || isLoading) return;
 
       // Sign-in gate — every chat call requires auth
@@ -373,7 +372,6 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
         });
 
         if (data.isTextResponse) {
-          // Plain chat reply
           const assistantMsg: Message = {
             id: `a-${Date.now()}`,
             role: "assistant",
@@ -385,7 +383,6 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
             { role: "assistant", content: data.message },
           ]);
         } else if (data.itineraryTable) {
-          // Itinerary generated/updated — sync with map + itinerary panel
           setCurrentItinerary(data);
 
           const extractedTripData: TripData = {
@@ -412,7 +409,6 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
             },
           ]);
 
-          // Show modifications notice if any
           if (data.modificationsApplied && data.modificationsApplied.length > 0) {
             setTimeout(() => {
               const modsMsg: Message = {
@@ -456,7 +452,6 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
       }
     },
     [
-      input,
       isLoading,
       conversationHistory,
       currentItinerary,
@@ -464,6 +459,32 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
       onItinerary,
       selectedDestination,
     ]
+  );
+
+  // Auto-send intent typed on the /plan intro page
+  useEffect(() => {
+    if (autoIntentSentRef.current) return;
+    if (messages.length !== 1) return; // wait for greeting message to appear
+    if (!accessToken) return;
+    try {
+      const intent = window.sessionStorage.getItem("velosta:planIntent");
+      if (!intent) return;
+      autoIntentSentRef.current = true;
+      window.sessionStorage.removeItem("velosta:planIntent");
+      // Short delay so the greeting is visible before the user message appears
+      window.setTimeout(() => sendText(intent), 600);
+    } catch { /* sessionStorage unavailable */ }
+  }, [messages.length, accessToken, sendText]);
+
+  // Send message handler
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      const text = input.trim();
+      if (!text) return;
+      await sendText(text);
+    },
+    [input, sendText]
   );
 
   return (

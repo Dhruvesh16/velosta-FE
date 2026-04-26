@@ -14,7 +14,7 @@ const mockRelatedPosts = [
     title: "Street Food Guide: Eating Like a Local in Southeast Asia",
     summary:
       "Discover the best street food experiences across Thailand, Vietnam, and Cambodia.",
-    coverImage: "/public/images/articles/food.jpg",
+    coverImage: "/images/articles/food.jpg",
     tags: ["Food", "Southeast Asia"],
     authorName: "Marcus Lee",
     readingTime: 6,
@@ -24,7 +24,7 @@ const mockRelatedPosts = [
     title: "Budget Travel Hacks: How to Travel More for Less",
     summary:
       "Practical tips and tricks to maximize your travel budget without compromising on experiences.",
-    coverImage: "/public/images/articles/hiking.jpg",
+    coverImage: "/images/articles/hiking.jpg",
     tags: ["Budget Travel", "Tips"],
     authorName: "Emma Wilson",
     readingTime: 7,
@@ -34,7 +34,7 @@ const mockRelatedPosts = [
     title: "Solo Travel Safety: A Comprehensive Guide",
     summary:
       "Everything you need to know to travel solo safely and confidently around the world.",
-    coverImage: "/public/images/articles/camel-safari.jpg",
+    coverImage: "/images/articles/camel-safari.jpg",
     tags: ["Solo Travel", "Safety"],
     authorName: "James Chen",
     readingTime: 9,

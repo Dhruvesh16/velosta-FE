@@ -248,7 +248,24 @@ export default function BlogEditor({
       );
 
       if (!res.ok) {
-        const msg = await res.text();
+        const status = res.status;
+        const msg = await res.text().catch(() => "");
+        if (status === 401) {
+          toast({
+            title: "Unauthorized",
+            description: "Your session expired. Please log out and sign in again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (status === 413) {
+          toast({
+            title: "Image Too Large",
+            description: "Try uploading a smaller image (under 3 MB).",
+            variant: "destructive",
+          });
+          return;
+        }
         throw new Error(msg || "Failed to publish blog");
       }
 
@@ -265,29 +282,11 @@ export default function BlogEditor({
       // Redirect to the appropriate listing page
       router.push(redirectAfterPublish);
     } catch (e: any) {
-      console.log("Error Status:", e.status); // ✅ will log 401, 413, etc.
-      console.log("Error Message:", e.message);
-
-      if (e.status === 401) {
-        toast({
-          title: "Unauthorized",
-          description:
-            "Your session expired. Please log out and sign in again.",
-          variant: "destructive",
-        });
-      } else if (e.status === 413) {
-        toast({
-          title: "Image Too Large",
-          description: "Try uploading a smaller image.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: e.message || "Publish failed",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Error",
+        description: e.message || "Publish failed",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }

@@ -143,7 +143,7 @@ export default function BlogList() {
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
-        setCurrentUserId(payload.id);
+        setCurrentUserId(payload.sub ?? payload.id ?? null);
       } catch (err) {
         console.error("Failed to decode token:", err);
       }
@@ -220,7 +220,7 @@ export default function BlogList() {
             <div>
               <h1 className="text-4xl font-semibold leading-tight text-[var(--color-navy)] md:text-5xl">
                 How{" "}
-                <span className="italic font-normal text-[var(--color-teal)]">not</span>{" "}
+                <span className="font-normal text-[var(--color-teal)] line-through decoration-2">not</span>{" "}
                 to travel
               </h1>
               <p className="mt-3 max-w-md text-base" style={{ color: "rgba(11,31,42,0.6)" }}>
@@ -312,7 +312,7 @@ export default function BlogList() {
               </h3>
               <p className="mt-2 max-w-sm text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>
                 {showMyPosts
-                  ? "You haven't written any posts yet — share your first travel mishap!"
+                  ? "You haven't written any posts yet. Share your first travel mishap!"
                   : "Be the first to share a travel lesson with the community."}
               </p>
               {isSignedIn && (

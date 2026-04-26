@@ -71,7 +71,7 @@ const c = {
 /* ── Data ── */
 const featuredTrips = [
   {
-    title: "Varanasi — Ghats, Galis & the Ganges",
+    title: "Varanasi: Ghats, Galis & the Ganges",
     location: "Uttar Pradesh",
     price: "₹14,000",
     duration: "4 days",
@@ -79,7 +79,7 @@ const featuredTrips = [
       "https://images.unsplash.com/photo-1561361058-c24cecae35ca?auto=format&fit=crop&w=1400&q=85",
   },
   {
-    title: "Hampi — Ruins & Open Skies",
+    title: "Hampi: Ruins & Open Skies",
     location: "Karnataka",
     price: "₹9,500",
     duration: "3 days",
@@ -121,7 +121,7 @@ const valueProps = [
   {
     icon: Compass,
     title: "End-to-end planning",
-    body: "From the first idea to the final goodbye — itineraries, bookings, and quiet moments stitched together with care.",
+    body: "From the first idea to the final goodbye, itineraries, bookings, and quiet moments stitched together with care.",
   },
   {
     icon: Wallet,
@@ -446,7 +446,7 @@ export default function Page() {
               className="mt-5 max-w-sm text-[16px] leading-[1.7]"
               style={{ color: "rgba(11,31,42,0.6)" }}
             >
-              Describe your dream trip in plain words — our AI builds a complete, personalized itinerary in under 90 seconds.
+              Describe your dream trip in plain words. Our AI builds a complete, personalized itinerary in under 90 seconds.
             </motion.p>
 
             {/* Feature row */}
@@ -888,7 +888,7 @@ export default function Page() {
                   className="mt-6 max-w-md text-[15px] leading-[1.8]"
                   style={{ color: "rgba(11,31,42,0.6)" }}
                 >
-                  We strip away the clutter so what remains is the trip itself —
+                  We strip away the clutter so what remains is the trip itself:
                   vivid, personal, and unhurried.
                 </p>
               </motion.div>
@@ -1013,7 +1013,7 @@ export default function Page() {
                 className="mt-10 max-w-md text-[17px] font-light leading-[1.8]"
                 style={{ color: "rgba(11,31,42,0.62)" }}
               >
-                A quiet conversation, a gentle rhythm — and suddenly a journey
+                A quiet conversation, a gentle rhythm, and suddenly a journey
                 shapes itself around you. The logistics disappear. Only the
                 moments remain.
               </p>
@@ -1172,7 +1172,7 @@ export default function Page() {
                                 className={`${playfair.className} mt-2 text-[12px] italic`}
                                 style={{ color: "rgba(58,133,137,0.85)" }}
                               >
-                                — the moment everything slows
+                                the moment everything slows
                               </p>
                             )}
                           </div>
@@ -1454,7 +1454,7 @@ export default function Page() {
                 className="mt-4 max-w-md text-[14px] leading-[1.7]"
                 style={{ color: "rgba(11,31,42,0.6)" }}
               >
-                Real scams, mishaps, and lessons learned — shared by travellers so you
+                Real scams, mishaps, and lessons learned. Shared by travellers so you
                 don&apos;t have to learn the hard way.
               </p>
             </div>
@@ -1477,7 +1477,7 @@ export default function Page() {
                 className={`${playfair.className} text-[20px] italic`}
                 style={{ color: "rgba(11,31,42,0.4)" }}
               >
-                No posts yet — be the first to share
+                No posts yet. Be the first to share
               </p>
               <Link
                 href="/how-not-travel/new-blog"

@@ -568,7 +568,7 @@ export function EnhancedChatWindow() {
             </Button>
           </div>
           <p className="mt-2 text-center text-xs text-gray-500">
-            Velosta AI may produce inaccurate info — please verify details before booking.
+            Velosta AI may produce inaccurate info. Please verify details before booking.
           </p>
         </div>
       </form>

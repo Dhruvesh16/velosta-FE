@@ -96,7 +96,7 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
               </div>
               <p className="mb-3 text-foreground">{comment.content}</p>
               <button className="text-sm text-[color:var(--color-brand)] hover:underline">
-                ❤️ {comment.likes} likes
+                {comment.likes} likes
               </button>
             </div>
           ))}

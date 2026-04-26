@@ -144,7 +144,7 @@ export function ExpensesList({
         </p>
         <div className="mt-6 p-4 bg-white/60 rounded-2xl border border-black/5 max-w-md mx-auto">
           <p className="text-xs sm:text-sm font-medium text-[var(--color-navy)]/70 mb-2">
-            💡 Pro Tip
+            Pro Tip
           </p>
           <p className="text-xs text-[var(--color-navy)]/60">
             Use quick add templates for common expenses like food, transport, and accommodation to save time!

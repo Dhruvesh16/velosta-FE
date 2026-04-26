@@ -147,7 +147,7 @@ export function BlogDetail({ blog }: BlogDetailProps) {
         <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="mb-8">
             <div className="mb-4 flex flex-wrap gap-2">
-              {blog.tags.map((tag) => (
+              {(blog.tags ?? []).map((tag) => (
                 <span
                   key={tag}
                   className="inline-block rounded-full bg-[color:var(--color-cream)] px-3 py-1 text-sm font-medium text-[color:var(--color-brand)]"

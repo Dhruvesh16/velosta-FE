@@ -357,7 +357,7 @@ export default function BlogEditor({
             <Lightbulb className="size-5 flex-shrink-0 text-[color:var(--editor-accent)]" />
             <div>
               <p className="text-xs font-semibold text-[color:var(--editor-accent)]">
-                💡 Writing Tip
+                Writing Tip
               </p>
               <p className="mt-1 text-sm text-foreground">
                 {WRITING_TIPS[currentTip]}
@@ -620,7 +620,7 @@ export default function BlogEditor({
 
               <div className="border-t bg-gradient-to-r from-[color:var(--editor-accent)]/5 to-transparent px-3 py-2">
                 <p className="text-xs text-muted-foreground">
-                  💡 <strong>Pro Tip:</strong> Use the formatting tools to make
+                  <strong>Pro Tip:</strong> Use the formatting tools to make
                   your content engaging and easy to read
                 </p>
               </div>

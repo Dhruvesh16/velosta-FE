@@ -127,7 +127,7 @@ export function AuthCard({ children, title, subtitle, mode = "signin" }: AuthCar
           >
             {mode === "signup"
               ? "Create an account to save trips, split costs across travelers, and unlock itineraries written by people who actually went."
-              : "Sign in to pick up where you left off — your itineraries, saved cities, and shared trips are waiting."}
+              : "Sign in to pick up where you left off. Your itineraries, saved cities, and shared trips are waiting."}
           </p>
 
           {/* Editorial photo composition */}

@@ -44,16 +44,41 @@ export default function SpatialPlannerShell() {
       style={{ background: "#FBF8F3" }}
       aria-label="Velosta AI Spatial Planner"
     >
-      {/* ── Desktop / Tablet landscape: Itinerary (left) + Map (right) ─ */}
+      {/* ── Desktop / Tablet landscape: Chat or Itinerary (left) + Map (right) ─ */}
       <div className="hidden md:flex h-full w-full">
-        {/* Itinerary panel — fluid: narrower on small laptops, wider on big screens */}
+        {/* Left panel — shows ChatPanel when no itinerary yet (enables auto-send from /plan),
+            switches to ItineraryPanel once an itinerary has been generated */}
         <motion.div
           className="w-[300px] lg:w-[340px] xl:w-[380px] h-full border-r border-[#0B1F2A]/8 bg-[#FBF8F3] shrink-0 flex flex-col overflow-hidden"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
-          <ItineraryPanel />
+          <AnimatePresence mode="wait" initial={false}>
+            {hasItinerary ? (
+              <motion.div
+                key="itinerary"
+                className="flex flex-col h-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ItineraryPanel />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="chat"
+                className="flex flex-col h-full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ChatPanel />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Map — fills remaining space */}

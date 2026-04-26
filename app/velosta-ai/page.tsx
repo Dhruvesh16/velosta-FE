@@ -41,16 +41,22 @@ export default function PlanPage() {
   const { setTripData, itineraryData } = usePlannerStore();
   const { markers } = useMapStore();
 
-  // When coming from /plan with a typed intent, skip onboarding and go straight to planner
+  // When coming from /plan with a typed intent, skip onboarding and go straight to planner.
+  // For ALL other entries, reset to "landing" so stale persisted flowStep never shows
+  // an empty planner shell to the user.
   useEffect(() => {
-    if (searchParams?.get("fromPlan") !== "1") return;
-    let hasIntent = false;
-    try {
-      hasIntent = !!window.sessionStorage.getItem("velosta:planIntent");
-    } catch { /* ignore */ }
-    if (hasIntent) {
-      setFlowStep("planner");
+    if (searchParams?.get("fromPlan") === "1") {
+      try {
+        const hasIntent = !!window.sessionStorage.getItem("velosta:planIntent");
+        if (hasIntent) {
+          setFlowStep("planner");
+          return;
+        }
+      } catch { /* ignore */ }
     }
+    // Fresh visit (no typed intent) — always start from the landing scene so
+    // a stale localStorage flowStep can never strand the user in an empty planner.
+    setFlowStep("landing");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

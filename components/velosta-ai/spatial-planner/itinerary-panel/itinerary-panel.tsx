@@ -25,23 +25,32 @@ import type { ActivityRow } from "@/lib/types/planner.types";
 
 // ── Google Maps navigation helper ────────────────────────────────────────
 function buildGoogleMapsUrl(rows: ActivityRow[], destination: string): string {
+  // Each stop is either "lat,lng" (when geocoded) or a plain-text search query.
+  // Never pre-encode the plain-text variant — URL construction below handles encoding.
   const stops = rows.map((r) =>
     r.coordinates
       ? `${r.coordinates[1]},${r.coordinates[0]}` // Mapbox [lng,lat] → Google "lat,lng"
-      : encodeURIComponent(`${r.activity}, ${destination}`)
+      : `${r.activity}, ${destination}`             // readable address, no pre-encoding
   );
+
   if (stops.length === 0)
     return `https://www.google.com/maps/search/${encodeURIComponent(destination)}`;
   if (stops.length === 1)
-    return `https://www.google.com/maps/search/${stops[0]}`;
-  const url = new URL("https://www.google.com/maps/dir/");
-  url.searchParams.set("api", "1");
-  url.searchParams.set("origin", stops[0]);
-  url.searchParams.set("destination", stops[stops.length - 1]);
-  const waypoints = stops.slice(1, -1).join("|");
-  if (waypoints) url.searchParams.set("waypoints", waypoints);
-  url.searchParams.set("travelmode", "driving");
-  return url.toString();
+    return `https://www.google.com/maps/search/${encodeURIComponent(stops[0])}`;
+
+  // Build the URL manually so that:
+  //   • each param value is encoded exactly once
+  //   • waypoint separators stay as %7C (Google Maps accepts both | and %7C)
+  const enc = encodeURIComponent;
+  const origin = enc(stops[0]);
+  const dest   = enc(stops[stops.length - 1]);
+  let   url    = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+
+  const midpoints = stops.slice(1, -1);
+  if (midpoints.length > 0) {
+    url += `&waypoints=${midpoints.map(enc).join("%7C")}`;
+  }
+  return url;
 }
 
 // ── Velosta Gilded Meridian palette ──────────────────────────────────────

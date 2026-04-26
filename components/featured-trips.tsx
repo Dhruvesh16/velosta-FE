@@ -144,9 +144,6 @@ export function FeaturedTrips() {
                     <h3 className="mt-1 line-clamp-2 text-sm font-medium text-foreground/90">
                       {c.title}
                     </h3>
-                    <div className="mt-2 text-[11px] text-muted-foreground">
-                      ⭐ 4.8 (200+)
-                    </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="rounded-full bg-muted px-3 py-1 text-[11px] text-muted-foreground">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Playfair_Display, Inter } from "next/font/google";
+import { Playfair_Display, Inter, Dancing_Script } from "next/font/google";
 import { motion, useScroll, useTransform } from "framer-motion";
 import {
   ArrowRight,
@@ -16,6 +16,9 @@ import {
   Twitter,
   Youtube,
   Mail,
+  Briefcase,
+  ShieldCheck,
+  Headphones,
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -46,6 +49,11 @@ const inter = Inter({
   weight: ["300", "400", "500", "600"],
 });
 
+const dancingScript = Dancing_Script({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
 /* ── Coastal Luxury Palette ── */
 const c = {
   navy: "#0B1F2A",
@@ -63,28 +71,28 @@ const c = {
 /* ── Data ── */
 const featuredTrips = [
   {
-    title: "Amalfi Coast Escape",
-    location: "Italy",
-    price: "$1,790",
-    duration: "7 days",
+    title: "Varanasi — Ghats, Galis & the Ganges",
+    location: "Uttar Pradesh",
+    price: "₹14,000",
+    duration: "4 days",
     image:
-      "https://images.unsplash.com/photo-1612698093158-e07ac200d44e?auto=format&fit=crop&w=1400&q=85",
+      "https://images.unsplash.com/photo-1561361058-c24cecae35ca?auto=format&fit=crop&w=1400&q=85",
   },
   {
-    title: "Kyoto Heritage Journey",
-    location: "Japan",
-    price: "$1,420",
-    duration: "5 days",
+    title: "Hampi — Ruins & Open Skies",
+    location: "Karnataka",
+    price: "₹9,500",
+    duration: "3 days",
     image:
-      "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?auto=format&fit=crop&w=1200&q=85",
+      "https://images.unsplash.com/photo-1670679897802-aea915dd45d9?auto=format&fit=crop&w=1200&q=85",
   },
   {
-    title: "Swiss Alpine Retreat",
-    location: "Switzerland",
-    price: "$2,150",
-    duration: "6 days",
+    title: "Rishikesh River Retreat",
+    location: "Uttarakhand",
+    price: "₹8,200",
+    duration: "4 days",
     image:
-      "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=1200&q=85",
+      "https://images.unsplash.com/photo-1603867106100-0d2039fc8757?auto=format&fit=crop&w=1200&q=85",
   },
 ];
 
@@ -355,385 +363,146 @@ export default function Page() {
         </div>
       </motion.header>
 
-      {/* ────────── Hero — Editorial Light, Human-Centered ────────── */}
+      {/* ────────── Hero — Full-Bleed Editorial ────────── */}
       <section
         ref={heroRef}
         id="explore"
-        className="relative overflow-hidden"
+        className="relative flex min-h-screen flex-col overflow-hidden"
         style={{ backgroundColor: c.sandLight }}
       >
-        {/* Decorative — soft mist arc top-right (off-canvas) */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-40 -top-40 h-[640px] w-[640px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(50% 50% at 50% 50%, rgba(47,111,115,0.10) 0%, rgba(47,111,115,0) 70%)",
-          }}
-        />
-
-        {/* Decorative — diagonal hairlines, very subtle */}
-        <svg
-          aria-hidden
-          className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.06]"
-          xmlns="http://www.w3.org/2000/svg"
+        {/* ── Background — full-bleed photo ── */}
+        <motion.div
+          initial={{ opacity: 0, scale: 1.04 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute inset-0"
         >
-          <defs>
-            <pattern
-              id="hero-grid"
-              width="64"
-              height="64"
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(20)"
-            >
-              <line x1="0" y1="0" x2="0" y2="64" stroke={c.navy} strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#hero-grid)" />
-        </svg>
+          <img
+            src="/images/hero.png"
+            alt="Indian travellers exploring the mountains"
+            className="h-full w-full object-cover object-center"
+            loading="eager"
+          />
+          {/* Mobile overlay — cream top fading down */}
+          <div
+            aria-hidden
+            className="absolute inset-0 lg:hidden"
+            style={{
+              background: `linear-gradient(to bottom, ${c.sandLight} 0%, rgba(245,239,230,0.92) 40%, rgba(245,239,230,0.55) 70%, rgba(245,239,230,0.15) 100%)`,
+            }}
+          />
+          {/* Desktop overlay — cream left fading right */}
+          <div
+            aria-hidden
+            className="absolute inset-0 hidden lg:block"
+            style={{
+              background: `linear-gradient(to right, ${c.sandLight} 0%, ${c.sandLight} 20%, rgba(245,239,230,0.92) 38%, rgba(245,239,230,0.55) 55%, rgba(245,239,230,0.05) 75%, transparent 88%)`,
+            }}
+          />
+        </motion.div>
 
+        {/* ── Content Panel — overlaid left ── */}
         <motion.div
           style={{ opacity: contentOpacity }}
-          className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-24 pt-36 sm:pt-40 lg:pb-32 lg:pt-44"
+          className="relative z-10 flex min-h-screen w-full flex-col items-start justify-center px-10 pt-28 pb-16 sm:px-16 lg:w-[54%] lg:px-20 lg:pt-0 lg:pb-0 xl:px-28"
         >
-          <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12">
-            {/* ── Left — Editorial headline + CTAs + Trust ── */}
-            <motion.div
-              variants={heroStagger}
-              initial="hidden"
-              animate="visible"
-              className="max-w-xl"
-            >
-              {/* Eyebrow */}
-              <motion.div
-                variants={heroChild}
-                className="mb-7 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5"
-                style={{
-                  borderColor: "rgba(47,111,115,0.22)",
-                  backgroundColor: "rgba(47,111,115,0.06)",
-                }}
-              >
-                <Sparkles className="h-3 w-3" style={{ color: c.teal }} />
-                <span
-                  className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-                  style={{ color: c.teal }}
-                >
-                  AI-curated journeys
-                </span>
-              </motion.div>
-
-              {/* Headline */}
-              <motion.h1
-                variants={heroChild}
-                className={`${playfair.className} text-[clamp(2.6rem,6.4vw,5rem)] leading-[0.98] tracking-[-0.025em]`}
+          <motion.div
+            variants={heroStagger}
+            initial="hidden"
+            animate="visible"
+            className="max-w-lg"
+          >
+            {/* Logo lockup */}
+            <motion.div variants={heroChild} className="mb-8 flex items-center gap-2">
+              <span
+                className={`${playfair.className} text-[22px] font-semibold tracking-tight`}
                 style={{ color: c.navy }}
               >
-                Start your journey
-                <br />
-                by one click,{" "}
-                <span style={{ fontStyle: "italic", color: c.teal }}>
-                  explore
-                </span>
-                <br />
-                beautifully.
-              </motion.h1>
-
-              {/* Subheading */}
-              <motion.p
-                variants={heroChild}
-                className="mt-7 max-w-md text-[16px] leading-[1.75]"
-                style={{ color: "rgba(11,31,42,0.62)" }}
-              >
-                Plan and book your perfect trip with expert advice, real
-                itineraries, and quiet moments — designed around the way you
-                actually travel.
-              </motion.p>
-
-              {/* CTA row */}
-              <motion.div
-                variants={heroChild}
-                className="mt-9 flex flex-wrap items-center gap-4"
-              >
-                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
-                  <Link
-                    href="/velosta-ai"
-                    className="group inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[14px] font-semibold"
-                    style={{
-                      backgroundColor: c.coral,
-                      color: "#fff",
-                      boxShadow:
-                        "0 14px 32px -10px rgba(217,119,87,0.55), 0 4px 8px -2px rgba(217,119,87,0.25)",
-                    }}
-                  >
-                    Start Planning
-                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                  </Link>
-                </motion.div>
-
-                <motion.div whileHover={{ x: 2 }}>
-                  <Link
-                    href="#journeys"
-                    className="group inline-flex items-center gap-2.5 text-[14px] font-medium"
-                    style={{ color: c.navy }}
-                  >
-                    <span
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border"
-                      style={{
-                        borderColor: "rgba(11,31,42,0.18)",
-                        backgroundColor: "rgba(245,239,230,0.6)",
-                      }}
-                    >
-                      <Play className="h-3 w-3 fill-current" style={{ color: c.navy }} />
-                    </span>
-                    How it works
-                  </Link>
-                </motion.div>
-              </motion.div>
-
-              {/* Trust row */}
-              <motion.div
-                variants={heroChild}
-                className="mt-12 flex items-center gap-5"
-              >
-                {/* Stacked avatars */}
-                <div className="flex -space-x-2">
-                  {[
-                    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=80&q=80",
-                    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=80&q=80",
-                    "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=80&q=80",
-                    "https://images.unsplash.com/photo-1463453091185-61582044d556?auto=format&fit=crop&w=80&q=80",
-                  ].map((src, i) => (
-                    <div
-                      key={i}
-                      className="h-9 w-9 overflow-hidden rounded-full"
-                      style={{ boxShadow: `0 0 0 2px ${c.sandLight}` }}
-                    >
-                      <img src={src} alt="" className="h-full w-full object-cover" />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className="h-3.5 w-3.5 fill-current"
-                        style={{ color: c.coral }}
-                      />
-                    ))}
-                    <span
-                      className="ml-1.5 text-[12px] font-semibold"
-                      style={{ color: c.navy }}
-                    >
-                      4.9
-                    </span>
-                  </div>
-                  <span
-                    className="text-[12px]"
-                    style={{ color: "rgba(11,31,42,0.55)" }}
-                  >
-                    12,000+ travelers planning with Velosta
-                  </span>
-                </div>
-              </motion.div>
+                velosta
+              </span>
+              <Sparkles className="h-4 w-4" style={{ color: c.coral }} />
             </motion.div>
 
-            {/* ── Right — Circular portrait + floating cards ── */}
+            {/* Coral divider */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.5 }}
-              className="relative mx-auto h-[560px] w-full max-w-[520px] lg:h-[600px]"
+              variants={heroChild}
+              className="mb-8 h-[3px] w-10 rounded-full"
+              style={{ backgroundColor: c.coral }}
+            />
+
+            {/* H1 */}
+            <motion.h1
+              variants={heroChild}
+              className={`${playfair.className} text-[clamp(3rem,6vw,5rem)] font-bold leading-[1.02] tracking-[-0.02em]`}
+              style={{ color: c.navy }}
             >
-              {/* Decorative dot orbit (top) */}
-              <svg
-                aria-hidden
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                width="540"
-                height="540"
-                viewBox="0 0 540 540"
-              >
-                <circle
-                  cx="270"
-                  cy="270"
-                  r="252"
-                  fill="none"
-                  stroke={c.teal}
-                  strokeWidth="1"
-                  strokeDasharray="2 8"
-                  opacity="0.35"
-                />
-              </svg>
+              One Prompt.<br />Your Perfect Trip.
+            </motion.h1>
 
-              {/* Accent dots */}
-              <span
-                aria-hidden
-                className="absolute right-[14%] top-[8%] h-3 w-3 rounded-full"
-                style={{ backgroundColor: c.coral }}
-              />
-              <span
-                aria-hidden
-                className="absolute left-[6%] top-[42%] h-2 w-2 rounded-full"
-                style={{ backgroundColor: c.teal }}
-              />
-              <span
-                aria-hidden
-                className="absolute bottom-[12%] right-[8%] h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: c.navy, opacity: 0.4 }}
-              />
+            {/* Subtext */}
+            <motion.p
+              variants={heroChild}
+              className="mt-5 max-w-sm text-[16px] leading-[1.7]"
+              style={{ color: "rgba(11,31,42,0.6)" }}
+            >
+              Describe your dream trip in plain words — our AI builds a complete, personalized itinerary in under 90 seconds.
+            </motion.p>
 
-              {/* Soft teal halo behind */}
-              <div
-                aria-hidden
-                className="absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-                style={{
-                  background:
-                    "radial-gradient(50% 50% at 50% 50%, rgba(47,111,115,0.18) 0%, rgba(47,111,115,0) 75%)",
-                  filter: "blur(20px)",
-                }}
-              />
-
-              {/* Circular portrait */}
-              <motion.div
-                style={{ y: useTransform(scrollYProgress, [0, 1], [0, -40]) }}
-                className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 lg:h-[460px] lg:w-[460px]"
-              >
-                <div
-                  className="relative h-full w-full overflow-hidden rounded-full"
-                  style={{
-                    boxShadow:
-                      "0 40px 80px -30px rgba(11,31,42,0.35), 0 12px 24px -8px rgba(11,31,42,0.15)",
-                  }}
-                >
-                  <img
-                    src="https://images.unsplash.com/photo-1539635278303-d4002c07eae3?auto=format&fit=crop&w=900&q=85"
-                    alt="Traveler exploring her next journey with Velosta"
-                    className="h-full w-full object-cover object-center"
-                    loading="eager"
-                  />
-                  {/* Warm overlay tint */}
-                  <div
-                    aria-hidden
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        "linear-gradient(180deg, rgba(245,239,230,0.05) 0%, rgba(11,31,42,0.08) 100%)",
-                    }}
-                  />
+            {/* Feature row */}
+            <motion.div
+              variants={heroChild}
+              className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4"
+            >
+              {[
+                { icon: Briefcase,   label: "AI-crafted Itineraries" },
+                { icon: MapPin,      label: "Smart Destination Picks" },
+                { icon: ShieldCheck, label: "Instant, Zero-hassle Plans" },
+                { icon: Headphones,  label: "24/7 Trip Support" },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="flex items-center gap-2.5">
+                  <span
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                    style={{ backgroundColor: "rgba(217,119,87,0.10)" }}
+                  >
+                    <Icon className="h-3.5 w-3.5" style={{ color: c.coral }} />
+                  </span>
+                  <span
+                    className="text-[12px] font-medium leading-tight"
+                    style={{ color: "rgba(11,31,42,0.7)" }}
+                  >
+                    {label}
+                  </span>
                 </div>
-              </motion.div>
+              ))}
+            </motion.div>
 
-              {/* ── Floating Card 1 — Location pill (top-right) ── */}
-              <motion.div
-                initial={{ opacity: 0, x: 16, y: -8 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 1.1 }}
-                className="absolute right-[2%] top-[14%] z-30"
-              >
-                <motion.div
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="flex items-center gap-2.5 rounded-full bg-white px-4 py-2.5"
-                  style={{
-                    boxShadow:
-                      "0 18px 40px -16px rgba(11,31,42,0.22), 0 4px 10px -4px rgba(11,31,42,0.08)",
-                  }}
-                >
-                  <span
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full"
-                    style={{ backgroundColor: "rgba(217,119,87,0.14)" }}
-                  >
-                    <MapPin className="h-3 w-3" style={{ color: c.coral }} />
-                  </span>
-                  <span
-                    className="text-[12.5px] font-semibold tracking-tight"
-                    style={{ color: c.navy }}
-                  >
-                    Santorini · Greece
-                  </span>
-                </motion.div>
-              </motion.div>
-
-              {/* ── Floating Card 2 — Destination preview (left, overlapping) ── */}
-              <motion.div
-                initial={{ opacity: 0, x: -20, y: 12 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                transition={{ duration: 0.95, ease: [0.22, 1, 0.36, 1], delay: 1.4 }}
-                className="absolute bottom-[16%] left-[-2%] z-30"
-              >
-                <motion.div
-                  animate={{ y: [0, 5, 0] }}
-                  transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
-                  className="overflow-hidden rounded-2xl bg-white p-2.5"
-                  style={{
-                    boxShadow:
-                      "0 24px 50px -18px rgba(11,31,42,0.28), 0 6px 14px -4px rgba(11,31,42,0.1)",
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
-                      <img
-                        src="https://images.unsplash.com/photo-1537956965359-7573183d1f57?auto=format&fit=crop&w=200&q=80"
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="pr-3">
-                      <p
-                        className="text-[10px] font-semibold uppercase tracking-[0.14em]"
-                        style={{ color: c.teal }}
-                      >
-                        Featured
-                      </p>
-                      <p
-                        className="mt-0.5 text-[13.5px] font-semibold tracking-tight"
-                        style={{ color: c.navy }}
-                      >
-                        Amalfi Coastal Loop
-                      </p>
-                      <p
-                        className="mt-0.5 text-[11px]"
-                        style={{ color: "rgba(11,31,42,0.5)" }}
-                      >
-                        7 days · from $1,790
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-
-              {/* ── Floating Card 3 — Feature pill (bottom-right) ── */}
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1], delay: 1.7 }}
-                className="absolute bottom-[6%] right-[6%] z-30"
-              >
-                <motion.div
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
-                  className="flex items-center gap-2.5 rounded-full px-4 py-2.5"
+            {/* CTA */}
+            <motion.div variants={heroChild} className="mt-10">
+              <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }}>
+                <Link
+                  href="/velosta-ai"
+                  className="group inline-flex items-center gap-2.5 rounded-full px-8 py-3.5 text-[14px] font-semibold"
                   style={{
                     backgroundColor: c.navy,
-                    boxShadow: "0 16px 36px -14px rgba(11,31,42,0.45)",
+                    color: "#fff",
+                    boxShadow: "0 14px 32px -10px rgba(11,31,42,0.35)",
                   }}
                 >
-                  <span
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full"
-                    style={{ backgroundColor: "rgba(245,239,230,0.14)" }}
-                  >
-                    <Sparkles className="h-3 w-3" style={{ color: c.sand }} />
-                  </span>
-                  <span
-                    className="text-[12px] font-semibold tracking-tight"
-                    style={{ color: c.sand }}
-                  >
-                    Plan in 90 seconds
-                  </span>
-                </motion.div>
+                  Plan My Trip
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                </Link>
               </motion.div>
             </motion.div>
-          </div>
+
+            {/* Script tagline */}
+            <motion.p
+              variants={heroChild}
+              className={`${dancingScript.className} mt-8 text-[18px]`}
+              style={{ color: "rgba(11,31,42,0.4)" }}
+            >
+              Where intelligence meets wanderlust.
+            </motion.p>
+          </motion.div>
         </motion.div>
       </section>
 

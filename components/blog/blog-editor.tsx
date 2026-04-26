@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/app/utils/context";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,7 @@ export default function BlogEditor({
 }: BlogEditorProps = {}) {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useUser();
   const editorRef = useRef<HTMLDivElement>(null);
 
   const [draft, setDraft] = useState<Draft>({
@@ -92,7 +94,7 @@ export default function BlogEditor({
     content: "",
     coverImage: "",
     tags: [],
-    authorName: "Traveler",
+    authorName: "",
   });
   const [tagInput, setTagInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -107,15 +109,19 @@ export default function BlogEditor({
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const loaded = JSON.parse(raw);
-        setDraft(loaded);
+        setDraft((prev) => ({ ...loaded, authorName: user?.name || loaded.authorName || "Traveler" }));
         setImagePreview(loaded.coverImage || "");
         if (editorRef.current && loaded.content) {
           editorRef.current.innerHTML = loaded.content;
         }
+      } else {
+        setDraft((prev) => ({ ...prev, authorName: user?.name || "Traveler" }));
       }
-    } catch {}
+    } catch {
+      setDraft((prev) => ({ ...prev, authorName: user?.name || "Traveler" }));
+    }
     setCurrentTip(Math.floor(Math.random() * WRITING_TIPS.length));
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     try {

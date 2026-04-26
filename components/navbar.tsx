@@ -41,7 +41,7 @@ const navLinks = [
   { href: "/#planner", label: "Planner" },
   { href: "/velosta-ai", label: "Trip Planner" },
   { href: "/stories", label: "Stories" },
-  { href: "/how-not-travel", label: "How Not to Travel" },
+  { href: "/cost-splitter", label: "Expense Tracker" },
 ];
 type NavbarProps = {
   className?: string;
@@ -61,69 +61,39 @@ export default function Navbar({ className = "" }: NavbarProps) {
       <div className={` ${className ? className : "mx-auto"}  max-w-6xl px-6`}>
         {/* bar */}
         <div
-          className="mt-4 flex items-center justify-between rounded-full border px-5 py-2.5 shadow-sm backdrop-blur-md"
+          className="mt-4 flex items-center rounded-full border px-5 py-2.5 shadow-sm backdrop-blur-md relative"
           style={{ backgroundColor: "rgba(245,239,230,0.72)", borderColor: "rgba(11,31,42,0.06)" }}
         >
           {/* left: brand */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center shrink-0">
             <BrandMark />
-            <nav className="flex items-center gap-4 pl-0 text-sm md:gap-6 md:pl-4 overflow-x-auto whitespace-nowrap no-scrollbar ">
-              {/* content */}
-
-              {navLinks.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="text-[13px] font-medium tracking-wide transition-colors duration-300"
-                  style={{ color: "rgba(11,31,42,0.5)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-navy)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(11,31,42,0.5)")}
-                  onClick={() =>
-                    l.label === "Destinations"
-                      ? setDestinationsOpen(true)
-                      : null
-                  }
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </nav>
           </div>
 
-          {/* center: search (desktop) */}
-          {/* <div className="hidden lg:flex min-w-[320px] max-w-[360px] flex-1 justify-center px-6">
-            <div className="relative w-full">
-              <Input
-                placeholder="Search destinations or activities"
-                className="h-9 rounded-full bg-white pr-9 text-sm"
-                aria-label="Search destinations or activities"
-              />
-              <svg
-                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
+          {/* center: nav links — absolutely centered in the pill */}
+          <nav className="hidden md:flex items-center gap-5 absolute left-1/2 -translate-x-1/2">
+            {navLinks.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="text-[13px] font-medium tracking-wide transition-colors duration-300 whitespace-nowrap"
+                style={{ color: "rgba(11,31,42,0.5)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-navy)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(11,31,42,0.5)")}
               >
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.3-4.3" />
-              </svg>
-            </div>
-          </div> */}
+                {l.label}
+              </Link>
+            ))}
+          </nav>
 
-          {/* right: currency + auth */}
+          {/* spacer to push auth to far right */}
+          <div className="flex-1" />
+
+
+          {/* right: auth */}
           {accessToken ? (
             <UserProfileMenu />
           ) : (
             <div className="flex items-center gap-2">
-              {/* <Link
-                href="sign-up"
-                className="hidden sm:inline text-sm font-medium text-neutral-700 hover:text-neutral-900 px-3 py-1.5"
-              >
-                Sign up
-              </Link> */}
-
               <Button
                 asChild
                 className="h-9 rounded-full px-4 text-sm font-semibold text-[color:var(--color-brand-contrast)] hidden md:block"

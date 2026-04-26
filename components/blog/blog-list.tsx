@@ -9,16 +9,6 @@ import authorAvatar from "../../public/icons/people.png";
 
 const STORY_TAG = "_story";
 
-const RANDOM_NAMES = [
-  "Rugved", "Vaisitha", "Dhuvesh", "Vikas", "Priya",
-  "Arjun", "Ananya", "Rohan", "Kavya", "Aditya",
-];
-
-const getRandomName = (id: string) => {
-  const hash = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  return RANDOM_NAMES[hash % RANDOM_NAMES.length];
-};
-
 type BlogPost = {
   id: string;
   title: string;
@@ -48,7 +38,6 @@ function SkeletonCard() {
 }
 
 function PostCard({ post }: { post: BlogPost }) {
-  const displayName = getRandomName(post.id);
   const readingMins = Math.max(
     1,
     Math.ceil(post.content.replace(/<[^>]*>/g, "").split(/\s+/).length / 200)
@@ -76,14 +65,14 @@ function PostCard({ post }: { post: BlogPost }) {
         <div className="flex items-center gap-3 mb-4">
           <Image
             src={post.authorAvatar || authorAvatar.src}
-            alt={displayName}
+            alt={post.authorName}
             width={36}
             height={36}
             className="rounded-full object-cover border-2 border-[var(--color-sand)]"
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[var(--color-navy)] truncate">
-              {displayName}
+              {post.authorName}
             </p>
             <div className="flex items-center gap-2 text-xs" style={{ color: "rgba(11,31,42,0.5)" }}>
               <Calendar className="h-3 w-3" />

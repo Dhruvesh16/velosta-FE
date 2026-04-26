@@ -257,6 +257,7 @@ export default function Page() {
                 { href: "#journeys", label: "Journeys" },
                 { href: "#planner", label: "Planner" },
                 { href: "/stories", label: "Stories" },
+                { href: "/cost-splitter", label: "Expense Tracker" },
                 { href: "/how-not-travel", label: "How Not to Travel" },
               ].map((l) => (
                 <Link

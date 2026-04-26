@@ -1,18 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
+import { Playfair_Display } from "next/font/google";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+
+const playfair = Playfair_Display({ subsets: ["latin"] });
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -62,102 +59,160 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[color:var(--color-cream)] px-4">
-      <div className="w-full max-w-sm">
-        {/* Brand mark */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="h-12 w-12 rounded-full bg-[color:var(--color-brand)] flex items-center justify-center mb-3">
-            <Shield className="h-6 w-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-[color:var(--color-navy)] tracking-tight">
-            velosta admin
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Content moderation
-          </p>
+    <div
+      className="min-h-screen flex items-center justify-center px-4 py-12"
+      style={{ backgroundColor: "var(--color-cream)" }}
+    >
+      <div className="w-full max-w-[420px]">
+        <div className="flex flex-col items-center mb-10">
+          <Link
+            href="/"
+            className={`${playfair.className} text-[32px] tracking-tight leading-none`}
+            style={{ color: "var(--color-navy)" }}
+          >
+            Velosta
+          </Link>
+          <span
+            className="mt-2 text-[10px] uppercase tracking-[0.24em] font-medium"
+            style={{ color: "var(--color-teal)" }}
+          >
+            Administration
+          </span>
         </div>
 
-        <Card className="border-border shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg text-[color:var(--color-navy)]">
-              Sign in
-            </CardTitle>
-            <CardDescription>
-              Access is restricted to authorised administrators.
-            </CardDescription>
-          </CardHeader>
+        <div
+          className="rounded-2xl border bg-white px-7 py-8"
+          style={{
+            borderColor: "rgba(11,31,42,0.08)",
+            boxShadow:
+              "0 1px 2px rgba(11,31,42,0.04), 0 8px 24px -12px rgba(11,31,42,0.08)",
+          }}
+        >
+          <div className="mb-6">
+            <h1
+              className={`${playfair.className} text-[22px] leading-tight`}
+              style={{ color: "var(--color-navy)" }}
+            >
+              Sign in to continue
+            </h1>
+            <p
+              className="text-[13px] mt-1.5"
+              style={{ color: "rgba(11,31,42,0.55)" }}
+            >
+              Restricted to authorised content moderators.
+            </p>
+          </div>
 
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="admin@velosta.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                    className="pl-9 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <p className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">
-                  {error}
-                </p>
-              )}
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-dark)] text-white"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="email"
+                className="text-[12px] font-medium tracking-wide"
+                style={{ color: "rgba(11,31,42,0.7)" }}
               >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    Signing in...
-                  </span>
-                ) : (
-                  "Sign in"
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@velosta.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="h-11 bg-white border-[rgba(11,31,42,0.12)] focus-visible:ring-[var(--color-brand)] focus-visible:ring-offset-0"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="password"
+                className="text-[12px] font-medium tracking-wide"
+                style={{ color: "rgba(11,31,42,0.7)" }}
+              >
+                Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="h-11 pr-11 bg-white border-[rgba(11,31,42,0.12)] focus-visible:ring-[var(--color-brand)] focus-visible:ring-offset-0"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-100"
+                  style={{ color: "rgba(11,31,42,0.45)" }}
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div
+                className="text-[13px] rounded-md px-3 py-2.5 border"
+                style={{
+                  backgroundColor: "rgba(217,119,87,0.06)",
+                  borderColor: "rgba(217,119,87,0.22)",
+                  color: "var(--color-brand-dark)",
+                }}
+                role="alert"
+              >
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 rounded-full font-medium tracking-wide transition-colors disabled:opacity-60"
+              style={{
+                backgroundColor: "var(--color-navy)",
+                color: "var(--color-cream)",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#142A36")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "var(--color-navy)")
+              }
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing in
+                </span>
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </form>
+        </div>
+
+        <p
+          className="text-[11px] text-center mt-6 tracking-wide"
+          style={{ color: "rgba(11,31,42,0.4)" }}
+        >
+          Not an admin?{" "}
+          <Link
+            href="/sign-in"
+            className="underline underline-offset-2 hover:text-[color:var(--color-navy)] transition-colors"
+          >
+            Return to sign in
+          </Link>
+        </p>
       </div>
     </div>
   );

@@ -85,26 +85,55 @@ export function AuthForm({ type }: AuthFormProps) {
     setLoading(true);
 
     try {
-      const bundle =
-        type === "signup"
-          ? await authApi.signup({
-              name: formData.name,
-              email: formData.email,
-              password: formData.password,
-            })
-          : await authApi.login({
-              email: formData.email,
-              password: formData.password,
-            });
+      if (type === "signup") {
+        const bundle = await authApi.signup({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        });
+        persistSession(bundle);
+        setAccessToken(bundle.access_token);
+        setUser(bundle.user);
+        toast.success("Welcome to Velosta");
+        router.push(nextPath);
+      } else {
+        // Try regular user login first
+        let regularError: Error | null = null;
+        try {
+          const bundle = await authApi.login({
+            email: formData.email,
+            password: formData.password,
+          });
+          persistSession(bundle);
+          setAccessToken(bundle.access_token);
+          setUser(bundle.user);
+          toast.success("Signed in successfully");
+          router.push(nextPath);
+          return;
+        } catch (err: any) {
+          regularError = err;
+        }
 
-      persistSession(bundle);
-      setAccessToken(bundle.access_token);
-      setUser(bundle.user);
+        // Fall back to admin login
+        try {
+          const adminBundle = await authApi.adminLogin({
+            email: formData.email,
+            password: formData.password,
+          });
+          localStorage.setItem("adminToken", adminBundle.accessToken);
+          toast.success("Welcome, Admin");
+          router.push("/admin/reports");
+          return;
+        } catch {
+          // Admin login also failed — surface the original error
+        }
 
-      toast.success(
-        type === "signup" ? "Welcome to Velosta" : "Signed in successfully"
-      );
-      router.push(nextPath);
+        const msg =
+          regularError instanceof ApiError
+            ? regularError.message
+            : regularError?.message || "Request failed";
+        toast.error(msg);
+      }
     } catch (err: any) {
       console.error(err);
       const msg =

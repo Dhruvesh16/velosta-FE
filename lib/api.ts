@@ -148,6 +148,13 @@ export const authApi = {
     ),
 
   me: () => api.get<{ user: AuthUser }>("/api/auth/me"),
+
+  adminLogin: (input: { email: string; password: string }) =>
+    api.post<{ accessToken: string; tokenType: string }>(
+      "/api/auth/admin/login",
+      input,
+      { auth: false }
+    ),
 };
 
 export function persistSession(bundle: TokenBundle) {

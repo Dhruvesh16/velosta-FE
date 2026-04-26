@@ -1,28 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  AlertTriangle,
-  CheckCircle,
-  ChevronDown,
-  ExternalLink,
-  Flag,
-  LogOut,
-  RefreshCw,
-  Shield,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { Playfair_Display } from "next/font/google";
+import { ChevronDown, ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -33,8 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+
+const playfair = Playfair_Display({ subsets: ["latin"] });
 
 type Report = {
   id: string;
@@ -61,6 +45,8 @@ const REASON_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+type Tab = "pending" | "resolved" | "all";
+
 function useAdminToken() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
@@ -83,7 +69,7 @@ export default function AdminReportsPage() {
   const token = useAdminToken();
 
   const [reports, setReports] = useState<Report[]>([]);
-  const [tab, setTab] = useState<"pending" | "resolved" | "all">("pending");
+  const [tab, setTab] = useState<Tab>("pending");
   const [loading, setLoading] = useState(false);
   const [actionDialog, setActionDialog] = useState<{
     report: Report;
@@ -91,7 +77,15 @@ export default function AdminReportsPage() {
   } | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(
+    null
+  );
+
+  const pendingCount = reports.filter((r) => r.status === "pending").length;
+  const takedownCount = reports.filter(
+    (r) => r.adminAction === "takedown"
+  ).length;
+  const keptCount = reports.filter((r) => r.adminAction === "keep").length;
 
   const showToast = (msg: string, type: "ok" | "err" = "ok") => {
     setToast({ msg, type });
@@ -103,8 +97,7 @@ export default function AdminReportsPage() {
       if (!token) return;
       setLoading(true);
       try {
-        const params =
-          statusFilter !== "all" ? `?status=${statusFilter}` : "";
+        const params = statusFilter !== "all" ? `?status=${statusFilter}` : "";
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/admin/reports${params}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -150,8 +143,8 @@ export default function AdminReportsPage() {
       if (!res.ok) throw new Error();
       showToast(
         actionDialog.action === "takedown"
-          ? "Post taken down successfully."
-          : "Post kept — report resolved."
+          ? "Post taken down."
+          : "Report resolved — post kept."
       );
       setActionDialog(null);
       setAdminNote("");
@@ -163,164 +156,213 @@ export default function AdminReportsPage() {
     }
   };
 
-  const pendingCount = reports.filter((r) => r.status === "pending").length;
-
   if (!token) return null;
 
   return (
-    <div className="min-h-screen bg-[color:var(--color-cream)]">
-      {/* Floating toast */}
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: "var(--color-cream)" }}
+    >
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 shadow-lg text-sm font-medium ${
-            toast.type === "ok"
-              ? "bg-[color:var(--color-navy)] text-white"
-              : "bg-red-600 text-white"
-          }`}
+          className="fixed top-6 right-6 z-50 flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-medium border"
+          style={{
+            backgroundColor:
+              toast.type === "ok" ? "var(--color-navy)" : "#8B2E1A",
+            color: "var(--color-cream)",
+            borderColor: "transparent",
+            boxShadow: "0 12px 32px -16px rgba(11,31,42,0.4)",
+          }}
+          role="status"
         >
-          {toast.type === "ok" ? (
-            <CheckCircle className="h-4 w-4 flex-shrink-0" />
-          ) : (
-            <XCircle className="h-4 w-4 flex-shrink-0" />
-          )}
           {toast.msg}
         </div>
       )}
 
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+      {/* Header pill — matches main navbar */}
+      <header className="sticky top-0 z-40 px-4 sm:px-6 pt-4">
+        <div
+          className="mx-auto max-w-6xl flex items-center justify-between rounded-full border px-5 py-2.5 backdrop-blur-md"
+          style={{
+            backgroundColor: "rgba(245,239,230,0.78)",
+            borderColor: "rgba(11,31,42,0.06)",
+            boxShadow: "0 1px 2px rgba(11,31,42,0.04)",
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-[color:var(--color-brand)] flex items-center justify-center">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <span className="font-semibold text-[color:var(--color-navy)] text-sm">
-                Velosta Admin
-              </span>
-              <p className="text-xs text-muted-foreground">
-                Content moderation
-              </p>
-            </div>
+            <Link
+              href="/"
+              className={`${playfair.className} text-[22px] tracking-tight leading-none`}
+              style={{ color: "var(--color-navy)" }}
+            >
+              Velosta
+            </Link>
+            <span
+              className="hidden sm:inline-block h-4 w-px"
+              style={{ backgroundColor: "rgba(11,31,42,0.15)" }}
+              aria-hidden
+            />
+            <span
+              className="hidden sm:inline-block text-[10px] uppercase tracking-[0.22em] font-medium"
+              style={{ color: "var(--color-teal)" }}
+            >
+              Administration
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
               onClick={() => fetchReports(tab)}
               disabled={loading}
+              aria-label="Refresh"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full transition-colors disabled:opacity-50"
+              style={{ color: "rgba(11,31,42,0.6)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "rgba(11,31,42,0.05)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+              />
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 localStorage.removeItem("adminToken");
                 router.replace("/admin/login");
               }}
-              className="text-muted-foreground hover:text-foreground"
+              className="h-8 inline-flex items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition-colors"
+              style={{ color: "rgba(11,31,42,0.65)" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor =
+                  "rgba(11,31,42,0.05)";
+                e.currentTarget.style.color = "var(--color-navy)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "rgba(11,31,42,0.65)";
+              }}
             >
-              <LogOut className="h-4 w-4 mr-1" />
+              <LogOut className="h-3.5 w-3.5" />
               Sign out
-            </Button>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 gap-4 mb-8 sm:grid-cols-3">
-          <Card className="border-border">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
-                  <AlertTriangle className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[color:var(--color-navy)]">
-                    {reports.filter((r) => r.status === "pending").length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Pending</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
-                  <Trash2 className="h-5 w-5 text-red-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[color:var(--color-navy)]">
-                    {
-                      reports.filter((r) => r.adminAction === "takedown")
-                        .length
-                    }
-                  </p>
-                  <p className="text-xs text-muted-foreground">Taken down</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border sm:block hidden">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-[color:var(--color-navy)]">
-                    {reports.filter((r) => r.adminAction === "keep").length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Kept</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filter tabs */}
-        <div className="mb-6">
-          <Tabs
-            value={tab}
-            onValueChange={(v) =>
-              setTab(v as "pending" | "resolved" | "all")
-            }
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-10 pb-16">
+        <div className="mb-10">
+          <span
+            className="text-[10px] uppercase tracking-[0.24em] font-medium"
+            style={{ color: "var(--color-teal)" }}
           >
-            <TabsList className="bg-[color:var(--color-sand)]">
-              <TabsTrigger value="pending">
-                Pending
-                {pendingCount > 0 && (
-                  <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--color-brand)] text-white text-xs font-bold">
-                    {pendingCount}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="resolved">Resolved</TabsTrigger>
-              <TabsTrigger value="all">All</TabsTrigger>
-            </TabsList>
-          </Tabs>
+            Moderation queue
+          </span>
+          <h1
+            className={`${playfair.className} text-[40px] sm:text-[48px] leading-[1.1] tracking-tight mt-2`}
+            style={{ color: "var(--color-navy)" }}
+          >
+            Reported stories
+          </h1>
+          <p
+            className="text-[14px] mt-3 max-w-xl leading-relaxed"
+            style={{ color: "rgba(11,31,42,0.6)" }}
+          >
+            Review traveller-submitted reports and decide whether each story
+            stays published or is taken down. All decisions are logged.
+          </p>
         </div>
 
-        {/* Reports list */}
+        {/* Stat strip */}
+        <div
+          className="grid grid-cols-3 gap-px rounded-2xl border overflow-hidden mb-10"
+          style={{
+            borderColor: "rgba(11,31,42,0.08)",
+            backgroundColor: "rgba(11,31,42,0.06)",
+          }}
+        >
+          <Stat label="Pending" value={pendingCount} accent="brand" />
+          <Stat label="Taken down" value={takedownCount} accent="navy" />
+          <Stat label="Kept" value={keptCount} accent="teal" />
+        </div>
+
+        {/* Segmented filter */}
+        <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+          <div
+            className="inline-flex items-center rounded-full border p-1"
+            style={{
+              borderColor: "rgba(11,31,42,0.1)",
+              backgroundColor: "rgba(255,255,255,0.6)",
+            }}
+            role="tablist"
+          >
+            {(
+              [
+                { value: "pending", label: "Pending", count: pendingCount },
+                { value: "resolved", label: "Resolved", count: null },
+                { value: "all", label: "All", count: null },
+              ] as { value: Tab; label: string; count: number | null }[]
+            ).map((t) => {
+              const active = tab === t.value;
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(t.value)}
+                  className="h-8 px-4 rounded-full text-[12px] font-medium tracking-wide transition-colors flex items-center gap-2"
+                  style={{
+                    backgroundColor: active
+                      ? "var(--color-navy)"
+                      : "transparent",
+                    color: active
+                      ? "var(--color-cream)"
+                      : "rgba(11,31,42,0.6)",
+                  }}
+                >
+                  {t.label}
+                  {t.count !== null && t.count > 0 && (
+                    <span
+                      className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold"
+                      style={{
+                        backgroundColor: active
+                          ? "var(--color-brand)"
+                          : "rgba(11,31,42,0.08)",
+                        color: active
+                          ? "var(--color-cream)"
+                          : "var(--color-navy)",
+                      }}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 border-2 border-[color:var(--color-brand)] border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-24">
+            <div
+              className="h-7 w-7 border-2 rounded-full animate-spin"
+              style={{
+                borderColor: "rgba(11,31,42,0.15)",
+                borderTopColor: "var(--color-navy)",
+              }}
+            />
           </div>
         ) : reports.length === 0 ? (
-          <div className="text-center py-20">
-            <Flag className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-            <p className="text-muted-foreground">No reports found.</p>
-          </div>
+          <EmptyState tab={tab} />
         ) : (
-          <div className="space-y-3">
+          <ul className="space-y-3">
             {reports.map((report) => (
-              <ReportCard
+              <ReportRow
                 key={report.id}
                 report={report}
                 onTakedown={() => {
@@ -333,11 +375,10 @@ export default function AdminReportsPage() {
                 }}
               />
             ))}
-          </div>
+          </ul>
         )}
       </main>
 
-      {/* Action confirmation dialog */}
       <Dialog
         open={!!actionDialog}
         onOpenChange={(open) => {
@@ -347,83 +388,105 @@ export default function AdminReportsPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent
+          className="sm:max-w-md border-[rgba(11,31,42,0.08)]"
+          style={{ backgroundColor: "var(--color-cream)" }}
+        >
           <DialogHeader>
             <DialogTitle
-              className={
-                actionDialog?.action === "takedown"
-                  ? "text-red-600"
-                  : "text-green-700"
-              }
+              className={`${playfair.className} text-[22px] leading-tight`}
+              style={{ color: "var(--color-navy)" }}
             >
               {actionDialog?.action === "takedown"
-                ? "Take down this post"
-                : "Keep this post"}
+                ? "Take down this story?"
+                : "Keep this story published?"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription
+              className="text-[13px] leading-relaxed"
+              style={{ color: "rgba(11,31,42,0.6)" }}
+            >
               {actionDialog?.action === "takedown"
-                ? "The post will be hidden from all users immediately. All other pending reports for this post will also be resolved."
-                : "The post will remain visible. The report will be marked as resolved."}
+                ? "The story will be hidden from all readers immediately, and any other pending reports for it will be auto-resolved."
+                : "The story stays published. This report will be marked resolved with no action taken."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2 py-2">
-            <div className="rounded-lg bg-[color:var(--color-sand)] px-4 py-3 text-sm">
-              <p className="font-medium text-[color:var(--color-navy)] line-clamp-2">
-                {actionDialog?.report.blogTitle ?? "Untitled"}
+          <div className="space-y-4 py-1">
+            <div
+              className="rounded-lg border px-4 py-3"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.7)",
+                borderColor: "rgba(11,31,42,0.08)",
+              }}
+            >
+              <p
+                className="text-[14px] font-medium leading-snug line-clamp-2"
+                style={{ color: "var(--color-navy)" }}
+              >
+                {actionDialog?.report.blogTitle ?? "Untitled story"}
               </p>
-              <p className="text-muted-foreground text-xs mt-0.5">
-                Reported for:{" "}
+              <p
+                className="text-[11px] uppercase tracking-[0.18em] mt-2 font-medium"
+                style={{ color: "var(--color-teal)" }}
+              >
+                Reason ·{" "}
                 {REASON_LABELS[actionDialog?.report.reason ?? ""] ??
                   actionDialog?.report.reason}
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="admin-note" className="text-sm">
+              <Label
+                htmlFor="admin-note"
+                className="text-[12px] font-medium"
+                style={{ color: "rgba(11,31,42,0.7)" }}
+              >
                 Internal note{" "}
-                <span className="text-muted-foreground font-normal">
-                  (optional)
-                </span>
+                <span style={{ color: "rgba(11,31,42,0.4)" }}>(optional)</span>
               </Label>
               <Textarea
                 id="admin-note"
-                placeholder="Add a note for audit purposes..."
+                placeholder="Reasoning for audit log…"
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
                 maxLength={500}
                 rows={2}
-                className="resize-none"
+                className="resize-none bg-white border-[rgba(11,31,42,0.12)] focus-visible:ring-[var(--color-brand)] focus-visible:ring-offset-0 text-[13px]"
               />
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button
               variant="outline"
               onClick={() => setActionDialog(null)}
               disabled={actionLoading}
+              className="rounded-full h-10 px-5 border-[rgba(11,31,42,0.15)] bg-transparent hover:bg-[rgba(11,31,42,0.04)]"
+              style={{ color: "rgba(11,31,42,0.7)" }}
             >
               Cancel
             </Button>
             <Button
               onClick={handleAction}
               disabled={actionLoading}
-              className={
-                actionDialog?.action === "takedown"
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-green-600 hover:bg-green-700 text-white"
-              }
+              className="rounded-full h-10 px-5 font-medium disabled:opacity-60"
+              style={{
+                backgroundColor:
+                  actionDialog?.action === "takedown"
+                    ? "var(--color-brand-dark)"
+                    : "var(--color-navy)",
+                color: "var(--color-cream)",
+              }}
             >
               {actionLoading ? (
                 <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  Processing...
+                  <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Processing
                 </span>
               ) : actionDialog?.action === "takedown" ? (
-                "Take down post"
+                "Take down"
               ) : (
-                "Keep post"
+                "Keep published"
               )}
             </Button>
           </DialogFooter>
@@ -433,7 +496,82 @@ export default function AdminReportsPage() {
   );
 }
 
-function ReportCard({
+/* ─────────── Sub-components ─────────── */
+
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent: "brand" | "navy" | "teal";
+}) {
+  const accentColor =
+    accent === "brand"
+      ? "var(--color-brand)"
+      : accent === "teal"
+        ? "var(--color-teal)"
+        : "var(--color-navy)";
+
+  return (
+    <div
+      className="px-6 py-5 sm:px-7 sm:py-6"
+      style={{ backgroundColor: "var(--color-cream)" }}
+    >
+      <div className="flex items-baseline gap-2">
+        <span
+          className="text-[32px] sm:text-[36px] font-semibold leading-none tracking-tight"
+          style={{ color: "var(--color-navy)" }}
+        >
+          {value}
+        </span>
+        <span
+          className="h-1 w-1 rounded-full inline-block"
+          style={{ backgroundColor: accentColor }}
+          aria-hidden
+        />
+      </div>
+      <p
+        className="text-[10px] uppercase tracking-[0.22em] font-medium mt-2"
+        style={{ color: "rgba(11,31,42,0.55)" }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function EmptyState({ tab }: { tab: Tab }) {
+  const message =
+    tab === "pending"
+      ? "Nothing awaiting review. The queue is clear."
+      : tab === "resolved"
+        ? "No resolved reports yet."
+        : "No reports on record.";
+  return (
+    <div
+      className="rounded-2xl border py-20 px-6 text-center"
+      style={{
+        borderColor: "rgba(11,31,42,0.08)",
+        borderStyle: "dashed",
+        backgroundColor: "rgba(255,255,255,0.4)",
+      }}
+    >
+      <p
+        className={`${playfair.className} text-[20px] leading-tight`}
+        style={{ color: "var(--color-navy)" }}
+      >
+        All quiet
+      </p>
+      <p className="text-[13px] mt-2" style={{ color: "rgba(11,31,42,0.55)" }}>
+        {message}
+      </p>
+    </div>
+  );
+}
+
+function ReportRow({
   report,
   onTakedown,
   onKeep,
@@ -444,139 +582,217 @@ function ReportCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const isPending = report.status === "pending";
+  const hasDetails = !!(report.description || report.adminNote);
 
   return (
-    <Card className="border-border overflow-hidden">
-      <CardContent className="p-0">
-        <div className="px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              {/* Blog title */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-[color:var(--color-navy)] truncate text-sm">
-                  {report.blogTitle ?? "Untitled post"}
-                </p>
-                {report.blogAuthorName && (
-                  <span className="text-xs text-muted-foreground">
-                    by {report.blogAuthorName}
-                  </span>
-                )}
-                <a
-                  href={`/how-not-travel/${report.blogId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-[color:var(--color-brand)] transition-colors"
-                  title="Open post"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-
-              {/* Reason + date */}
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Badge
-                  variant="secondary"
-                  className="text-xs bg-[color:var(--color-sand)] text-[color:var(--color-navy)]"
-                >
-                  <Flag className="h-3 w-3 mr-1" />
-                  {REASON_LABELS[report.reason] ?? report.reason}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(report.createdAt).toLocaleDateString("en-US", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </span>
-                {!isPending && (
-                  <Badge
-                    className={`text-xs ${
-                      report.adminAction === "takedown"
-                        ? "bg-red-100 text-red-700 border-red-200"
-                        : "bg-green-100 text-green-700 border-green-200"
-                    }`}
-                    variant="outline"
-                  >
-                    {report.adminAction === "takedown"
-                      ? "Taken down"
-                      : "Kept"}
-                  </Badge>
-                )}
-                {isPending && (
-                  <Badge
-                    variant="outline"
-                    className="text-xs bg-amber-50 text-amber-700 border-amber-200"
-                  >
-                    Pending review
-                  </Badge>
-                )}
-              </div>
+    <li
+      className="rounded-2xl border bg-white overflow-hidden transition-shadow"
+      style={{
+        borderColor: "rgba(11,31,42,0.08)",
+        boxShadow: "0 1px 2px rgba(11,31,42,0.03)",
+      }}
+    >
+      <div className="px-5 sm:px-6 py-5">
+        <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <StatusPill report={report} />
+              <ReasonPill reason={report.reason} />
+              <span
+                className="text-[11px]"
+                style={{ color: "rgba(11,31,42,0.45)" }}
+              >
+                {new Date(report.createdAt).toLocaleDateString("en-US", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
             </div>
 
-            {/* Action buttons for pending reports */}
-            {isPending && (
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onKeep}
-                  className="text-green-700 border-green-200 hover:bg-green-50 text-xs h-8"
-                >
-                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                  Keep
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={onTakedown}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs h-8"
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Take down
-                </Button>
-              </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3
+                className={`${playfair.className} text-[18px] leading-snug truncate`}
+                style={{ color: "var(--color-navy)" }}
+              >
+                {report.blogTitle ?? "Untitled story"}
+              </h3>
+              <a
+                href={`/how-not-travel/${report.blogId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open story in new tab"
+                className="inline-flex items-center justify-center h-6 w-6 rounded-full transition-colors"
+                style={{ color: "rgba(11,31,42,0.45)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(11,31,42,0.05)";
+                  e.currentTarget.style.color = "var(--color-navy)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "rgba(11,31,42,0.45)";
+                }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </div>
+
+            {report.blogAuthorName && (
+              <p
+                className="text-[12px] mt-1"
+                style={{ color: "rgba(11,31,42,0.55)" }}
+              >
+                by {report.blogAuthorName}
+              </p>
             )}
           </div>
 
-          {/* Expand for details */}
-          {(report.description || report.adminNote) && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-3 transition-colors"
-            >
-              <ChevronDown
-                className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
-              />
-              {expanded ? "Hide details" : "Show details"}
-            </button>
+          {isPending && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={onKeep}
+                className="h-9 px-4 rounded-full text-[12px] font-medium tracking-wide border transition-colors"
+                style={{
+                  borderColor: "rgba(11,31,42,0.15)",
+                  color: "var(--color-navy)",
+                  backgroundColor: "transparent",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor =
+                    "rgba(11,31,42,0.04)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                Keep
+              </button>
+              <button
+                type="button"
+                onClick={onTakedown}
+                className="h-9 px-4 rounded-full text-[12px] font-medium tracking-wide transition-colors"
+                style={{
+                  backgroundColor: "var(--color-brand-dark)",
+                  color: "var(--color-cream)",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#9C4D34")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor =
+                    "var(--color-brand-dark)")
+                }
+              >
+                Take down
+              </button>
+            </div>
           )}
         </div>
 
-        {expanded &&
-          (report.description || report.adminNote) && (
-            <>
-              <Separator />
-              <div className="px-5 py-4 space-y-3 bg-[color:var(--color-sand)]/30">
-                {report.description && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                      Reporter note
-                    </p>
-                    <p className="text-sm text-foreground">{report.description}</p>
-                  </div>
-                )}
-                {report.adminNote && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                      Admin note
-                    </p>
-                    <p className="text-sm text-foreground">{report.adminNote}</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-      </CardContent>
-    </Card>
+        {hasDetails && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1 text-[11px] uppercase tracking-[0.18em] font-medium mt-4 transition-colors"
+            style={{ color: "rgba(11,31,42,0.5)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--color-navy)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "rgba(11,31,42,0.5)")
+            }
+          >
+            <ChevronDown
+              className={`h-3 w-3 transition-transform ${
+                expanded ? "rotate-180" : ""
+              }`}
+            />
+            {expanded ? "Hide details" : "Show details"}
+          </button>
+        )}
+      </div>
+
+      {expanded && hasDetails && (
+        <>
+          <Separator style={{ backgroundColor: "rgba(11,31,42,0.06)" }} />
+          <div
+            className="px-5 sm:px-6 py-5 space-y-4"
+            style={{ backgroundColor: "rgba(245,239,230,0.4)" }}
+          >
+            {report.description && (
+              <DetailBlock label="Reporter note" content={report.description} />
+            )}
+            {report.adminNote && (
+              <DetailBlock label="Admin note" content={report.adminNote} />
+            )}
+          </div>
+        </>
+      )}
+    </li>
+  );
+}
+
+function StatusPill({ report }: { report: Report }) {
+  const isPending = report.status === "pending";
+  const isTakedown = report.adminAction === "takedown";
+
+  let bg = "rgba(217,119,87,0.1)";
+  let fg = "var(--color-brand-dark)";
+  let label = "Pending review";
+
+  if (!isPending) {
+    if (isTakedown) {
+      bg = "rgba(11,31,42,0.85)";
+      fg = "var(--color-cream)";
+      label = "Taken down";
+    } else {
+      bg = "rgba(47,111,115,0.1)";
+      fg = "var(--color-teal)";
+      label = "Kept";
+    }
+  }
+
+  return (
+    <span
+      className="inline-flex items-center h-5 px-2 rounded-full text-[10px] uppercase tracking-[0.16em] font-semibold"
+      style={{ backgroundColor: bg, color: fg }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ReasonPill({ reason }: { reason: string }) {
+  return (
+    <span
+      className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-medium"
+      style={{
+        backgroundColor: "var(--color-sand)",
+        color: "var(--color-navy)",
+      }}
+    >
+      {REASON_LABELS[reason] ?? reason}
+    </span>
+  );
+}
+
+function DetailBlock({ label, content }: { label: string; content: string }) {
+  return (
+    <div>
+      <p
+        className="text-[10px] uppercase tracking-[0.22em] font-semibold mb-1.5"
+        style={{ color: "var(--color-teal)" }}
+      >
+        {label}
+      </p>
+      <p
+        className="text-[13px] leading-relaxed"
+        style={{ color: "rgba(11,31,42,0.85)" }}
+      >
+        {content}
+      </p>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
@@ -22,28 +22,6 @@ type BlogPost = {
   likes: number;
 };
 
-// Array of random Indian names
-const RANDOM_NAMES = [
-  "Rugved",
-  "Vaisitha",
-  "Dhuvesh",
-  "Vikas",
-  "Priya",
-  "Arjun",
-  "Ananya",
-  "Rohan",
-  "Kavya",
-  "Aditya",
-];
-
-// Function to get a consistent random name based on post ID
-const getRandomName = (postId: string): string => {
-  const hash = postId
-    .split("")
-    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return RANDOM_NAMES[hash % RANDOM_NAMES.length];
-};
-
 export function BlogCard({
   post,
   className,
@@ -52,9 +30,6 @@ export function BlogCard({
   className?: string;
 }) {
   const [isLoading, setIsLoading] = useState(false);
-
-  // Get a consistent random name for this post
-  const displayName = useMemo(() => getRandomName(post.id), [post.id]);
 
   const handleReadClick = (e: React.MouseEvent) => {
     setIsLoading(true);
@@ -100,14 +75,14 @@ export function BlogCard({
           <div className="flex items-center gap-3 mb-3">
             <Image
               src={post.authorAvatar || authorAvatar.src}
-              alt={displayName}
+              alt={post.authorName}
               width={40}
               height={40}
               className="rounded-full object-cover border-2 border-gray-100"
             />
             <div>
               <p className="text-sm font-semibold text-[var(--color-navy)]">
-                {displayName}
+                {post.authorName}
               </p>
               <p className="text-xs text-[var(--color-navy)]/60">
                 {new Date(post.createdAt).toLocaleDateString("en-US", {

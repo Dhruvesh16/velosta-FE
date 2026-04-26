@@ -255,7 +255,7 @@ export default function Page() {
               {[
                 { href: "#explore", label: "Explore" },
                 { href: "#journeys", label: "Journeys" },
-                { href: "#planner", label: "Planner" },
+                { href: "/velosta-ai", label: "Velosta AI" },
                 { href: "/stories", label: "Stories" },
                 { href: "/cost-splitter", label: "Expense Tracker" },
                 { href: "/how-not-travel", label: "How Not to Travel" },

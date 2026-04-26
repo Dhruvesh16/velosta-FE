@@ -24,8 +24,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "@/app/utils/context";
-import { clearSession } from "@/lib/api";
-import { LogOut } from "lucide-react";
+import Navbar from "@/components/navbar";
 
 // Ambient 3D — client-only, lazy
 const ParticleField = dynamic(
@@ -165,11 +164,8 @@ const fadeUp = {
 export default function Page() {
   const heroRef = useRef(null);
   const featuredRef = useRef(null);
-  const { user, accessToken, setUser, setAccessToken } = useUser();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [storyPosts, setStoryPosts] = useState([]);
   const [hnttPosts, setHnttPosts] = useState([]);
-  const menuRef = useRef(null);
 
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_URL || "";
@@ -185,27 +181,6 @@ export default function Page() {
     }
     fetchPosts();
   }, []);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
-
-  const handleLogout = () => {
-    clearSession();
-    setUser(null);
-    setAccessToken(null);
-    setMenuOpen(false);
-  };
-
-  const firstName = user?.name ? user.name.split(" ")[0] : "Account";
-  const initial = user?.name ? user.name[0].toUpperCase() : "U";
 
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -229,141 +204,7 @@ export default function Page() {
       style={{ backgroundColor: c.sand, color: c.navy }}
     >
       {/* ────────── Navigation ────────── */}
-      <motion.header
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
-        className="fixed inset-x-0 top-0 z-50"
-      >
-        <div className="mx-auto max-w-7xl px-6 pt-5">
-          <nav
-            className="flex items-center justify-between rounded-full border px-7 py-3.5 backdrop-blur-2xl"
-            style={{
-              borderColor: "rgba(11,31,42,0.06)",
-              backgroundColor: "rgba(245,239,230,0.72)",
-            }}
-          >
-            <Link
-              href="/"
-              className={`${playfair.className} text-[22px] tracking-tight`}
-              style={{ color: c.navy }}
-            >
-              Velosta
-            </Link>
-
-            <div className="hidden items-center gap-10 md:flex">
-              {[
-                { href: "#explore", label: "Explore" },
-                { href: "#journeys", label: "Journeys" },
-                { href: "/velosta-ai", label: "Velosta AI" },
-                { href: "/stories", label: "Stories" },
-                { href: "/cost-splitter", label: "Expense Tracker" },
-                { href: "/how-not-travel", label: "How Not to Travel" },
-              ].map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className="text-[13px] font-medium tracking-wide transition-colors duration-300"
-                  style={{ color: "rgba(11,31,42,0.5)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = c.navy)}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(11,31,42,0.5)")}
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-
-            <motion.div
-              whileHover={{ scale: 1.03, y: -1 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ duration: 0.2 }}
-              className="hidden md:inline-block"
-            >
-              {accessToken && user ? (
-                <div ref={menuRef} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setMenuOpen((v) => !v)}
-                    aria-haspopup="menu"
-                    aria-expanded={menuOpen}
-                    className="inline-flex items-center gap-2.5 rounded-full pl-1.5 pr-5 py-1.5 text-[13px] font-semibold transition-colors"
-                    style={{
-                      backgroundColor: c.coral,
-                      color: "#fff",
-                      boxShadow: "0 8px 20px -8px rgba(217,119,87,0.55)",
-                    }}
-                  >
-                    <span
-                      className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold"
-                      style={{
-                        backgroundColor: "rgba(255,255,255,0.22)",
-                        color: "#fff",
-                      }}
-                    >
-                      {initial}
-                    </span>
-                    <span className="max-w-[140px] truncate">{firstName}</span>
-                  </button>
-
-                  {menuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.15 }}
-                      role="menu"
-                      className="absolute right-0 mt-2 w-64 overflow-hidden rounded-2xl border bg-white shadow-xl"
-                      style={{ borderColor: "rgba(11,31,42,0.08)" }}
-                    >
-                      <div
-                        className="px-4 py-3"
-                        style={{ backgroundColor: "rgba(245,239,230,0.5)" }}
-                      >
-                        <p
-                          className="text-[13px] font-semibold truncate"
-                          style={{ color: c.navy }}
-                        >
-                          {user.name || "User"}
-                        </p>
-                        <p
-                          className="text-[12px] truncate"
-                          style={{ color: "rgba(11,31,42,0.55)" }}
-                        >
-                          {user.email}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        role="menuitem"
-                        className="flex w-full items-center gap-2.5 border-t px-4 py-3 text-left text-[13px] font-medium transition-colors hover:bg-red-50"
-                        style={{
-                          borderColor: "rgba(11,31,42,0.06)",
-                          color: "#c2410c",
-                        }}
-                      >
-                        <LogOut className="h-4 w-4" />
-                        <span>Log out</span>
-                      </button>
-                    </motion.div>
-                  )}
-                </div>
-              ) : (
-                <Link
-                  href="/sign-in"
-                  className="inline-flex items-center rounded-full px-6 py-2.5 text-[13px] font-semibold"
-                  style={{
-                    backgroundColor: c.coral,
-                    color: "#fff",
-                    boxShadow: "0 8px 20px -8px rgba(217,119,87,0.55)",
-                  }}
-                >
-                  Sign Up
-                </Link>
-              )}
-            </motion.div>
-          </nav>
-        </div>
-      </motion.header>
+      <Navbar />
 
       {/* ────────── Hero — Full-Bleed Editorial ────────── */}
       <section

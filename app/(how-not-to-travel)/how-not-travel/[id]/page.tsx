@@ -19,8 +19,9 @@ export default async function BlogPage({ params }: Props) {
   );
   if (!res.ok) return notFound();
 
-  const blog = await res.json();
-  if (!blog) {
+  const json = await res.json();
+  const blog = json?.data ?? json;
+  if (!blog?.id) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">

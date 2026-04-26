@@ -196,7 +196,7 @@ export default function BlogList() {
           style={{ background: "var(--color-brand)" }}
         />
 
-        <div className="relative mx-auto max-w-6xl px-6 py-16">
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 py-12 sm:py-16">
           <div
             className="mb-5 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider"
             style={{ background: "rgba(47,111,115,0.12)", color: "var(--color-teal)" }}
@@ -207,7 +207,7 @@ export default function BlogList() {
 
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
-              <h1 className="text-4xl font-semibold leading-tight text-[var(--color-navy)] md:text-5xl">
+              <h1 className="text-[clamp(2rem,7vw,3rem)] font-semibold leading-tight text-[var(--color-navy)]">
                 How{" "}
                 <span className="font-normal text-[var(--color-teal)] line-through decoration-2">not</span>{" "}
                 to travel
@@ -253,7 +253,7 @@ export default function BlogList() {
 
       {/* ── Content ── */}
       <div className="min-h-[40vh]" style={{ background: "var(--color-cream)" }}>
-        <div className="mx-auto max-w-6xl px-6 py-12">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-12">
 
           {/* Filter tabs */}
           <div className="mb-8 flex items-center gap-2">

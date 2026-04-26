@@ -171,11 +171,30 @@
 }
 
 @layer base {
+  /* Prevent iOS / Android auto text inflation when rotating; honours user's OS zoom */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Smoother scaling on Windows/HiDPI when user uses browser/system zoom */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Defensive: never allow horizontal page scroll from a stray wide element */
+  html, body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /* Improve target sizing for touch (≥ 44×44 per WCAG/AA) on small viewports */
+  @media (max-width: 640px) {
+    button, a[role="button"], [data-slot="button"] {
+      min-height: 40px;
+    }
   }
 }
 
@@ -188,6 +207,12 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /* Dynamic-viewport units that respect mobile chrome + OS zoom.
+     Falls back to vh on browsers that don't support dvh. */
+  .min-h-dscreen { min-height: 100vh; min-height: 100dvh; }
+  .h-dscreen     { height: 100vh;     height: 100dvh; }
+  .max-h-dscreen { max-height: 100vh; max-height: 100dvh; }
 }
 
 /* Hide scrollbar but keep scroll functionality */

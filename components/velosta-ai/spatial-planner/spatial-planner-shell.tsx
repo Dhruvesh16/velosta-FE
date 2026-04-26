@@ -44,11 +44,11 @@ export default function SpatialPlannerShell() {
       style={{ background: "#FBF8F3" }}
       aria-label="Velosta AI Spatial Planner"
     >
-      {/* ── Desktop: Itinerary (left) + Map (right) ──────────── */}
-      <div className="hidden lg:flex h-full w-full">
-        {/* Itinerary panel — fixed width left side */}
+      {/* ── Desktop / Tablet landscape: Itinerary (left) + Map (right) ─ */}
+      <div className="hidden md:flex h-full w-full">
+        {/* Itinerary panel — fluid: narrower on small laptops, wider on big screens */}
         <motion.div
-          className="w-[340px] h-full border-r border-[#0B1F2A]/8 bg-[#FBF8F3] shrink-0 flex flex-col overflow-hidden"
+          className="w-[300px] lg:w-[340px] xl:w-[380px] h-full border-r border-[#0B1F2A]/8 bg-[#FBF8F3] shrink-0 flex flex-col overflow-hidden"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
@@ -64,8 +64,8 @@ export default function SpatialPlannerShell() {
         </div>
       </div>
 
-      {/* ── Mobile: single panel with tab bar ────────────────────────────── */}
-      <div className="flex flex-col lg:hidden h-full">
+      {/* ── Mobile / narrow tablet: single panel with tab bar ─────────── */}
+      <div className="flex flex-col md:hidden h-full">
         {/* Active panel area */}
         <div className="flex-1 overflow-hidden relative">
           <AnimatePresence mode="wait" initial={false}>

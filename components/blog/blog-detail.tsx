@@ -237,7 +237,7 @@ export function BlogDetail({ blog }: BlogDetailProps) {
               ))}
             </div>
 
-            <h1 className="mb-4 text-4xl font-bold leading-tight text-[color:var(--color-navy)] md:text-5xl">
+              <h1 className="mb-4 text-[clamp(1.875rem,6vw,3rem)] font-bold leading-tight text-[color:var(--color-navy)]">
               {blog.title}
             </h1>
 

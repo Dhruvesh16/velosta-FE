@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
@@ -12,6 +12,15 @@ export const metadata: Metadata = {
   other: {
     "google-site-verification": "G7OiI7ff-lSIWayJpfgC1so8g5lPdEmAFETV3ZPkShs",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: "#FBF8F3",
 };
 
 export default function RootLayout({

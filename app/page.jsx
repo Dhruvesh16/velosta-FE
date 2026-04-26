@@ -247,7 +247,7 @@ export default function Page() {
         {/* ── Content Panel — overlaid left ── */}
         <motion.div
           style={{ opacity: contentOpacity }}
-          className="relative z-10 flex min-h-screen w-full flex-col items-start justify-center px-10 pt-28 pb-16 sm:px-16 lg:w-[54%] lg:px-20 lg:pt-0 lg:pb-0 xl:px-28"
+          className="relative z-10 flex min-h-screen w-full flex-col items-start justify-center px-5 pt-24 pb-12 sm:px-12 sm:pt-28 sm:pb-16 lg:w-[54%] lg:px-20 lg:pt-0 lg:pb-0 xl:px-28"
         >
           <motion.div
             variants={heroStagger}
@@ -275,7 +275,7 @@ export default function Page() {
             {/* H1 */}
             <motion.h1
               variants={heroChild}
-              className={`${playfair.className} text-[clamp(3rem,6vw,5rem)] font-bold leading-[1.02] tracking-[-0.02em]`}
+              className={`${playfair.className} text-[clamp(2.25rem,8vw,5rem)] font-bold leading-[1.02] tracking-[-0.02em]`}
               style={{ color: c.navy }}
             >
               One Prompt.<br />Your Perfect Trip.

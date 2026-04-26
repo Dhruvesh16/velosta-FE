@@ -243,32 +243,32 @@ export default function CostSplitterPage() {
       <Navbar />
 
       {/* ── Hero ── */}
-      <section className="pt-32 pb-10">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="flex items-end justify-between gap-6 flex-wrap">
-            <div className="max-w-2xl">
+      <section className="pt-28 sm:pt-32 pb-8 sm:pb-10">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="flex items-end justify-between gap-4 sm:gap-6 flex-wrap">
+            <div className="max-w-2xl min-w-0">
               <p
-                className="text-xs uppercase tracking-[0.18em] mb-3 font-medium"
+                className="text-xs uppercase tracking-[0.18em] mb-2 sm:mb-3 font-medium"
                 style={{ color: "var(--color-teal)" }}
               >
                 Expense Tracker
               </p>
               <h1
-                className={`${playfair.className} text-[44px] md:text-[56px] leading-[1.05] tracking-tight`}
+                className={`${playfair.className} text-[clamp(2rem,7vw,3.5rem)] leading-[1.05] tracking-tight`}
                 style={{ color: "var(--color-navy)" }}
               >
                 Settle the trip,
                 <br />
                 <span style={{ color: "var(--color-brand)" }}>not the friendship.</span>
               </h1>
-              <p className="mt-5 text-[15px] leading-relaxed" style={{ color: "rgba(11,31,42,0.65)" }}>
+              <p className="mt-4 sm:mt-5 text-[14px] sm:text-[15px] leading-relaxed" style={{ color: "rgba(11,31,42,0.65)" }}>
                 Add a trip, invite the people you traveled with, log who paid for what,
                 and we&rsquo;ll figure out the simplest way to settle up.
               </p>
             </div>
             <Button
               onClick={() => setNewTripOpen(true)}
-              className="h-11 px-6 rounded-full text-[14px] font-semibold gap-2"
+              className="h-11 px-5 sm:px-6 rounded-full text-[14px] font-semibold gap-2 shrink-0"
               style={{
                 background: "var(--color-navy)",
                 color: "var(--color-cream)",
@@ -282,8 +282,8 @@ export default function CostSplitterPage() {
       </section>
 
       {/* ── Body ── */}
-      <section className="pb-24">
-        <div className="mx-auto max-w-6xl px-6">
+      <section className="pb-16 sm:pb-24">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           {trips.length === 0 ? (
             <EmptyTrips onCreate={() => setNewTripOpen(true)} />
           ) : (

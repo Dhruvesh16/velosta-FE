@@ -17,7 +17,7 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-PROJECT="${GCP_PROJECT:-velosta-gcp}"
+PROJECT="${GCP_PROJECT:-versatile-digit-476220-g6}"
 REGION="${GCP_REGION:-asia-south1}"
 AR_HOST="${GCP_AR_HOST:-${REGION}-docker.pkg.dev/${PROJECT}/velosta}"
 SA_EMAIL="${GCP_SA_EMAIL:-velosta-sa@${PROJECT}.iam.gserviceaccount.com}"
@@ -44,9 +44,10 @@ sm_get() {
   gcloud secrets versions access latest --secret="$1" --project="$PROJECT" 2>/dev/null || echo ""
 }
 
-# ── Verify GCP auth ────────────────────────────────────────────────────────────
+# ── Verify GCP auth / project access ───────────────────────────────────────────
 gcloud auth print-access-token &>/dev/null || die "Not authenticated. Run: gcloud auth login"
-gcloud config set project "$PROJECT"
+gcloud projects describe "$PROJECT" --project="$PROJECT" >/dev/null 2>&1 || \
+  die "No access to project '$PROJECT'. Set GCP_PROJECT to a project you can access."
 
 # ── Fetch config from Secret Manager ─────────────────────────────────────────
 log "Fetching config from Secret Manager..."

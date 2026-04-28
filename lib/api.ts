@@ -132,6 +132,7 @@ export interface OtpChallenge {
   otpRequired: true;
   otpToken: string;
   twoFaMethod?: "email_otp" | "totp";
+  hasPasskey?: boolean;
 }
 
 export interface TotpSetupData {
@@ -163,6 +164,12 @@ export const authApi = {
 
   resendOtp: (otp_token: string) =>
     api.post<{ message: string }>("/api/auth/resend-otp", { otp_token }, { auth: false }),
+
+  verifyEmail: (token: string) =>
+    api.post<{ message: string }>("/api/auth/verify-email", { token }, { auth: false }),
+
+  resendVerificationEmail: (email: string) =>
+    api.post<{ message: string }>("/api/auth/resend-verification-email", { email }, { auth: false }),
 
   google: (idToken: string) =>
     api.post<TokenBundle>(

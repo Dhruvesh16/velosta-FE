@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,12 +94,48 @@ export function AuthForm({ type }: AuthFormProps) {
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   const { user, setUser, setAccessToken } = useUser();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "email" && pendingVerificationEmail) {
+      setPendingVerificationEmail(null);
+    }
+  };
+
+  const passwordStrength = useMemo(() => {
+    const password = formData.password;
+    const checks = [
+      password.length >= 8,
+      /[A-Z]/.test(password),
+      /[a-z]/.test(password),
+      /[0-9]/.test(password),
+      /[\W_]/.test(password),
+    ];
+    const score = checks.filter(Boolean).length;
+    if (!password) return { score: 0, label: "Too weak", color: "rgba(11,31,42,0.16)" };
+    if (score <= 2) return { score, label: "Weak", color: "#E55A57" };
+    if (score <= 4) return { score, label: "Good", color: "#E0A94A" };
+    return { score, label: "Strong", color: "#3BAF7A" };
+  }, [formData.password]);
+
+  const handleResendVerification = async () => {
+    const email = pendingVerificationEmail || formData.email;
+    if (!email) return;
+    setResendingVerification(true);
+    try {
+      const result = await authApi.resendVerificationEmail(email);
+      toast.success(result.message || "Verification email sent. Check your inbox.");
+    } catch (err: any) {
+      const msg = err instanceof ApiError ? err.message : "Could not resend verification email.";
+      toast.error(msg);
+    } finally {
+      setResendingVerification(false);
+    }
   };
 
   const validateForm = () => {
@@ -120,13 +156,22 @@ export function AuthForm({ type }: AuthFormProps) {
       toast.error("Password must be at least 8 characters");
       return false;
     }
-    if (!/[A-Z]/.test(password))
+    if (!/[A-Z]/.test(password)) {
       toast.error("Password must contain an uppercase letter");
-    if (!/[a-z]/.test(password))
+      return false;
+    }
+    if (!/[a-z]/.test(password)) {
       toast.error("Password must contain a lowercase letter");
-    if (!/[0-9]/.test(password)) toast.error("Password must contain a number");
-    if (!/[\W_]/.test(password))
+      return false;
+    }
+    if (!/[0-9]/.test(password)) {
+      toast.error("Password must contain a number");
+      return false;
+    }
+    if (!/[\W_]/.test(password)) {
       toast.error("Password must contain a special character");
+      return false;
+    }
 
     if (type === "signup" && password !== confirmPassword) {
       toast.error("Passwords do not match");
@@ -153,18 +198,15 @@ export function AuthForm({ type }: AuthFormProps) {
 
     try {
       if (type === "signup") {
-        const bundle = await authApi.signup({
+        await authApi.signup({
           name: formData.name,
           email: formData.email,
           password: formData.password,
           accepted_terms: acceptedTerms,
           marketing_opt_in: marketingOptIn,
         });
-        persistSession(bundle);
-        setAccessToken(bundle.access_token);
-        setUser(bundle.user);
-        toast.success("Welcome to Velosta! Check your inbox for a welcome email.");
-        router.push(nextPath);
+        toast.success("Welcome aboard! We sent a single email with your verification link.");
+        router.push("/sign-in");
       } else {
         // Try admin login first — now also returns OTP challenge
         let adminOtpToken: string | null = null;
@@ -196,6 +238,7 @@ export function AuthForm({ type }: AuthFormProps) {
           });
           const method = challenge.twoFaMethod || "email_otp";
           const params = new URLSearchParams({ token: challenge.otpToken, method });
+          if (challenge.hasPasskey) params.set("hasPasskey", "1");
           if (nextPath !== "/") params.set("next", nextPath);
           if (method === "totp") {
             toast.info("Enter the code from your authenticator app.");
@@ -205,6 +248,13 @@ export function AuthForm({ type }: AuthFormProps) {
           router.push(`/verify-otp?${params.toString()}`);
           return;
         } catch (err: any) {
+          if (err instanceof ApiError && err.code === "email_not_verified") {
+            const unverifiedEmail =
+              (typeof err.details?.email === "string" && err.details.email) || formData.email;
+            setPendingVerificationEmail(unverifiedEmail);
+            toast.info("You haven’t verified your email yet. Verify it and then sign in.");
+            return;
+          }
           const msg =
             err instanceof ApiError
               ? err.message
@@ -361,7 +411,41 @@ export function AuthForm({ type }: AuthFormProps) {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          {type === "signup" && (
+            <div className="space-y-1 pt-1">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[rgba(11,31,42,0.08)]">
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${(passwordStrength.score / 5) * 100}%`,
+                    backgroundColor: passwordStrength.color,
+                  }}
+                />
+              </div>
+              <p className="text-[12px]" style={{ color: "rgba(11,31,42,0.55)" }}>
+                Password strength: <span style={{ color: passwordStrength.color }}>{passwordStrength.label}</span>
+              </p>
+            </div>
+          )}
         </div>
+
+        {type === "signin" && pendingVerificationEmail && (
+          <div
+            className="rounded-xl border px-3.5 py-3 text-[13px]"
+            style={{ borderColor: "rgba(217,119,87,0.35)", background: "rgba(217,119,87,0.08)", color: "#0B1F2A" }}
+          >
+            You haven&apos;t verified your email yet. Verify from your inbox to unlock sign-in.
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendingVerification}
+              className="ml-2 font-semibold underline underline-offset-2 disabled:opacity-60"
+              style={{ color: "#D97757" }}
+            >
+              {resendingVerification ? "Resending..." : "Resend verification link"}
+            </button>
+          </div>
+        )}
 
         {type === "signup" && (
           <div className="space-y-2">

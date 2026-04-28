@@ -25,6 +25,7 @@ export function OtpForm() {
   const nextPath = searchParams?.get("next") || "/";
   const twoFaMethod = searchParams?.get("method") || "email_otp";
   const isTotp = twoFaMethod === "totp";
+  const hasPasskey = searchParams?.get("hasPasskey") === "1";
 
   useEffect(() => {
     if (!otpToken) {
@@ -122,6 +123,33 @@ export function OtpForm() {
     submitOtp(otp);
   };
 
+  const handlePasskeySignIn = async () => {
+    setLoading(true);
+    try {
+      const { startAuthentication } = await import("@simplewebauthn/browser");
+      const { sessionId, options } = await authApi.passkeyLoginBegin();
+      const credential = await startAuthentication({ optionsJSON: options as any });
+      const bundle = await authApi.passkeyLoginComplete({
+        session_id: sessionId,
+        credential: credential as unknown as Record<string, unknown>,
+      });
+      persistSession(bundle);
+      setAccessToken(bundle.access_token);
+      setUser(bundle.user);
+      toast.success("Signed in with passkey");
+      router.push(nextPath);
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError") {
+        toast.error("Passkey sign-in was cancelled.");
+      } else {
+        const msg = err instanceof ApiError ? err.message : "Passkey sign-in failed.";
+        toast.error(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <ToastContainer />
@@ -194,6 +222,26 @@ export function OtpForm() {
           <p className="text-center text-[13px]" style={{ color: "rgba(11,31,42,0.55)" }}>
             Open your authenticator app and enter the 6-digit code.
           </p>
+        )}
+        {isTotp && hasPasskey && (
+          <div className="pt-1">
+            <p className="mb-2 text-center text-[12px]" style={{ color: "rgba(11,31,42,0.5)" }}>
+              Or sign in instantly with your passkey.
+            </p>
+            <button
+              type="button"
+              onClick={handlePasskeySignIn}
+              disabled={loading}
+              className="w-full h-11 rounded-full border font-semibold text-[13.5px] disabled:opacity-60"
+              style={{
+                borderColor: "rgba(11,31,42,0.15)",
+                color: "#0B1F2A",
+                background: "#fff",
+              }}
+            >
+              {loading ? "Verifying…" : "Sign in with Passkey"}
+            </button>
+          </div>
         )}
 
         <p className="text-center text-[12px]" style={{ color: "rgba(11,31,42,0.4)" }}>

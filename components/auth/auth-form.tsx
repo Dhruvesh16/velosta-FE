@@ -107,24 +107,7 @@ export function AuthForm({ type }: AuthFormProps) {
         toast.success("Welcome to Velosta! Check your inbox for a welcome email.");
         router.push(nextPath);
       } else {
-        // Try regular user login — returns an OTP challenge
-        let regularError: Error | null = null;
-        try {
-          const challenge = await authApi.login({
-            email: formData.email,
-            password: formData.password,
-          });
-          // Redirect to OTP verification page
-          const params = new URLSearchParams({ token: challenge.otpToken });
-          if (nextPath !== "/") params.set("next", nextPath);
-          toast.info("A verification code has been sent to your email.");
-          router.push(`/verify-otp?${params.toString()}`);
-          return;
-        } catch (err: any) {
-          regularError = err;
-        }
-
-        // Fall back to admin login (admin doesn't use OTP)
+        // Try admin login first — admin gets a direct JWT, no OTP required
         try {
           const adminBundle = await authApi.adminLogin({
             email: formData.email,
@@ -135,14 +118,27 @@ export function AuthForm({ type }: AuthFormProps) {
           router.push("/admin/reports");
           return;
         } catch {
-          // Admin login also failed — surface the original error
+          // Not admin credentials — proceed with regular login (OTP flow)
         }
 
-        const msg =
-          regularError instanceof ApiError
-            ? regularError.message
-            : regularError?.message || "Request failed";
-        toast.error(msg);
+        // Regular user login — returns an OTP challenge
+        try {
+          const challenge = await authApi.login({
+            email: formData.email,
+            password: formData.password,
+          });
+          const params = new URLSearchParams({ token: challenge.otpToken });
+          if (nextPath !== "/") params.set("next", nextPath);
+          toast.info("A verification code has been sent to your email.");
+          router.push(`/verify-otp?${params.toString()}`);
+          return;
+        } catch (err: any) {
+          const msg =
+            err instanceof ApiError
+              ? err.message
+              : err?.message || "Request failed";
+          toast.error(msg);
+        }
       }
     } catch (err: any) {
       console.error(err);

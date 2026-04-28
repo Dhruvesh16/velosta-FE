@@ -295,21 +295,21 @@ export function AuthCard({ children, title, subtitle, mode = "signin" }: AuthCar
             style={{ color: "rgba(11,31,42,0.45)" }}
           >
             By continuing, you agree to Velosta&apos;s{" "}
-            <a
-              href="#"
+            <Link
+              href="/terms-of-service"
               className="underline underline-offset-2 transition-colors"
               style={{ color: "rgba(11,31,42,0.65)" }}
             >
               Terms
-            </a>{" "}
+            </Link>{" "}
             &{" "}
-            <a
-              href="#"
+            <Link
+              href="/privacy-policy"
               className="underline underline-offset-2 transition-colors"
               style={{ color: "rgba(11,31,42,0.65)" }}
             >
               Privacy
-            </a>
+            </Link>
             .
           </p>
         </div>

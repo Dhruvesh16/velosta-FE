@@ -62,6 +62,31 @@ export default function Footer() {
             </ul>
           </div>
 
+          {/* Legal */}
+          <div>
+            <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">
+              Legal
+            </h4>
+            <ul className="space-y-2 text-sm text-[var(--color-navy)]/70">
+              <li>
+                <a
+                  href="/privacy-policy"
+                  className="hover:text-[var(--color-navy)]"
+                >
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/terms-of-service"
+                  className="hover:text-[var(--color-navy)]"
+                >
+                  Terms of Service
+                </a>
+              </li>
+            </ul>
+          </div>
+
           {/* Support */}
           {/* <div>
             <h4 className="mb-3 text-sm font-semibold text-[var(--color-navy)]">

@@ -13,6 +13,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { authApi, persistSession, ApiError } from "@/lib/api";
+import Link from "next/link";
 
 interface AuthFormProps {
   type: "signin" | "signup";
@@ -32,6 +33,8 @@ export function AuthForm({ type }: AuthFormProps) {
     confirmPassword: "",
     name: "",
   });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   const { user, setUser, setAccessToken } = useUser();
 
@@ -76,6 +79,11 @@ export function AuthForm({ type }: AuthFormProps) {
       return false;
     }
 
+    if (type === "signup" && !acceptedTerms) {
+      toast.error("You must accept the Privacy Policy and Terms of Service to continue");
+      return false;
+    }
+
     return true;
   };
 
@@ -90,31 +98,33 @@ export function AuthForm({ type }: AuthFormProps) {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          accepted_terms: acceptedTerms,
+          marketing_opt_in: marketingOptIn,
         });
         persistSession(bundle);
         setAccessToken(bundle.access_token);
         setUser(bundle.user);
-        toast.success("Welcome to Velosta");
+        toast.success("Welcome to Velosta! Check your inbox for a welcome email.");
         router.push(nextPath);
       } else {
-        // Try regular user login first
+        // Try regular user login — returns an OTP challenge
         let regularError: Error | null = null;
         try {
-          const bundle = await authApi.login({
+          const challenge = await authApi.login({
             email: formData.email,
             password: formData.password,
           });
-          persistSession(bundle);
-          setAccessToken(bundle.access_token);
-          setUser(bundle.user);
-          toast.success("Signed in successfully");
-          router.push(nextPath);
+          // Redirect to OTP verification page
+          const params = new URLSearchParams({ token: challenge.otpToken });
+          if (nextPath !== "/") params.set("next", nextPath);
+          toast.info("A verification code has been sent to your email.");
+          router.push(`/verify-otp?${params.toString()}`);
           return;
         } catch (err: any) {
           regularError = err;
         }
 
-        // Fall back to admin login
+        // Fall back to admin login (admin doesn't use OTP)
         try {
           const adminBundle = await authApi.adminLogin({
             email: formData.email,
@@ -326,6 +336,53 @@ export function AuthForm({ type }: AuthFormProps) {
                 {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+          </div>
+        )}
+
+        {type === "signup" && (
+          <div className="space-y-3 pt-1">
+            {/* Terms & Privacy acceptance */}
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border accent-[#D97757]"
+                required
+              />
+              <span className="text-[13px] leading-snug" style={{ color: "rgba(11,31,42,0.7)" }}>
+                I have read and agree to the{" "}
+                <Link
+                  href="/privacy-policy"
+                  target="_blank"
+                  className="font-semibold text-[#D97757] hover:underline"
+                >
+                  Privacy Policy
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/terms-of-service"
+                  target="_blank"
+                  className="font-semibold text-[#D97757] hover:underline"
+                >
+                  Terms of Service
+                </Link>
+                . <span className="text-[#D97757]">*</span>
+              </span>
+            </label>
+
+            {/* Marketing opt-in */}
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={marketingOptIn}
+                onChange={(e) => setMarketingOptIn(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border accent-[#D97757]"
+              />
+              <span className="text-[13px] leading-snug" style={{ color: "rgba(11,31,42,0.7)" }}>
+                Send me weekly travel stories, destination guides, and Velosta updates. (Optional)
+              </span>
+            </label>
           </div>
         )}
 

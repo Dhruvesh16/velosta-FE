@@ -126,12 +126,28 @@ export interface TokenBundle {
   token_type: string;
 }
 
+export interface OtpChallenge {
+  otpRequired: true;
+  otpToken: string;
+}
+
 export const authApi = {
-  signup: (input: { email: string; password: string; name?: string }) =>
-    api.post<TokenBundle>("/api/auth/signup", input, { auth: false }),
+  signup: (input: {
+    email: string;
+    password: string;
+    name?: string;
+    accepted_terms: boolean;
+    marketing_opt_in: boolean;
+  }) => api.post<TokenBundle>("/api/auth/signup", input, { auth: false }),
 
   login: (input: { email: string; password: string }) =>
-    api.post<TokenBundle>("/api/auth/login", input, { auth: false }),
+    api.post<OtpChallenge>("/api/auth/login", input, { auth: false }),
+
+  verifyOtp: (input: { otp_token: string; otp: string }) =>
+    api.post<TokenBundle>("/api/auth/verify-otp", input, { auth: false }),
+
+  resendOtp: (otp_token: string) =>
+    api.post<{ message: string }>("/api/auth/resend-otp", { otp_token }, { auth: false }),
 
   google: (idToken: string) =>
     api.post<TokenBundle>(

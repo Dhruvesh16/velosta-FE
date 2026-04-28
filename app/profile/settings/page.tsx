@@ -703,15 +703,16 @@ function TwoFaSection() {
 
 // ── Delete account section ─────────────────────────────────────────────────────
 function DeleteSection() {
-  const { setUser, setAccessToken } = useUser();
+  const { user, setUser, setAccessToken } = useUser();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const isOAuth = user?.hasPassword === false;
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await authApi.deleteAccount(password);
+      await authApi.deleteAccount(isOAuth ? "" : password);
       clearSession();
       setUser(null);
       setAccessToken(null);
@@ -754,24 +755,26 @@ function DeleteSection() {
                   This action is permanent. Your account, trips, and all personal data will be deleted immediately and cannot be recovered.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="py-2">
-                <Label className="text-sm font-medium mb-1.5 block" style={{ color: navy }}>
-                  Confirm your password
-                </Label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="rounded-xl"
-                  style={{ borderColor: "rgba(220,38,38,0.3)" }}
-                />
-              </div>
+              {!isOAuth && (
+                <div className="py-2">
+                  <Label className="text-sm font-medium mb-1.5 block" style={{ color: navy }}>
+                    Confirm your password
+                  </Label>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="rounded-xl"
+                    style={{ borderColor: "rgba(220,38,38,0.3)" }}
+                  />
+                </div>
+              )}
               <AlertDialogFooter>
                 <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDelete}
-                  disabled={deleting || !password}
+                  disabled={deleting || (!isOAuth && !password)}
                   className="rounded-full bg-red-600 hover:bg-red-700 disabled:opacity-60"
                 >
                   {deleting ? "Deleting…" : "Yes, delete my account"}
@@ -836,7 +839,8 @@ export default function ProfileSettingsPage() {
       {/* Content */}
       <div className="mx-auto max-w-2xl px-4 sm:px-8 py-8 space-y-6">
         <ProfileSection />
-        <TwoFaSection />
+        {/* Sign-in methods only make sense for password-based accounts */}
+        {user.hasPassword && <TwoFaSection />}
         <DeleteSection />
       </div>
     </div>

@@ -118,6 +118,7 @@ export interface AuthUser {
   name: string | null;
   avatarUrl?: string | null;
   twoFaMethod?: "email_otp" | "totp";
+  hasPassword?: boolean;
 }
 
 export interface TokenBundle {

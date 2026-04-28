@@ -63,21 +63,41 @@ FE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Build & push ──────────────────────────────────────────────────────────────
 if [[ "$SKIP_BUILD" == "false" ]]; then
-  log "Configuring docker for Artifact Registry..."
-  gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-
-  log "Building image: $IMAGE_FULL"
+  log "Building image via Cloud Build: $IMAGE_FULL"
   cd "$FE_DIR"
-  docker build \
-    --file Dockerfile \
-    --tag "$IMAGE_FULL" \
-    --build-arg "NEXT_PUBLIC_API_BASE_URL=${GATEWAY_URL}" \
-    --build-arg "NEXT_PUBLIC_URL=${GATEWAY_URL}" \
-    --build-arg "NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}" \
-    --build-arg "NEXT_PUBLIC_MAPBOX_TOKEN=${MAPBOX_TOKEN}" \
-    --build-arg "NEXT_PUBLIC_SITE_NAME=Velosta" \
-    .
-  docker push "$IMAGE_FULL"
+
+  # Generate a temporary cloudbuild config with build-time env vars baked in.
+  # NEXT_PUBLIC_* vars must be ARG/ENV at build time — Cloud Run env vars are ignored.
+  CLOUDBUILD_TMP="$(mktemp /tmp/cloudbuild-fe-XXXX.yaml)"
+  cat > "$CLOUDBUILD_TMP" <<YAML
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - --build-arg
+      - NEXT_PUBLIC_API_BASE_URL=${GATEWAY_URL}
+      - --build-arg
+      - NEXT_PUBLIC_URL=https://velosta.com
+      - --build-arg
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - --build-arg
+      - NEXT_PUBLIC_MAPBOX_TOKEN=${MAPBOX_TOKEN}
+      - --build-arg
+      - NEXT_PUBLIC_SITE_NAME=Velosta
+      - -t
+      - ${IMAGE_FULL}
+      - .
+images:
+  - ${IMAGE_FULL}
+options:
+  logging: CLOUD_LOGGING_ONLY
+YAML
+
+  gcloud builds submit . \
+    --config="$CLOUDBUILD_TMP" \
+    --timeout=600 \
+    --project="$PROJECT"
+  rm -f "$CLOUDBUILD_TMP"
   ok "Image pushed: $IMAGE_FULL"
 fi
 

@@ -117,6 +117,7 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatarUrl?: string | null;
+  twoFaMethod?: "email_otp" | "totp";
 }
 
 export interface TokenBundle {
@@ -129,6 +130,12 @@ export interface TokenBundle {
 export interface OtpChallenge {
   otpRequired: true;
   otpToken: string;
+  twoFaMethod?: "email_otp" | "totp";
+}
+
+export interface TotpSetupData {
+  secret: string;
+  qrDataUri: string;
 }
 
 export const authApi = {
@@ -171,6 +178,44 @@ export const authApi = {
       input,
       { auth: false }
     ),
+
+  // ── Profile ──────────────────────────────────────────────────────────────
+
+  updateProfile: (input: { name?: string; avatar_url?: string }) =>
+    api.patch<{ user: AuthUser }>("/api/auth/profile", input),
+
+  uploadAvatar: async (file: File): Promise<{ user: AuthUser; avatarUrl: string }> => {
+    const token = typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null;
+    const form = new FormData();
+    form.append("avatar", file);
+    const res = await fetch(`${BASE_URL}/api/auth/profile/avatar`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const payload = await res.json();
+    if (!res.ok || payload.ok === false) {
+      const err = payload?.error ?? {};
+      throw new ApiError(err.message || "Upload failed", err.code, res.status);
+    }
+    return payload?.data ?? payload;
+  },
+
+  // ── 2-FA ─────────────────────────────────────────────────────────────────
+
+  totpSetup: () =>
+    api.get<TotpSetupData>("/api/auth/2fa/totp/setup"),
+
+  totpEnable: (input: { secret: string; code: string }) =>
+    api.post<{ twoFaMethod: string; user: AuthUser }>("/api/auth/2fa/totp/enable", input),
+
+  twoFaDisable: () =>
+    api.post<{ twoFaMethod: string; user: AuthUser }>("/api/auth/2fa/disable"),
+
+  // ── Account ───────────────────────────────────────────────────────────────
+
+  deleteAccount: (password: string) =>
+    apiFetch<{ message: string }>("/api/auth/account", { method: "DELETE", body: { password } }),
 };
 
 export function persistSession(bundle: TokenBundle) {

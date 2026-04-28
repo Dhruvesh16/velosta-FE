@@ -23,6 +23,8 @@ export function OtpForm() {
 
   const otpToken = searchParams?.get("token") || "";
   const nextPath = searchParams?.get("next") || "/";
+  const twoFaMethod = searchParams?.get("method") || "email_otp";
+  const isTotp = twoFaMethod === "totp";
 
   useEffect(() => {
     if (!otpToken) {
@@ -174,18 +176,25 @@ export function OtpForm() {
           )}
         </Button>
 
-        <p className="text-center text-[13px]" style={{ color: "rgba(11,31,42,0.55)" }}>
-          Didn&apos;t receive the code?{" "}
-          <button
-            type="button"
-            onClick={handleResend}
-            disabled={resending || countdown > 0}
-            className="font-semibold transition-colors disabled:opacity-40"
-            style={{ color: "#D97757" }}
-          >
-            {countdown > 0 ? `Resend in ${countdown}s` : resending ? "Sending…" : "Resend code"}
-          </button>
-        </p>
+        {!isTotp && (
+          <p className="text-center text-[13px]" style={{ color: "rgba(11,31,42,0.55)" }}>
+            Didn&apos;t receive the code?{" "}
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resending || countdown > 0}
+              className="font-semibold transition-colors disabled:opacity-40"
+              style={{ color: "#D97757" }}
+            >
+              {countdown > 0 ? `Resend in ${countdown}s` : resending ? "Sending…" : "Resend code"}
+            </button>
+          </p>
+        )}
+        {isTotp && (
+          <p className="text-center text-[13px]" style={{ color: "rgba(11,31,42,0.55)" }}>
+            Open your authenticator app and enter the 6-digit code.
+          </p>
+        )}
 
         <p className="text-center text-[12px]" style={{ color: "rgba(11,31,42,0.4)" }}>
           <a href="/sign-in" style={{ color: "#D97757" }}>

@@ -135,9 +135,14 @@ export function AuthForm({ type }: AuthFormProps) {
             email: formData.email,
             password: formData.password,
           });
-          const params = new URLSearchParams({ token: challenge.otpToken });
+          const method = challenge.twoFaMethod || "email_otp";
+          const params = new URLSearchParams({ token: challenge.otpToken, method });
           if (nextPath !== "/") params.set("next", nextPath);
-          toast.info("A verification code has been sent to your email.");
+          if (method === "totp") {
+            toast.info("Enter the code from your authenticator app.");
+          } else {
+            toast.info("A verification code has been sent to your email.");
+          }
           router.push(`/verify-otp?${params.toString()}`);
           return;
         } catch (err: any) {

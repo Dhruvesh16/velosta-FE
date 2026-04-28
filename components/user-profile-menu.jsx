@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect, useContext } from "react";
-import { MapPin, LayoutDashboard, LogOut } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Settings, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/app/utils/context";
 
 export function UserProfileMenu({ isLoggedIn = true }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
+  const router = useRouter();
 
   const { user, setUser, setAccessToken } = useUser();
 
@@ -78,27 +80,19 @@ export function UserProfileMenu({ isLoggedIn = true }) {
 
           {/* Menu Items */}
           <div className="py-2">
-            {/* <button
-              onClick={() => setIsOpen(false)}
-              className="w-full px-4 py-2.5 flex items-center gap-3 text-neutral-700 hover:bg-neutral-50 transition-colors text-sm font-medium"
-            >
-              <MapPin
-                className="h-4 w-4"
-                style={{ color: "var(--color-brand)" }}
-              />
-              <span>My Trips</span>
-            </button>
-
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                setIsOpen(false);
+                router.push("/profile/settings");
+              }}
               className="w-full px-4 py-2.5 flex items-center gap-3 text-neutral-700 hover:bg-neutral-50 transition-colors text-sm font-medium"
             >
-              <LayoutDashboard
+              <Settings
                 className="h-4 w-4"
                 style={{ color: "var(--color-brand)" }}
               />
-              <span>Dashboard</span>
-            </button> */}
+              <span>Account Settings</span>
+            </button>
 
             <button
               onClick={() => {

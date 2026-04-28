@@ -113,23 +113,13 @@ export default function Footer() {
                         About
                       </Link>
                     </li>
-                    <li>
-                      <Link href="/" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>
-                        Careers
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>
-                        Press
-                      </Link>
-                    </li>
                   </ul>
                 )}
                 {group.heading === "Resources" && (
                   <ul className="mt-5 space-y-3.5">
                     <li><Link href="/" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>Help Center</Link></li>
                     <li><Link href="/" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>Travel Guides</Link></li>
-                    <li><Link href="/" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>Blog</Link></li>
+                    <li><Link href="/stories" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>Stories</Link></li>
                   </ul>
                 )}
               </div>

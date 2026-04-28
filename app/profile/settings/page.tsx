@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useUser } from "@/app/utils/context";
-import { authApi, ApiError, clearSession, persistSession, type TotpSetupData } from "@/lib/api";
+import {
+  authApi,
+  ApiError,
+  clearSession,
+  type TotpSetupData,
+  type PasskeyCredential,
+} from "@/lib/api";
 import { toast } from "react-toastify";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -19,7 +24,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -218,14 +222,241 @@ function ProfileSection() {
 // ── 2-FA section ───────────────────────────────────────────────────────────────
 type TwoFaTab = "email_otp" | "totp" | "passkey";
 
+function PasskeyTabContent({ userId }: { userId: string }) {
+  const [credentials, setCredentials] = useState<PasskeyCredential[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  useEffect(() => {
+    authApi.passkeyList()
+      .then((res) => setCredentials(res.credentials))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleRegister = async () => {
+    if (!window.PublicKeyCredential) {
+      toast.error("This browser or device does not support passkeys.");
+      return;
+    }
+    setRegistering(true);
+    try {
+      const { startRegistration } = await import("@simplewebauthn/browser");
+      const { sessionId, options } = await authApi.passkeyRegisterBegin();
+      const credential = await startRegistration({ optionsJSON: options as any });
+      const result = await authApi.passkeyRegisterComplete({
+        session_id: sessionId,
+        credential: credential as unknown as Record<string, unknown>,
+        name: newName.trim() || "Passkey",
+      });
+      setCredentials(result.credentials);
+      setNewName("");
+      toast.success("Passkey registered! You can now sign in with it.");
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError") {
+        toast.error("Passkey registration was cancelled.");
+      } else {
+        toast.error(err instanceof ApiError ? err.message : "Could not register passkey.");
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const result = await authApi.passkeyDelete(id);
+      setCredentials(result.credentials);
+      toast.success("Passkey removed.");
+    } catch (err: any) {
+      toast.error(err instanceof ApiError ? err.message : "Could not remove passkey.");
+    }
+  };
+
+  const handleRename = async (id: string) => {
+    try {
+      const result = await authApi.passkeyRename(id, editName.trim());
+      setCredentials((prev) => prev.map((c) => (c.id === id ? result.credential : c)));
+      setEditingId(null);
+      toast.success("Passkey renamed.");
+    } catch (err: any) {
+      toast.error(err instanceof ApiError ? err.message : "Could not rename.");
+    }
+  };
+
+  const KeyIcon = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z" />
+      <circle cx="16.5" cy="7.5" r=".5" />
+    </svg>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Explainer */}
+      <div
+        className="flex items-start gap-3 rounded-xl p-4"
+        style={{ background: cream, border: "1px solid rgba(11,31,42,0.07)" }}
+      >
+        <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full flex items-center justify-center" style={{ background: "rgba(217,119,87,0.1)" }}>
+          <KeyIcon />
+        </div>
+        <div>
+          <p className="text-sm font-medium" style={{ color: navy }}>Sign in without a password</p>
+          <p className="mt-1 text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>
+            Passkeys use your device's biometrics (Face ID, Touch ID, Windows Hello) or PIN.
+            They work with <strong>1Password</strong>, <strong>Proton Pass</strong>, <strong>iCloud Keychain</strong>, and any FIDO2-compatible manager.
+          </p>
+        </div>
+      </div>
+
+      {/* Existing passkeys */}
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm" style={{ color: "rgba(11,31,42,0.5)" }}>
+          <div className="h-4 w-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: brand }} />
+          Loading passkeys…
+        </div>
+      ) : credentials.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(11,31,42,0.4)" }}>
+            Registered passkeys
+          </p>
+          {credentials.map((cred) => (
+            <div
+              key={cred.id}
+              className="flex items-center gap-3 rounded-xl px-4 py-3"
+              style={{ border: "1px solid rgba(11,31,42,0.09)", background: "#fff" }}
+            >
+              <div className="h-8 w-8 shrink-0 rounded-full flex items-center justify-center" style={{ background: "rgba(34,197,94,0.1)" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                {editingId === cred.id ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="h-7 rounded-lg text-sm py-0"
+                      style={{ borderColor: "rgba(11,31,42,0.15)" }}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRename(cred.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRename(cred.id)}
+                      className="text-xs font-semibold"
+                      style={{ color: brand }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium truncate" style={{ color: navy }}>
+                      {cred.name || "Passkey"}
+                    </p>
+                    <p className="text-xs" style={{ color: "rgba(11,31,42,0.45)" }}>
+                      {cred.deviceType === "multiDevice" ? "Synced passkey" : "Device-bound"} ·{" "}
+                      {new Date(cred.createdAt).toLocaleDateString()}
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {editingId !== cred.id && (
+                  <button
+                    type="button"
+                    onClick={() => { setEditingId(cred.id); setEditName(cred.name || ""); }}
+                    className="p-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                    style={{ color: "rgba(11,31,42,0.4)" }}
+                    aria-label="Rename"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    </svg>
+                  </button>
+                )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                      style={{ color: "rgba(220,38,38,0.7)" }}
+                      aria-label="Remove passkey"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                      </svg>
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-2xl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remove passkey?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        "{cred.name || "Passkey"}" will be removed. You can always register a new one.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="rounded-full">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDelete(cred.id)}
+                        className="rounded-full bg-red-600 hover:bg-red-700"
+                      >
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm" style={{ color: "rgba(11,31,42,0.5)" }}>
+          No passkeys registered yet.
+        </p>
+      )}
+
+      {/* Register new passkey */}
+      <div
+        className="rounded-xl p-4 space-y-3"
+        style={{ border: "1px dashed rgba(11,31,42,0.15)", background: "#fafaf9" }}
+      >
+        <p className="text-sm font-medium" style={{ color: navy }}>
+          {credentials.length > 0 ? "Add another passkey" : "Register a passkey"}
+        </p>
+        <div className="flex gap-3">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="e.g. 1Password on MacBook"
+            maxLength={120}
+            className="rounded-xl flex-1"
+            style={{ borderColor: "rgba(11,31,42,0.15)", color: navy }}
+          />
+          <PrimaryBtn loading={registering} onClick={handleRegister}>
+            {credentials.length > 0 ? "Add passkey" : "Register"}
+          </PrimaryBtn>
+        </div>
+        <p className="text-xs" style={{ color: "rgba(11,31,42,0.45)" }}>
+          Your browser will prompt you to use Face ID, Touch ID, Windows Hello, or your password manager.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function TwoFaSection() {
   const { user, setUser } = useUser();
-  const [activeTab, setActiveTab] = useState<TwoFaTab>(
-    (user?.twoFaMethod as TwoFaTab) || "email_otp"
-  );
-  const [currentMethod, setCurrentMethod] = useState<TwoFaTab>(
-    (user?.twoFaMethod as TwoFaTab) || "email_otp"
-  );
+  const [activeTab, setActiveTab] = useState<TwoFaTab>("email_otp");
 
   // TOTP setup state
   const [totpData, setTotpData] = useState<TotpSetupData | null>(null);
@@ -234,6 +465,8 @@ function TwoFaSection() {
   const [loadingSetup, setLoadingSetup] = useState(false);
   const [enablingTotp, setEnablingTotp] = useState(false);
   const [disabling, setDisabling] = useState(false);
+
+  const currentMethod = (user?.twoFaMethod || "email_otp") as TwoFaTab;
 
   const tabs: { id: TwoFaTab; label: string; icon: React.ReactNode }[] = [
     {
@@ -248,7 +481,7 @@ function TwoFaSection() {
     },
     {
       id: "totp",
-      label: "Authenticator App",
+      label: "Authenticator",
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="5" y="2" width="14" height="20" rx="2" />
@@ -293,7 +526,6 @@ function TwoFaSection() {
     setEnablingTotp(true);
     try {
       const res = await authApi.totpEnable({ secret: totpData.secret, code: totpCode });
-      setCurrentMethod("totp");
       setUser(res.user as any);
       if (typeof window !== "undefined") {
         window.localStorage.setItem("userData", JSON.stringify(res.user));
@@ -310,14 +542,12 @@ function TwoFaSection() {
     setDisabling(true);
     try {
       const res = await authApi.twoFaDisable();
-      setCurrentMethod("email_otp");
-      setActiveTab("email_otp");
-      setTotpData(null);
-      setTotpCode("");
       setUser(res.user as any);
       if (typeof window !== "undefined") {
         window.localStorage.setItem("userData", JSON.stringify(res.user));
       }
+      setTotpData(null);
+      setTotpCode("");
       toast.success("Switched back to email OTP.");
     } catch (err: any) {
       toast.error(err instanceof ApiError ? err.message : "Could not disable.");
@@ -335,12 +565,12 @@ function TwoFaSection() {
 
   return (
     <SectionCard
-      title="Two-Factor Authentication"
-      description="Add an extra layer of security to your account."
+      title="Sign-in Methods"
+      description="Choose how you verify your identity when signing in."
     >
       {/* Current method badge */}
       <div className="mb-5 flex items-center gap-2">
-        <span className="text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>Active method:</span>
+        <span className="text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>Active:</span>
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
           style={{
@@ -348,7 +578,7 @@ function TwoFaSection() {
             color: currentMethod === "email_otp" ? brand : "#16a34a",
           }}
         >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: "currentColor" }} />
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
           {currentMethod === "email_otp" ? "Email OTP" : currentMethod === "totp" ? "Authenticator App" : "Passkey"}
         </span>
       </div>
@@ -373,7 +603,7 @@ function TwoFaSection() {
         ))}
       </div>
 
-      {/* Tab content */}
+      {/* ── Email OTP tab ── */}
       {activeTab === "email_otp" && (
         <div className="space-y-4">
           <div
@@ -381,8 +611,8 @@ function TwoFaSection() {
             style={{ background: cream, border: "1px solid rgba(11,31,42,0.07)" }}
           >
             <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full flex items-center justify-center" style={{ background: "rgba(217,119,87,0.12)" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={brand} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.68h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17z" />
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={brand} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
               </svg>
             </div>
             <div>
@@ -390,183 +620,83 @@ function TwoFaSection() {
                 Email OTP {currentMethod === "email_otp" && <span className="ml-2 text-xs font-normal" style={{ color: brand }}>✓ Active</span>}
               </p>
               <p className="mt-1 text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>
-                A one-time passcode is sent to <strong>{user?.email}</strong> each time you sign in. This is the default and requires no extra setup.
+                A one-time code is emailed to <strong>{user?.email}</strong> on every sign-in. No extra setup needed.
               </p>
             </div>
           </div>
           {currentMethod === "totp" && (
-            <button
-              type="button"
-              onClick={handleDisable}
-              disabled={disabling}
-              className="text-sm font-medium underline underline-offset-2 disabled:opacity-60"
-              style={{ color: brand }}
-            >
+            <button type="button" onClick={handleDisable} disabled={disabling} className="text-sm font-medium underline underline-offset-2 disabled:opacity-60" style={{ color: brand }}>
               {disabling ? "Switching…" : "Switch back to Email OTP"}
             </button>
           )}
         </div>
       )}
 
+      {/* ── Authenticator tab ── */}
       {activeTab === "totp" && (
         <div className="space-y-5">
           {currentMethod === "totp" ? (
-            <div
-              className="flex items-start gap-3 rounded-xl p-4"
-              style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)" }}
-            >
+            <div className="flex items-start gap-3 rounded-xl p-4" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)" }}>
               <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full flex items-center justify-center bg-green-100">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
               </div>
               <div>
                 <p className="text-sm font-semibold text-green-800">Authenticator app is active</p>
-                <p className="mt-1 text-sm text-green-700">
-                  You're using an authenticator app for 2-FA. To switch to a new app or remove it, use the button below.
-                </p>
+                <p className="mt-1 text-sm text-green-700">You're protected with a TOTP app. Remove it below to switch methods.</p>
               </div>
             </div>
           ) : (
             <>
               <p className="text-sm" style={{ color: "rgba(11,31,42,0.6)" }}>
-                Use Google Authenticator, Authy, or any TOTP-compatible app. Scan the QR code or enter the secret manually.
+                Use Google Authenticator, Authy, or any TOTP-compatible app. Scan the QR or enter the secret manually.
               </p>
-
               {loadingSetup ? (
                 <div className="flex items-center justify-center h-32">
                   <div className="h-7 w-7 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: brand }} />
                 </div>
               ) : totpData ? (
                 <div className="space-y-5">
-                  {/* QR Code */}
                   <div className="flex flex-col sm:flex-row items-start gap-6">
-                    <div
-                      className="shrink-0 rounded-2xl p-3 border"
-                      style={{ background: "#fff", borderColor: "rgba(11,31,42,0.1)" }}
-                    >
-                      <img
-                        src={totpData.qrDataUri}
-                        alt="TOTP QR Code"
-                        width={160}
-                        height={160}
-                        className="rounded-lg"
-                      />
+                    <div className="shrink-0 rounded-2xl p-3 border" style={{ background: "#fff", borderColor: "rgba(11,31,42,0.1)" }}>
+                      <img src={totpData.qrDataUri} alt="TOTP QR" width={160} height={160} className="rounded-lg" />
                     </div>
-
                     <div className="flex-1 space-y-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "rgba(11,31,42,0.4)" }}>
-                          Secret key (manual entry)
-                        </p>
-                        <div
-                          className="flex items-center gap-2 rounded-xl p-3"
-                          style={{ background: cream, border: "1px solid rgba(11,31,42,0.1)" }}
-                        >
-                          <code className="flex-1 text-sm font-mono break-all select-all" style={{ color: navy }}>
-                            {totpData.secret}
-                          </code>
-                          <button
-                            type="button"
-                            onClick={copySecret}
-                            className="shrink-0 rounded-lg p-1.5 transition-colors"
-                            style={{ color: secretCopied ? "#16a34a" : brand }}
-                            aria-label="Copy secret"
-                          >
-                            {secretCopied ? (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M20 6 9 17l-5-5" />
-                              </svg>
-                            ) : (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
+                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "rgba(11,31,42,0.4)" }}>Secret key</p>
+                      <div className="flex items-center gap-2 rounded-xl p-3" style={{ background: cream, border: "1px solid rgba(11,31,42,0.1)" }}>
+                        <code className="flex-1 text-sm font-mono break-all select-all" style={{ color: navy }}>{totpData.secret}</code>
+                        <button type="button" onClick={copySecret} className="shrink-0 rounded-lg p-1.5" style={{ color: secretCopied ? "#16a34a" : brand }} aria-label="Copy">
+                          {secretCopied
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                          }
+                        </button>
                       </div>
-
-                      <p className="text-xs" style={{ color: "rgba(11,31,42,0.45)" }}>
-                        After scanning, enter the 6-digit code your app shows to verify and enable.
-                      </p>
+                      <p className="text-xs" style={{ color: "rgba(11,31,42,0.45)" }}>After scanning, enter the 6-digit code to verify and enable.</p>
                     </div>
                   </div>
-
-                  {/* Verify code */}
                   <div>
-                    <Label className="text-sm font-medium mb-1.5 block" style={{ color: navy }}>
-                      Verification code
-                    </Label>
+                    <Label className="text-sm font-medium mb-1.5 block" style={{ color: navy }}>Verification code</Label>
                     <div className="flex gap-3">
-                      <Input
-                        value={totpCode}
-                        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        placeholder="000000"
-                        maxLength={6}
-                        inputMode="numeric"
-                        className="rounded-xl font-mono text-center text-xl tracking-[0.5em] max-w-[160px]"
-                        style={{ borderColor: "rgba(11,31,42,0.15)", color: navy }}
-                      />
-                      <PrimaryBtn
-                        loading={enablingTotp}
-                        disabled={totpCode.length !== 6}
-                        onClick={handleEnableTotp}
-                      >
-                        Enable
-                      </PrimaryBtn>
+                      <Input value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" maxLength={6} inputMode="numeric" className="rounded-xl font-mono text-center text-xl tracking-[0.5em] max-w-[160px]" style={{ borderColor: "rgba(11,31,42,0.15)", color: navy }} />
+                      <PrimaryBtn loading={enablingTotp} disabled={totpCode.length !== 6} onClick={handleEnableTotp}>Enable</PrimaryBtn>
                     </div>
                   </div>
                 </div>
               ) : (
-                <button type="button" onClick={loadTotpSetup} className="text-sm underline" style={{ color: brand }}>
-                  Load setup
-                </button>
+                <button type="button" onClick={loadTotpSetup} className="text-sm underline" style={{ color: brand }}>Load setup</button>
               )}
             </>
           )}
-
           {currentMethod === "totp" && (
-            <button
-              type="button"
-              onClick={handleDisable}
-              disabled={disabling}
-              className="text-sm font-medium underline underline-offset-2 disabled:opacity-60"
-              style={{ color: "rgba(11,31,42,0.5)" }}
-            >
+            <button type="button" onClick={handleDisable} disabled={disabling} className="text-sm font-medium underline underline-offset-2 disabled:opacity-60" style={{ color: "rgba(11,31,42,0.5)" }}>
               {disabling ? "Disabling…" : "Remove authenticator app"}
             </button>
           )}
         </div>
       )}
 
-      {activeTab === "passkey" && (
-        <div
-          className="flex items-start gap-3 rounded-xl p-4"
-          style={{ background: cream, border: "1px solid rgba(11,31,42,0.07)" }}
-        >
-          <div className="mt-0.5 h-8 w-8 shrink-0 rounded-full flex items-center justify-center" style={{ background: "rgba(11,31,42,0.06)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={navy} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-              <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z" />
-              <circle cx="16.5" cy="7.5" r=".5" />
-            </svg>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium" style={{ color: navy }}>Passkey</p>
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                style={{ background: "rgba(11,31,42,0.07)", color: "rgba(11,31,42,0.5)" }}
-              >
-                Coming soon
-              </span>
-            </div>
-            <p className="mt-1 text-sm" style={{ color: "rgba(11,31,42,0.55)" }}>
-              Sign in with Face ID, Touch ID, or your device PIN — no passwords or codes needed. Passkey support is coming soon to Velosta.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* ── Passkey tab ── */}
+      {activeTab === "passkey" && user && <PasskeyTabContent userId={user.id} />}
     </SectionCard>
   );
 }

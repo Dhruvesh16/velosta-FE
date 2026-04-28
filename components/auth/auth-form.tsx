@@ -15,6 +15,65 @@ import "react-toastify/dist/ReactToastify.css";
 import { authApi, persistSession, ApiError } from "@/lib/api";
 import Link from "next/link";
 
+// ── Passkey sign-in button (lazy-loads @simplewebauthn/browser) ───────────────
+function PasskeySignInButton({ nextPath }: { nextPath: string }) {
+  const [loading, setLoading] = useState(false);
+  const { setUser, setAccessToken } = useUser();
+  const router = useRouter();
+
+  const handlePasskeySignIn = async () => {
+    setLoading(true);
+    try {
+      const { startAuthentication } = await import("@simplewebauthn/browser");
+      const { sessionId, options } = await authApi.passkeyLoginBegin();
+      const credential = await startAuthentication({ optionsJSON: options as any });
+      const bundle = await authApi.passkeyLoginComplete({
+        session_id: sessionId,
+        credential: credential as unknown as Record<string, unknown>,
+      });
+      persistSession(bundle);
+      setAccessToken(bundle.access_token);
+      setUser(bundle.user);
+      toast.success("Signed in with passkey");
+      router.push(nextPath || "/");
+    } catch (err: any) {
+      if (err?.name === "NotAllowedError") {
+        toast.error("Passkey sign-in was cancelled.");
+      } else if (err instanceof ApiError) {
+        toast.error(err.message);
+      } else {
+        toast.error("Passkey sign-in failed. Try email instead.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handlePasskeySignIn}
+      disabled={loading}
+      className="group w-full h-11 flex items-center justify-center gap-2.5 rounded-full border font-semibold text-[13.5px] transition-all duration-200 hover:shadow-sm disabled:opacity-60"
+      style={{
+        borderColor: "rgba(11,31,42,0.15)",
+        color: "#0B1F2A",
+        background: "#fff",
+      }}
+    >
+      {loading ? (
+        <div className="h-4 w-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "#D97757" }} />
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z" />
+          <circle cx="16.5" cy="7.5" r=".5" />
+        </svg>
+      )}
+      {loading ? "Verifying…" : "Sign in with Passkey"}
+    </button>
+  );
+}
+
 interface AuthFormProps {
   type: "signin" | "signup";
 }
@@ -454,6 +513,11 @@ export function AuthForm({ type }: AuthFormProps) {
             shape="pill"
           />
         </div>
+
+        {/* PASSKEY LOGIN — only on sign-in, only if browser supports WebAuthn */}
+        {type === "signin" && typeof window !== "undefined" && (window as any).PublicKeyCredential && (
+          <PasskeySignInButton nextPath={nextPath} />
+        )}
 
         <p
           className="mt-2 text-center text-[13px]"

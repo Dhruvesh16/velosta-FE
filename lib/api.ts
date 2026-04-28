@@ -138,6 +138,13 @@ export interface TotpSetupData {
   qrDataUri: string;
 }
 
+export interface PasskeyCredential {
+  id: string;
+  name: string | null;
+  deviceType: string;
+  createdAt: string;
+}
+
 export const authApi = {
   signup: (input: {
     email: string;
@@ -216,6 +223,48 @@ export const authApi = {
 
   deleteAccount: (password: string) =>
     apiFetch<{ message: string }>("/api/auth/account", { method: "DELETE", body: { password } }),
+
+  // ── Passkey (WebAuthn) ────────────────────────────────────────────────────
+
+  passkeyRegisterBegin: () =>
+    api.post<{ sessionId: string; options: Record<string, unknown> }>("/api/auth/passkey/register/begin"),
+
+  passkeyRegisterComplete: (input: {
+    session_id: string;
+    credential: Record<string, unknown>;
+    name?: string;
+  }) =>
+    api.post<{ credential: PasskeyCredential; credentials: PasskeyCredential[] }>(
+      "/api/auth/passkey/register/complete",
+      input,
+    ),
+
+  passkeyList: () =>
+    api.get<{ credentials: PasskeyCredential[] }>("/api/auth/passkey/credentials"),
+
+  passkeyRename: (credentialId: string, name: string) =>
+    api.patch<{ credential: PasskeyCredential }>(
+      `/api/auth/passkey/credentials/${encodeURIComponent(credentialId)}`,
+      { name },
+    ),
+
+  passkeyDelete: (credentialId: string) =>
+    api.delete<{ credentials: PasskeyCredential[] }>(
+      `/api/auth/passkey/credentials/${encodeURIComponent(credentialId)}`,
+    ),
+
+  passkeyLoginBegin: () =>
+    api.post<{ sessionId: string; options: Record<string, unknown> }>(
+      "/api/auth/passkey/login/begin",
+      {},
+      { auth: false },
+    ),
+
+  passkeyLoginComplete: (input: {
+    session_id: string;
+    credential: Record<string, unknown>;
+  }) =>
+    api.post<TokenBundle>("/api/auth/passkey/login/complete", input, { auth: false }),
 };
 
 export function persistSession(bundle: TokenBundle) {

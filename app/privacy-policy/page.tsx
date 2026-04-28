@@ -94,7 +94,7 @@ export default function PrivacyPolicyPage() {
             .
           </p>
 
-          <h2>6. Cookies &amp; Tracking</h2>
+          <h2 id="cookies">6. Cookies &amp; Tracking</h2>
           <p>
             We use cookies and similar technologies to keep you signed in and to understand how the
             platform is used. You can disable cookies in your browser settings, though some features

@@ -1604,15 +1604,19 @@ export default function Page() {
               &copy; 2026 Velosta. Crafted for slower journeys.
             </p>
             <div className="flex gap-6 text-[12px]" style={{ color: "rgba(245,239,230,0.4)" }}>
-              {["Privacy", "Terms", "Cookies"].map((l) => (
+              {[
+                { label: "Privacy", href: "/privacy-policy" },
+                { label: "Terms", href: "/terms-of-service" },
+                { label: "Cookies", href: "/privacy-policy#cookies" },
+              ].map(({ label, href }) => (
                 <a
-                  key={l}
-                  href="#"
+                  key={label}
+                  href={href}
                   className="transition-colors duration-300"
                   onMouseEnter={(e) => (e.currentTarget.style.color = c.coral)}
                   onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(245,239,230,0.4)")}
                 >
-                  {l}
+                  {label}
                 </a>
               ))}
             </div>

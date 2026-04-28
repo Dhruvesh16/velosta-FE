@@ -3,7 +3,7 @@
 import { Playfair_Display } from "next/font/google";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Instagram, Twitter, Youtube } from "lucide-react";
+import { Instagram, Youtube } from "lucide-react";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -62,13 +62,15 @@ export default function Footer() {
 
             <div className="mt-7 flex items-center gap-3">
               {[
-                { Icon: Instagram, href: "#", label: "Instagram" },
-                { Icon: Twitter, href: "#", label: "X" },
-                { Icon: Youtube, href: "#", label: "YouTube" },
-              ].map(({ Icon, href, label }) => (
+                { href: "https://www.instagram.com/velostatravel/", label: "Instagram", content: <Instagram className="h-4 w-4" /> },
+                { href: "https://x.com/VelostaTravel", label: "X", content: <span className="text-[13px] font-semibold leading-none">X</span> },
+                { href: "https://youtube.com/@velostatravel", label: "YouTube", content: <Youtube className="h-4 w-4" /> },
+              ].map(({ href, label, content }) => (
                 <motion.a
                   key={label}
                   href={href}
+                  target="_blank"
+                  rel="noreferrer"
                   aria-label={label}
                   whileHover={{ y: -3 }}
                   transition={{ duration: 0.2 }}
@@ -88,9 +90,9 @@ export default function Footer() {
                     e.currentTarget.style.borderColor = "rgba(245,239,230,0.1)";
                     e.currentTarget.style.color = "rgba(245,239,230,0.7)";
                   }}
-                >
-                  <Icon className="h-4 w-4" />
-                </motion.a>
+                  >
+                    {content}
+                  </motion.a>
               ))}
             </div>
           </div>

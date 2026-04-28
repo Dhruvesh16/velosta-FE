@@ -22,7 +22,7 @@ export default function Footer() {
               HITEC City, Hyderabad, Telangana 500081, India
             </p>
             <p className="mt-2 text-sm text-[var(--color-navy)]/70">
-              hello@velosta.com
+              support@velosta.com
             </p>
           </div>
 

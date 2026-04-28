@@ -21,7 +21,7 @@ const REVIEWS: Review[] = [
   {
     name: "Daniel Cruz",
     role: "Travel Blogger",
-    text: "As a blogger, Velosta’s detailed trip plans save me hours of research. Plus, the ‘How Not to Travel’ community gives me hilarious, honest travel fails that inspire my next stories.",
+    text: "As a blogger, Velosta’s detailed trip plans save me hours of research. Plus, the ‘How n̶o̶t̶ to Travel’ community gives me hilarious, honest travel fails that inspire my next stories.",
     avatar: "/images/avatars/user-2.jpg",
     alt: "Traveler with camera laughing",
   },
@@ -35,7 +35,7 @@ const REVIEWS: Review[] = [
   {
     name: "Karan Mehta",
     role: "Backpacker & Community Member",
-    text: "The ‘How Not to Travel’ section is gold — learning from other travelers’ real mistakes is more useful than any guidebook. Velosta feels like a smart friend who knows what you’d actually enjoy.",
+    text: "The ‘How n̶o̶t̶ to Travel’ section is gold — learning from other travelers’ real mistakes is more useful than any guidebook. Velosta feels like a smart friend who knows what you’d actually enjoy.",
     avatar: "/images/avatars/user-4.jpg",
     alt: "Man with travel bag smiling outdoors",
   },

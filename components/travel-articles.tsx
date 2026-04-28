@@ -163,7 +163,7 @@ export default function TravelArticles() {
     <section className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6 flex items-center justify-between gap-4">
         <h2 className="text-2xl font-semibold text-[color:var(--color-navy)]">
-          How Not To Travel
+          How n̶o̶t̶ To Travel
         </h2>
         {/* <div className="flex items-center gap-3">
           <a href="/how-not-travel/new-blog">

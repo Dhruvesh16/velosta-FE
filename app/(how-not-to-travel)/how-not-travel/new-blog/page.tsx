@@ -19,7 +19,7 @@ export default function NewTravelBlogPage() {
             heading="Share a Travel Mishap"
             subheading="Warn fellow travellers — your honest story about what went wrong could save someone else's trip."
             accentVar="--color-teal"
-            contextLabel="How Not to Travel"
+            contextLabel="How n̶o̶t̶ to Travel"
           />
         </div>
         <Footer />

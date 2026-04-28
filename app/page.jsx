@@ -12,10 +12,6 @@ import {
   Compass,
   Wallet,
   HeartHandshake,
-  Instagram,
-  Twitter,
-  Youtube,
-  Mail,
   Briefcase,
   ShieldCheck,
   Headphones,
@@ -25,6 +21,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "@/app/utils/context";
 import Navbar from "@/components/navbar";
+import Footer from "@/components/footer";
 
 // Ambient 3D — client-only, lazy
 const ParticleField = dynamic(
@@ -1288,7 +1285,7 @@ export default function Page() {
               >
                 How{" "}
                 <span style={{ fontStyle: "italic", color: "rgba(11,31,42,0.7)" }}>
-                  not to travel
+                  n̶o̶t̶ to travel
                 </span>
               </h2>
               <p
@@ -1417,212 +1414,7 @@ export default function Page() {
         </div>
       </section>
 
-      {/* ────────── Footer — Deep Navy ────────── */}
-      <motion.footer
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
-        className="relative overflow-hidden"
-        style={{ backgroundColor: c.navy }}
-      >
-        {/* Decorative — soft coral glow bottom-right */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-40 -bottom-40 h-[520px] w-[520px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(50% 50% at 50% 50%, rgba(217,119,87,0.16) 0%, rgba(217,119,87,0) 70%)",
-            filter: "blur(40px)",
-          }}
-        />
-        {/* Decorative — subtle teal glow top-left */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(50% 50% at 50% 50%, rgba(47,111,115,0.18) 0%, rgba(47,111,115,0) 70%)",
-            filter: "blur(40px)",
-          }}
-        />
-
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-24 sm:pt-28">
-          {/* Newsletter band */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="grid grid-cols-1 items-center gap-10 rounded-3xl p-8 sm:p-12 lg:grid-cols-[1.1fr_0.9fr]"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(245,239,230,0.06) 0%, rgba(47,111,115,0.08) 100%)",
-              border: "1px solid rgba(245,239,230,0.08)",
-            }}
-          >
-            <div>
-              <p
-                className="mb-3 text-[11px] font-semibold uppercase tracking-[0.28em]"
-                style={{ color: c.tealLight }}
-              >
-                Field Notes
-              </p>
-              <h3
-                className={`${playfair.className} text-[clamp(1.6rem,3.4vw,2.4rem)] leading-[1.1] tracking-[-0.015em]`}
-                style={{ color: c.sand }}
-              >
-                Quiet stories, once a month.
-              </h3>
-              <p
-                className="mt-3 max-w-md text-[14px] leading-[1.7]"
-                style={{ color: "rgba(245,239,230,0.55)" }}
-              >
-                Slow itineraries, hidden corners, and the kind of travel writing
-                we wish we&apos;d found sooner.
-              </p>
-            </div>
-            <form
-              onSubmit={(e) => e.preventDefault()}
-              className="flex w-full flex-col gap-3 sm:flex-row"
-            >
-              <div
-                className="flex flex-1 items-center gap-3 rounded-full px-5"
-                style={{
-                  backgroundColor: "rgba(245,239,230,0.08)",
-                  border: "1px solid rgba(245,239,230,0.12)",
-                }}
-              >
-                <Mail className="h-4 w-4 shrink-0" style={{ color: "rgba(245,239,230,0.5)" }} />
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  className="w-full bg-transparent py-3.5 text-[14px] outline-none"
-                  style={{ color: c.sand }}
-                />
-              </div>
-              <motion.button
-                type="submit"
-                whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-semibold"
-                style={{
-                  backgroundColor: c.coral,
-                  color: "#fff",
-                  boxShadow: "0 12px 28px -10px rgba(217,119,87,0.55)",
-                }}
-              >
-                Subscribe
-                <ArrowRight className="h-3.5 w-3.5" />
-              </motion.button>
-            </form>
-          </motion.div>
-
-          {/* Main footer grid */}
-          <div className="mt-20 flex flex-col justify-between gap-16 md:flex-row md:items-start">
-            <div className="max-w-sm">
-              <p className={`${playfair.className} text-3xl tracking-tight`} style={{ color: c.sand }}>
-                Velosta
-              </p>
-              <p
-                className={`${playfair.className} mt-4 text-[17px] italic leading-relaxed`}
-                style={{ color: "rgba(245,239,230,0.45)" }}
-              >
-                Travel planning for people
-                <br />
-                who care how it feels.
-              </p>
-
-              {/* Social icons */}
-              <div className="mt-7 flex items-center gap-3">
-                {[
-                  { Icon: Instagram, href: "#", label: "Instagram" },
-                  { Icon: Twitter, href: "#", label: "X" },
-                  { Icon: Youtube, href: "#", label: "YouTube" },
-                ].map(({ Icon, href, label }) => (
-                  <motion.a
-                    key={label}
-                    href={href}
-                    aria-label={label}
-                    whileHover={{ y: -3 }}
-                    transition={{ duration: 0.2 }}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-300"
-                    style={{
-                      backgroundColor: "rgba(245,239,230,0.06)",
-                      border: "1px solid rgba(245,239,230,0.1)",
-                      color: "rgba(245,239,230,0.7)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = c.coral;
-                      e.currentTarget.style.borderColor = c.coral;
-                      e.currentTarget.style.color = "#fff";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "rgba(245,239,230,0.06)";
-                      e.currentTarget.style.borderColor = "rgba(245,239,230,0.1)";
-                      e.currentTarget.style.color = "rgba(245,239,230,0.7)";
-                    }}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </motion.a>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-16 sm:gap-20">
-              {[
-                { heading: "Company", links: ["About", "Careers", "Press"] },
-                { heading: "Resources", links: ["Help Center", "Travel Guides", "Blog"] },
-                { heading: "Product", links: ["AI Planner", "Cost Splitter", "How Not to Travel"] },
-              ].map((group) => (
-                <div key={group.heading}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.25em]" style={{ color: "rgba(245,239,230,0.4)" }}>
-                    {group.heading}
-                  </p>
-                  <ul className="mt-5 space-y-3.5">
-                    {group.links.map((link) => (
-                      <li key={link}>
-                        <a
-                          href="#"
-                          className="text-sm transition-colors duration-300"
-                          style={{ color: "rgba(245,239,230,0.6)" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = c.coral)}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(245,239,230,0.6)")}
-                        >
-                          {link}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-20 flex flex-col gap-4 border-t pb-10 pt-8 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "rgba(245,239,230,0.08)" }}>
-            <p className="text-[12px]" style={{ color: "rgba(245,239,230,0.4)" }}>
-              &copy; 2026 Velosta. Crafted for slower journeys.
-            </p>
-            <div className="flex gap-6 text-[12px]" style={{ color: "rgba(245,239,230,0.4)" }}>
-              {[
-                { label: "Privacy", href: "/privacy-policy" },
-                { label: "Terms", href: "/terms-of-service" },
-                { label: "Cookies", href: "/privacy-policy#cookies" },
-              ].map(({ label, href }) => (
-                <a
-                  key={label}
-                  href={href}
-                  className="transition-colors duration-300"
-                  onMouseEnter={(e) => (e.currentTarget.style.color = c.coral)}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(245,239,230,0.4)")}
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
-      </motion.footer>
+      <Footer />
 
       {/* ────────── Mobile Sticky CTA ────────── */}
       <motion.div

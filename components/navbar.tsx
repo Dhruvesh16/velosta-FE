@@ -39,7 +39,7 @@ const navLinks = [
   { href: "/#explore", label: "Explore" },
   { href: "/#journeys", label: "Journeys" },
   { href: "/velosta-ai", label: "Velosta AI" },
-  { href: "/how-not-travel", label: "How Not to Travel" },
+  { href: "/how-not-travel", label: "How n̶o̶t̶ to Travel" },
   { href: "/stories", label: "Stories" },
   { href: "/expense-tracker", label: "Expense Tracker" },
 ];

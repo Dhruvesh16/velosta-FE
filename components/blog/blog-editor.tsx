@@ -242,7 +242,7 @@ export default function BlogEditor({
       };
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/create-blog`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/create-blog`,
         {
           method: "POST",
           headers: {

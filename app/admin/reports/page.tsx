@@ -99,7 +99,7 @@ export default function AdminReportsPage() {
       try {
         const params = statusFilter !== "all" ? `?status=${statusFilter}` : "";
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/admin/reports${params}`,
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/admin/reports${params}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.status === 401) {
@@ -127,7 +127,7 @@ export default function AdminReportsPage() {
     setActionLoading(true);
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/admin/reports/${actionDialog.report.id}/action`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/admin/reports/${actionDialog.report.id}/action`,
         {
           method: "POST",
           headers: {

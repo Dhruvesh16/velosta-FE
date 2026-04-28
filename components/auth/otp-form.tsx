@@ -71,6 +71,15 @@ export function OtpForm() {
     setLoading(true);
     try {
       const bundle = await authApi.verifyOtp({ otp_token: otpToken, otp });
+
+      // Admin OTP: store admin token separately and skip user session
+      if ((bundle as any).isAdmin) {
+        localStorage.setItem("adminToken", (bundle as any).adminToken);
+        toast.success("Welcome, Admin");
+        router.push(nextPath || "/admin/reports");
+        return;
+      }
+
       persistSession(bundle);
       setAccessToken(bundle.access_token);
       setUser(bundle.user);

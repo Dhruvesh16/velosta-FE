@@ -98,7 +98,7 @@ export function BlogDetail({ blog }: BlogDetailProps) {
           : null;
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/delete-blog/${blog.id}`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/delete-blog/${blog.id}`,
         {
           method: "DELETE",
           headers: {
@@ -154,7 +154,7 @@ export function BlogDetail({ blog }: BlogDetailProps) {
           : null;
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/${blog.id}/report`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/${blog.id}/report`,
         {
           method: "POST",
           headers: {

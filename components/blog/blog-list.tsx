@@ -145,7 +145,7 @@ export default function BlogList() {
       try {
         const token = localStorage.getItem("accessToken");
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/all-blogs`,
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/all-blogs`,
           {
             headers: token
               ? {

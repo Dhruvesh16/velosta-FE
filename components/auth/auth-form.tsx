@@ -107,18 +107,26 @@ export function AuthForm({ type }: AuthFormProps) {
         toast.success("Welcome to Velosta! Check your inbox for a welcome email.");
         router.push(nextPath);
       } else {
-        // Try admin login first — admin gets a direct JWT, no OTP required
+        // Try admin login first — now also returns OTP challenge
+        let adminOtpToken: string | null = null;
         try {
-          const adminBundle = await authApi.adminLogin({
+          const adminResult = await authApi.adminLogin({
             email: formData.email,
             password: formData.password,
           });
-          localStorage.setItem("adminToken", adminBundle.accessToken);
-          toast.success("Welcome, Admin");
-          router.push("/admin/reports");
-          return;
+          // adminLogin returns OTP challenge for admin
+          if ((adminResult as any).otpToken) {
+            adminOtpToken = (adminResult as any).otpToken;
+          }
         } catch {
-          // Not admin credentials — proceed with regular login (OTP flow)
+          // Not admin credentials — proceed with regular login
+        }
+
+        if (adminOtpToken) {
+          const params = new URLSearchParams({ token: adminOtpToken, next: "/admin/reports" });
+          toast.info("A verification code has been sent to your admin email.");
+          router.push(`/verify-otp?${params.toString()}`);
+          return;
         }
 
         // Regular user login — returns an OTP challenge

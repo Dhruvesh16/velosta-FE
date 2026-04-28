@@ -26,7 +26,7 @@ export default function AdminLoginPage() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_URL}/api/auth/admin/login`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/admin/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -43,14 +43,15 @@ export default function AdminLoginPage() {
         return;
       }
 
-      const token = json?.data?.accessToken ?? json?.accessToken;
-      if (!token) {
-        setError("Authentication failed. No token received.");
+      // Admin login now returns an OTP challenge — redirect to OTP verification
+      const otpToken = json?.data?.otpToken ?? json?.otpToken;
+      if (otpToken) {
+        const params = new URLSearchParams({ token: otpToken, next: "/admin/reports" });
+        router.replace(`/verify-otp?${params.toString()}`);
         return;
       }
 
-      localStorage.setItem("adminToken", token);
-      router.replace("/admin/reports");
+      setError("Authentication failed. Please try again.");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

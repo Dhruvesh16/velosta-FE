@@ -166,7 +166,7 @@ export const authApi = {
   me: () => api.get<{ user: AuthUser }>("/api/auth/me"),
 
   adminLogin: (input: { email: string; password: string }) =>
-    api.post<{ accessToken: string; tokenType: string }>(
+    api.post<OtpChallenge>(
       "/api/auth/admin/login",
       input,
       { auth: false }

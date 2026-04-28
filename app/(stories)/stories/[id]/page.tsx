@@ -14,7 +14,7 @@ export default async function StoryPage({ params }: Props) {
   const { id } = await params;
 
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_URL}/api/travel-blog/view-blog/${id}`
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/view-blog/${id}`
   );
   if (!res.ok) return notFound();
 

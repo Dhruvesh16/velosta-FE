@@ -88,8 +88,8 @@ export default function PrivacyPolicyPage() {
             We retain your personal data for as long as your account is active or as needed to provide
             you services. You may request deletion of your account and associated data by contacting us
             at{" "}
-            <a href="mailto:travelwithvelosta@gmail.com" className="text-[#D97757] no-underline hover:underline">
-              travelwithvelosta@gmail.com
+            <a href="mailto:hello@velosta.com" className="text-[#D97757] no-underline hover:underline">
+              hello@velosta.com
             </a>
             .
           </p>
@@ -120,8 +120,8 @@ export default function PrivacyPolicyPage() {
           <p>
             Depending on your location, you may have rights to access, correct, delete, or restrict
             processing of your personal data. To exercise these rights, contact us at{" "}
-            <a href="mailto:travelwithvelosta@gmail.com" className="text-[#D97757] no-underline hover:underline">
-              travelwithvelosta@gmail.com
+            <a href="mailto:hello@velosta.com" className="text-[#D97757] no-underline hover:underline">
+              hello@velosta.com
             </a>
             .
           </p>
@@ -136,8 +136,8 @@ export default function PrivacyPolicyPage() {
           <h2>11. Contact Us</h2>
           <p>
             For questions about this Privacy Policy, please contact us at{" "}
-            <a href="mailto:travelwithvelosta@gmail.com" className="text-[#D97757] no-underline hover:underline">
-              travelwithvelosta@gmail.com
+            <a href="mailto:hello@velosta.com" className="text-[#D97757] no-underline hover:underline">
+              hello@velosta.com
             </a>
             .
           </p>

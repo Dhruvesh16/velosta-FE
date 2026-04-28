@@ -44,8 +44,8 @@ export default function TermsOfServicePage() {
             <li>
               You are responsible for all activity that occurs under your account. Notify us immediately
               at{" "}
-              <a href="mailto:travelwithvelosta@gmail.com" className="text-[#D97757] no-underline hover:underline">
-                travelwithvelosta@gmail.com
+              <a href="mailto:hello@velosta.com" className="text-[#D97757] no-underline hover:underline">
+                hello@velosta.com
               </a>{" "}
               if you suspect unauthorized access.
             </li>
@@ -136,8 +136,8 @@ export default function TermsOfServicePage() {
           <h2>13. Contact Us</h2>
           <p>
             If you have questions about these Terms, please contact us at{" "}
-            <a href="mailto:travelwithvelosta@gmail.com" className="text-[#D97757] no-underline hover:underline">
-              travelwithvelosta@gmail.com
+            <a href="mailto:hello@velosta.com" className="text-[#D97757] no-underline hover:underline">
+              hello@velosta.com
             </a>
             .
           </p>

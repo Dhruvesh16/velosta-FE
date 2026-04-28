@@ -6,17 +6,6 @@ export default function Footer() {
     <footer className="mt-16 w-full bg-[var(--color-cream)]">
       {/* Top prompt row */}
       <div className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8">
-        <div className="flex items-center justify-between py-10 text-sm text-[var(--color-navy)]">
-          <p>
-            Write to us at: {"   "}
-            <a
-              className="font-semibold text-[var(--color-brand)]"
-              href="tel:18004536744"
-            >
-              travelwithvelosta@gmail.com
-            </a>
-          </p>
-        </div>
       </div>
 
       <hr className="border-black/10" />
@@ -33,7 +22,7 @@ export default function Footer() {
               HITEC City, Hyderabad, Telangana 500081, India
             </p>
             <p className="mt-2 text-sm text-[var(--color-navy)]/70">
-              travelwithvelosta@gmail.com
+              hello@velosta.com
             </p>
           </div>
 

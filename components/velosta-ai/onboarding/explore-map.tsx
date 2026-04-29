@@ -26,7 +26,10 @@ import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
 import { DESTINATIONS, type Destination } from "@/lib/data/destinations";
 import { generatePlannerStreamAsync } from "@/lib/services/planner-service";
-import { hydrateItineraryIntoStores } from "@/lib/services/itinerary-hydrator";
+import {
+  commitItineraryToStores,
+  enrichItineraryInBackground,
+} from "@/lib/services/itinerary-hydrator";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import CloudOverlay from "./cloud-overlay";
@@ -98,7 +101,32 @@ export default function ExploreMapView() {
   const [hoveredDest, setHoveredDest] = useState<Destination | null>(null);
   const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationDone, setGenerationDone] = useState(false);
+  const [craftingPlace, setCraftingPlace] = useState<string>("");
   const [streamBuffer, setStreamBuffer] = useState<string | undefined>(undefined);
+  // Ref holds the destination needed when user clicks "Open itinerary"
+  const pendingDestRef = useRef<{ dest: ReturnType<typeof useOnboardingStore.getState>["selectDestination"] extends (d: infer D) => void ? D : string } | null>(null);
+
+  // Safety timeout — if generation somehow never resolves, force-close the overlay
+  useEffect(() => {
+    if (!isGenerating) return;
+    const safetyTimer = window.setTimeout(() => {
+      setIsGenerating(false);
+      setGenerationDone(false);
+      setGeneratingItinerary(false);
+      setStreamBuffer(undefined);
+      setCraftingPlace("");
+      setGenerationError("Generation timed out. Please try again.");
+    }, 5 * 60 * 1000);
+    return () => window.clearTimeout(safetyTimer);
+  }, [isGenerating, setGeneratingItinerary]);
+
+  const handleViewItinerary = useCallback(() => {
+    const destName = (pendingDestRef.current as any)?.name as string | undefined;
+    setIsGenerating(false);
+    setGenerationDone(false);
+    if (destName) selectDestination(destName);
+  }, [selectDestination]);
   const [showSignInGate, setShowSignInGate] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -327,6 +355,24 @@ export default function ExploreMapView() {
       }
 
       setGenerationError(null);
+      const runId =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : String(Date.now());
+      try {
+        window.localStorage.setItem(
+          "velosta:itineraryStatus",
+          JSON.stringify({
+            runId,
+            status: "generating",
+            destination: dest.name,
+            updatedAt: Date.now(),
+          })
+        );
+      } catch {
+        // Non-fatal when storage is blocked
+      }
+      setCraftingPlace(dest.name);
       setIsGenerating(true);
       setGeneratingItinerary(true);
       setGeneratedItinerary(null);
@@ -346,12 +392,17 @@ export default function ExploreMapView() {
         );
 
         if (!response.isTextResponse && response.itineraryTable) {
-          await hydrateItineraryIntoStores(response, {
+          // Phase 1 — instant: commit raw data to store.
+          commitItineraryToStores(response, {
             destination: response.destination ?? dest.name,
             budget: response.totalEstimatedCost || response.totalBudget,
           });
           setGeneratedItinerary(response);
           didSucceed = true;
+          // Stash destination so handleViewItinerary can use it
+          pendingDestRef.current = { name: response.destination ?? dest.name } as any;
+          // Phase 2 — background: geocode markers quietly.
+          enrichItineraryInBackground(response, response.destination ?? dest.name);
         } else {
           setGenerationError(
             response.isTextResponse
@@ -367,13 +418,45 @@ export default function ExploreMapView() {
             : "Could not reach Velosta AI. Please try again."
         );
       } finally {
-        setIsGenerating(false);
         setGeneratingItinerary(false);
         setStreamBuffer(undefined);
+        setCraftingPlace("");
+        if (!didSucceed) {
+          // On failure, close overlay so user isn't stuck
+          setIsGenerating(false);
+          setGenerationDone(false);
+        }
         if (didSucceed) {
+          // Keep overlay open and show the "ready" modal — user taps to proceed
+          setGenerationDone(true);
           setSelectedDest(null);
-          // Triggers flowStep → "planner"
-          selectDestination(dest.name);
+          try {
+            window.localStorage.setItem(
+              "velosta:itineraryStatus",
+              JSON.stringify({
+                runId,
+                status: "ready",
+                destination: dest.name,
+                updatedAt: Date.now(),
+              })
+            );
+          } catch {
+            // Non-fatal when storage is blocked
+          }
+        } else {
+          try {
+            window.localStorage.setItem(
+              "velosta:itineraryStatus",
+              JSON.stringify({
+                runId,
+                status: "failed",
+                destination: dest.name,
+                updatedAt: Date.now(),
+              })
+            );
+          } catch {
+            // ignore
+          }
         }
       }
     },
@@ -467,7 +550,10 @@ export default function ExploreMapView() {
         visible={isGenerating}
         mode="crafting"
         message="Your itinerary is being crafted"
+        contextPlace={craftingPlace}
         liveTokenBuffer={streamBuffer}
+        generationComplete={generationDone}
+        onViewItinerary={handleViewItinerary}
         sublines={[
           "Tracing the best route through your destination\u2026",
           "Mapping stays, food and golden-hour stops\u2026",

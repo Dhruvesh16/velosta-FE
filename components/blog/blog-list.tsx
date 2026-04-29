@@ -7,8 +7,6 @@ import { useUser } from "@/app/utils/context";
 import { PenLine, AlertTriangle, Heart, Calendar } from "lucide-react";
 import authorAvatar from "../../public/icons/people.png";
 
-const STORY_TAG = "_story";
-
 type BlogPost = {
   id: string;
   title: string;
@@ -21,6 +19,7 @@ type BlogPost = {
   authorAvatar?: string;
   createdAt: string;
   likes: number;
+  blogType?: string;
 };
 
 function SkeletonCard() {
@@ -145,7 +144,7 @@ export default function BlogList() {
       try {
         const token = localStorage.getItem("accessToken");
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/all-blogs`,
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/all-blogs?type=how_not_to_travel`,
           {
             headers: token
               ? {
@@ -157,8 +156,13 @@ export default function BlogList() {
         );
         if (!res.ok) throw new Error("Failed to fetch blogs");
         const json = await res.json();
-        const data: BlogPost[] = Array.isArray(json) ? json : (json.data ?? []);
-        setPosts(data.filter((p) => !p.tags?.includes(STORY_TAG)));
+        const inner = json?.data ?? json;
+        const data: BlogPost[] = Array.isArray(inner)
+          ? inner
+          : Array.isArray(inner?.blogs)
+            ? inner.blogs
+            : [];
+        setPosts(data);
       } catch (err) {
         console.error(err);
       } finally {

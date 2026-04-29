@@ -6,8 +6,6 @@ import Image from "next/image";
 import { useUser } from "@/app/utils/context";
 import { PenLine, Compass, Heart, Calendar } from "lucide-react";
 
-const STORY_TAG = "_story";
-
 type BlogPost = {
   id: string;
   title: string;
@@ -79,10 +77,10 @@ function EmptyState({ isSignedIn }: { isSignedIn: boolean }) {
 function StoryCard({ post }: { post: BlogPost }) {
   const displayName = post.authorName?.trim() || "Traveler";
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const visibleTags = post.tags.filter((t) => t !== STORY_TAG);
+  const visibleTags = (post.tags || []).filter((t) => !t.startsWith("_"));
   const readingMins = Math.max(
     1,
-    Math.ceil(post.content.replace(/<[^>]*>/g, "").split(/\s+/).length / 200)
+    Math.ceil((post.content || "").replace(/<[^>]*>/g, "").split(/\s+/).length / 200)
   );
 
   const initials = displayName
@@ -193,7 +191,7 @@ export default function StoriesList() {
       try {
         const token = localStorage.getItem("accessToken");
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/all-blogs`,
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/trips/stories`,
           {
             headers: token
               ? {
@@ -205,8 +203,13 @@ export default function StoriesList() {
         );
         if (!res.ok) throw new Error("Failed to fetch stories");
         const json = await res.json();
-        const data: BlogPost[] = Array.isArray(json) ? json : (json.data ?? []);
-        setPosts(data.filter((p) => p.tags?.includes(STORY_TAG)));
+        const inner = json?.data ?? json;
+        const list: BlogPost[] = Array.isArray(inner)
+          ? inner
+          : Array.isArray(inner?.stories)
+            ? inner.stories
+            : [];
+        setPosts(list);
       } catch (err) {
         console.error(err);
       } finally {

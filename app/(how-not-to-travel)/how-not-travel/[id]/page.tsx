@@ -2,6 +2,7 @@ import { BlogDetail } from "@/components/blog/blog-detail";
 import { RelatedPosts } from "@/components/blog/related-posts";
 import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
+import ItineraryReadyBanner from "@/components/velosta-ai/itinerary-ready-banner";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -41,6 +42,7 @@ export default async function BlogPage({ params }: Props) {
       <Navbar />
 
       <BlogDetail blog={blog} />
+      <ItineraryReadyBanner />
       {/* <BlogComments blogId={blog.id} /> */}
       {/* <RelatedPosts currentBlogId={blog.id} /> */}
 

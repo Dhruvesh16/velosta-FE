@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Compass } from "lucide-react";
+import { Sparkles, Compass, MapPin } from "lucide-react";
+import { Playfair_Display } from "next/font/google";
+
+const playfair = Playfair_Display({ subsets: ["latin"], weight: ["500", "600", "700"] });
 
 /**
  * CloudOverlay — reusable animated cloud component.
@@ -16,6 +19,8 @@ interface CloudOverlayProps {
   visible: boolean;
   mode?: "landing" | "loading" | "crafting";
   message?: string;
+  /** Place currently being planned; used to surface related community posts */
+  contextPlace?: string;
   /** Optional rotating sublines (used in `crafting` mode) */
   sublines?: string[];
   /**
@@ -24,7 +29,20 @@ interface CloudOverlayProps {
    * typed out by the model.  When undefined the dummy typewriter fallback runs.
    */
   liveTokenBuffer?: string;
+  /** When true, shows the "itinerary ready" modal instead of crafting UI */
+  generationComplete?: boolean;
+  /** Called when user confirms they want to navigate to the itinerary */
+  onViewItinerary?: () => void;
 }
+
+type PlaceFeedItem = {
+  id: string;
+  type: "story" | "blog";
+  title: string;
+  summary: string;
+  authorName: string;
+  createdAt: string;
+};
 
 /** Individual cloud element with radial gradient for visible contrast */
 function Cloud({
@@ -532,13 +550,327 @@ function StreamingDays({
   return <DummyStreamDays active={active} />;
 }
 
+/* ── Itinerary Ready Modal ───────────────────────────────────────── */
+function ItineraryReadyModal({
+  visible,
+  destination,
+  onView,
+}: {
+  visible: boolean;
+  destination?: string;
+  onView?: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <>
+          {/* Extra darkening veil so the modal pops */}
+          <motion.div
+            className="absolute inset-0"
+            style={{ background: "rgba(11,31,42,0.52)", zIndex: 10010 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
+          />
+
+          {/* Modal card */}
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center px-6 pointer-events-auto"
+            style={{ zIndex: 10011 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <motion.div
+              className="relative w-full max-w-[420px] rounded-3xl overflow-hidden"
+              style={{
+                background: "#FFFDF9",
+                border: "1px solid rgba(201,152,58,0.3)",
+                boxShadow: "0 32px 80px -20px rgba(11,31,42,0.55), 0 0 0 1px rgba(201,152,58,0.12)",
+              }}
+              initial={{ scale: 0.88, y: 24, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.92, y: 12, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28, delay: 0.08 }}
+            >
+              {/* Gold shimmer top bar */}
+              <div className="h-[3px] w-full overflow-hidden">
+                <motion.div
+                  className="h-full w-[60%]"
+                  style={{
+                    background: "linear-gradient(90deg, transparent, #C9983A, #F5D189, #C9983A, transparent)",
+                  }}
+                  animate={{ x: ["-60%", "200%"] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              </div>
+
+              <div className="px-8 pt-8 pb-9">
+                {/* Badge */}
+                <div className="flex items-center gap-2 mb-5">
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.2em]"
+                    style={{
+                      background: "rgba(201,152,58,0.10)",
+                      border: "1px solid rgba(201,152,58,0.28)",
+                      color: "#9A6F1A",
+                    }}
+                  >
+                    <Sparkles size={9} />
+                    Itinerary ready
+                  </span>
+                </div>
+
+                {/* Headline */}
+                <h2
+                  className={`${playfair.className} text-[28px] font-semibold leading-[1.18] tracking-tight mb-3`}
+                  style={{ color: "#0B1F2A" }}
+                >
+                  Your journey{destination ? (
+                    <> to <span style={{ color: "#9A6F1A" }}>{destination}</span></>
+                  ) : " blueprint"} is ready.
+                </h2>
+
+                {/* Subtext */}
+                <p className="text-[13.5px] leading-relaxed mb-7" style={{ color: "rgba(11,31,42,0.55)" }}>
+                  Every hour of your trip has been thoughtfully mapped — from golden-hour spots to hidden local gems. Your adventure begins now.
+                </p>
+
+                {/* Days summary dots */}
+                <div className="flex items-center gap-2 mb-7">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <motion.span
+                      key={i}
+                      className="block rounded-full"
+                      style={{
+                        width: i === 0 ? 28 : 8,
+                        height: 8,
+                        background: i === 0
+                          ? "linear-gradient(90deg, #C9983A, #F5D189)"
+                          : "rgba(201,152,58,0.22)",
+                      }}
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.18 + i * 0.06, type: "spring", stiffness: 400 }}
+                    />
+                  ))}
+                  <span className="text-[11px] font-medium ml-1" style={{ color: "rgba(11,31,42,0.38)" }}>
+                    Day by day
+                  </span>
+                </div>
+
+                {/* CTA */}
+                <motion.button
+                  type="button"
+                  onClick={onView}
+                  className="group w-full flex items-center justify-center gap-2.5 rounded-2xl py-4 text-[14px] font-semibold text-white transition-opacity hover:opacity-92"
+                  style={{
+                    background: "linear-gradient(135deg, #0B1F2A 0%, #1A3545 100%)",
+                    boxShadow: "0 10px 28px -8px rgba(11,31,42,0.45)",
+                  }}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <MapPin size={15} className="text-[#F5D189]" />
+                  Open my itinerary
+                  <motion.span
+                    className="text-[#F5D189]"
+                    animate={{ x: [0, 3, 0] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    →
+                  </motion.span>
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function PlaceStoriesBar({
+  visible,
+  place,
+}: {
+  visible: boolean;
+  place?: string;
+}) {
+  const [items, setItems] = useState<PlaceFeedItem[]>([]);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    const placeWords = (place || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 2);
+
+    async function load() {
+      try {
+        const base = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+        const unwrapList = (json: any, key: string) => {
+          const inner = json?.data ?? json;
+          if (Array.isArray(inner)) return inner;
+          if (key && Array.isArray(inner?.[key])) return inner[key];
+          return [];
+        };
+
+        // Use lite mode (drops content/coverImage) and limit=20 so the bar
+        // never downloads hundreds of KBs of blog content during planner
+        // streaming. Score against title/summary/tags is plenty for matching.
+        const fetchOpts: RequestInit = {
+          // AbortController not strictly needed because cancelled flag guards
+          // state writes; keep credentials so auth cookies travel where needed.
+          credentials: "same-origin",
+        };
+        const [storiesRes, blogsRes] = await Promise.all([
+          fetch(`${base}/api/trips/stories?limit=20&lite=1`, fetchOpts),
+          fetch(`${base}/api/travel-blog/all-blogs?limit=20&lite=1`, fetchOpts),
+        ]);
+
+        if (cancelled) return;
+
+        const stories = storiesRes.ok ? unwrapList(await storiesRes.json(), "stories") : [];
+        const blogs = blogsRes.ok ? unwrapList(await blogsRes.json(), "blogs") : [];
+
+        const merged = [
+          ...stories.map((row: any) => ({ ...row, _kind: "story" as const })),
+          ...blogs.map((row: any) => ({ ...row, _kind: "blog" as const })),
+        ];
+
+        const scored = merged
+          .map((row: any) => {
+            const hay = `${row.title || ""} ${row.summary || ""} ${row.location || ""} ${(row.tags || []).join(" ")}`.toLowerCase();
+            const score = placeWords.reduce((acc, w) => (hay.includes(w) ? acc + 1 : acc), 0);
+            return {
+              id: String(row.id),
+              type: row._kind,
+              title: String(row.title || "Untitled"),
+              summary: String(row.summary || "").slice(0, 140),
+              authorName: String(row.authorName || "Traveler"),
+              createdAt: String(row.createdAt || ""),
+              _score: score,
+            };
+          })
+          // If no place words match, still surface the most-recent stories
+          // (covers landing in the overlay before destination text settles).
+          .filter((r: any) => placeWords.length === 0 || r._score > 0)
+          .sort((a: any, b: any) => b._score - a._score)
+          .slice(0, 8)
+          .map(({ _score, ...rest }: any) => rest);
+        if (!cancelled) {
+          setItems(scored);
+          setActiveIdx(0);
+        }
+      } catch {
+        if (!cancelled) setItems([]);
+      }
+    }
+    // Defer load by ~800ms so the SSE connection can establish first
+    // without competing for browser HTTP/1.1 connection slots on cold start.
+    const deferred = window.setTimeout(load, 800);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(deferred);
+    };
+  }, [visible, place]);
+
+  useEffect(() => {
+    if (!visible || items.length < 2) return;
+    const t = setInterval(() => {
+      setActiveIdx((i) => (i + 1) % items.length);
+    }, 2600);
+    return () => clearInterval(t);
+  }, [visible, items]);
+
+  if (!visible || items.length === 0) return null;
+
+  const stack = [0, 1, 2]
+    .map((offset) => items[(activeIdx + offset) % items.length])
+    .filter(Boolean);
+  const openItem = (item: PlaceFeedItem) => {
+    const path =
+      item.type === "story" ? `/stories/${item.id}` : `/how-not-travel/${item.id}`;
+    let runId = "";
+    try {
+      const raw = window.localStorage.getItem("velosta:itineraryStatus");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { runId?: string };
+        runId = parsed.runId || "";
+      }
+    } catch {
+      runId = "";
+    }
+    const params = new URLSearchParams({ fromPlanner: "1" });
+    if (runId) params.set("runId", runId);
+    window.open(`${path}?${params.toString()}`, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[10002] w-[min(92vw,560px)] pointer-events-none">
+      <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-[#F5D189]">
+        Stories for {place || "your destination"}
+      </p>
+      <div className="relative h-28">
+        {stack
+          .slice()
+          .reverse()
+          .map((item, revIdx) => {
+            const pos = stack.length - 1 - revIdx;
+            return (
+              <motion.div
+                key={item.id}
+                className={`absolute inset-x-0 rounded-2xl border border-[#C9983A]/45 bg-white px-4 py-3 shadow-[0_12px_30px_-18px_rgba(11,31,42,0.65)] ${
+                  pos === 0 ? "pointer-events-auto cursor-pointer" : ""
+                }`}
+                animate={{
+                  y: pos * 12,
+                  scale: 1 - pos * 0.03,
+                  opacity: 1 - pos * 0.18,
+                }}
+                transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                style={{ zIndex: 30 - pos }}
+                onClick={pos === 0 ? () => openItem(item) : undefined}
+              >
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#C9983A]">
+                    {item.type === "story" ? "Story" : "How Not To Travel"}
+                  </span>
+                  <span className="text-[10px] text-[#7D5D1D]/70">{item.authorName}</span>
+                </div>
+                <p className="line-clamp-1 text-[14px] font-semibold text-[#8A6516]">{item.title}</p>
+                {pos === 0 && item.summary && (
+                  <p className="line-clamp-1 text-[11px] text-[#8A6516]/75">{item.summary}</p>
+                )}
+                {pos === 0 && (
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[#C9983A]/80">
+                    Tap to read
+                  </p>
+                )}
+              </motion.div>
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main export ─────────────────────────────────────────────────── */
 export default function CloudOverlay({
   visible,
   mode = "loading",
   message = "Discovering amazing places...",
+  contextPlace,
   sublines,
   liveTokenBuffer,
+  generationComplete = false,
+  onViewItinerary,
 }: CloudOverlayProps) {
   // Rotate sublines every 2.4s (only in crafting mode)
   const [sublineIdx, setSublineIdx] = useState(0);
@@ -725,6 +1057,16 @@ export default function CloudOverlay({
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* Spotify / media-like place stories bar — hidden when modal is up */}
+            <PlaceStoriesBar visible={visible && !generationComplete} place={contextPlace} />
+
+            {/* Itinerary ready modal */}
+            <ItineraryReadyModal
+              visible={generationComplete}
+              destination={contextPlace}
+              onView={onViewItinerary}
+            />
 
           </motion.div>
         )}

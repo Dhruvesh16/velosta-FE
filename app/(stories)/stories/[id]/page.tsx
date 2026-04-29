@@ -2,6 +2,7 @@ import { BlogDetail } from "@/components/blog/blog-detail";
 import { RelatedPosts } from "@/components/blog/related-posts";
 import Footer from "@/components/footer";
 import Navbar from "@/components/navbar";
+import ItineraryReadyBanner from "@/components/velosta-ai/itinerary-ready-banner";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -13,12 +14,14 @@ export default async function StoryPage({ params }: Props) {
   const { id } = await params;
 
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/view-blog/${id}`
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/trips/stories/${id}`,
+    { cache: "no-store" }
   );
   if (!res.ok) return notFound();
 
   const json = await res.json();
-  const blog = json?.data ?? json;
+  const inner = json?.data ?? json;
+  const blog = inner?.story ?? inner;
   if (!blog?.id) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -44,6 +47,7 @@ export default async function StoryPage({ params }: Props) {
         <BlogDetail blog={blog} />
         <RelatedPosts currentPostId={id} />
       </div>
+      <ItineraryReadyBanner />
       <Footer />
     </main>
   );

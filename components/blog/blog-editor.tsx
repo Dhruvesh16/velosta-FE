@@ -234,24 +234,41 @@ export default function BlogEditor({
       const token = localStorage.getItem("accessToken"); // adjust based on your auth
       if (!token) throw new Error("You must be logged in to publish");
 
-      const payload = {
-        ...draft,
-        tags: category
-          ? [...new Set([...draft.tags, category])]
-          : draft.tags,
-      };
+      const isStory = category === "_story";
+      const cleanTags = (draft.tags || []).filter((t) => !t.startsWith("_"));
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/create-blog`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const payload = isStory
+        ? {
+            title: draft.title,
+            content: draft.content,
+            coverImage: draft.coverImage,
+            location: draft.summary?.trim() || cleanTags[0] || undefined,
+            tags: cleanTags,
+            authorName: draft.authorName,
+          }
+        : {
+            title: draft.title,
+            summary: draft.summary,
+            content: draft.content,
+            coverImage: draft.coverImage,
+            tags: cleanTags,
+            authorName: draft.authorName,
+            blogType:
+              category === "_hntt" ? "how_not_to_travel" : "general",
+          };
+
+      const url = isStory
+        ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/trips/stories`
+        : `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/create-blog`;
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) {
         const status = res.status;

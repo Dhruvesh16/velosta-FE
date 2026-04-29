@@ -11,6 +11,21 @@ function uid(): string {
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
+/** fetch() with a hard timeout so blocked/slow requests never hang forever */
+async function fetchWithTimeout(
+  url: string,
+  opts: RequestInit = {},
+  timeoutMs = 6000
+): Promise<Response> {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: ac.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Haversine distance in km ────────────────────────────────────────────────
 function haversineKm(
   [lng1, lat1]: [number, number],
@@ -129,7 +144,7 @@ async function geocodePlace(
     if (proximity) params.set("proximity", `${proximity[0]},${proximity[1]}`);
     if (cc) params.set("country", cc);
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?${params}`
     );
     const data = await res.json();
@@ -169,7 +184,7 @@ async function geocodePlaceWithCountry(
     });
     const cc = countryCode?.toLowerCase();
     if (cc) params.set("country", cc);
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(placeName)}.json?${params}`
     );
     const data = await res.json();
@@ -217,7 +232,7 @@ async function googlePlacesLookup(
       lat: String(proximity[1]),
     });
     if (destination) params.set("destination", destination);
-    const res = await fetch(`/api/places?${params}`);
+    const res = await fetchWithTimeout(`/api/places?${params}`, {}, 5000);
     if (!res.ok) {
       geocodeCache.set(cacheKey, null);
       return null;

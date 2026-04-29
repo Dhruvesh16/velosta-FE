@@ -93,7 +93,6 @@ const featuredTrips = [
 ];
 
 
-
 const itineraryItems = [
   {
     time: "Morning",
@@ -177,13 +176,25 @@ export default function Page() {
     const base =
       process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_URL || "";
     async function fetchPosts() {
+      const unwrap = (json, key) => {
+        const inner = json?.data ?? json;
+        if (Array.isArray(inner)) return inner;
+        if (key && Array.isArray(inner?.[key])) return inner[key];
+        return [];
+      };
       try {
-        const res = await fetch(`${base}/api/travel-blog/all-blogs`);
-        if (!res.ok) return;
-        const json = await res.json();
-        const all = Array.isArray(json) ? json : (json.data ?? []);
-        setStoryPosts(all.filter((p) => p.tags?.includes("_story")).slice(0, 4));
-        setHnttPosts(all.filter((p) => !p.tags?.includes("_story")).slice(0, 3));
+        const [storiesRes, hnttRes] = await Promise.all([
+          fetch(`${base}/api/trips/stories`),
+          fetch(`${base}/api/travel-blog/all-blogs?type=how_not_to_travel`),
+        ]);
+        if (storiesRes.ok) {
+          const json = await storiesRes.json();
+          setStoryPosts(unwrap(json, "stories").slice(0, 4));
+        }
+        if (hnttRes.ok) {
+          const json = await hnttRes.json();
+          setHnttPosts(unwrap(json, "blogs").slice(0, 3));
+        }
       } catch (_) {}
     }
     fetchPosts();

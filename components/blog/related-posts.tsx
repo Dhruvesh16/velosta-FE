@@ -1,47 +1,58 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight } from "lucide-react";
 
 type RelatedPostsProps = {
-  currentBlogId: string;
+  currentPostId: string;
 };
 
-const mockRelatedPosts = [
-  {
-    id: "2",
-    title: "Street Food Guide: Eating Like a Local in Southeast Asia",
-    summary:
-      "Discover the best street food experiences across Thailand, Vietnam, and Cambodia.",
-    coverImage: "/images/articles/food.jpg",
-    tags: ["Food", "Southeast Asia"],
-    authorName: "Marcus Lee",
-    readingTime: 6,
-  },
-  {
-    id: "3",
-    title: "Budget Travel Hacks: How to Travel More for Less",
-    summary:
-      "Practical tips and tricks to maximize your travel budget without compromising on experiences.",
-    coverImage: "/images/articles/hiking.jpg",
-    tags: ["Budget Travel", "Tips"],
-    authorName: "Emma Wilson",
-    readingTime: 7,
-  },
-  {
-    id: "4",
-    title: "Solo Travel Safety: A Comprehensive Guide",
-    summary:
-      "Everything you need to know to travel solo safely and confidently around the world.",
-    coverImage: "/images/articles/camel-safari.jpg",
-    tags: ["Solo Travel", "Safety"],
-    authorName: "James Chen",
-    readingTime: 9,
-  },
-];
+type BlogPost = {
+  id: string;
+  title: string;
+  summary?: string;
+  content: string;
+  coverImage?: string;
+  tags?: string[];
+  readingTime?: number;
+};
 
-export function RelatedPosts({ currentBlogId }: RelatedPostsProps) {
+export function RelatedPosts({ currentPostId }: RelatedPostsProps) {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [currentIsStory, setCurrentIsStory] = useState(false);
+
+  useEffect(() => {
+    async function fetchRelated() {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/travel-blog/all-blogs`
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        const all: BlogPost[] = Array.isArray(json) ? json : (json.data ?? []);
+        const current = all.find((p) => p.id === currentPostId);
+        const isStory = !!current?.tags?.includes("_story");
+        setCurrentIsStory(isStory);
+        const filtered = all
+          .filter((p) => p.id !== currentPostId)
+          .filter((p) =>
+            isStory
+              ? p.tags?.includes("_story")
+              : !p.tags?.includes("_story")
+          )
+          .slice(0, 3);
+        setPosts(filtered);
+      } catch {
+        setPosts([]);
+      }
+    }
+    fetchRelated();
+  }, [currentPostId]);
+
+  if (posts.length === 0) return null;
+
   return (
     <section className="border-t border-border bg-background">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
@@ -50,8 +61,15 @@ export function RelatedPosts({ currentBlogId }: RelatedPostsProps) {
         </h2>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {mockRelatedPosts.map((post) => (
-            <Link key={post.id} href={`/how-not-travel/${post.id}`}>
+          {posts.map((post) => (
+            <Link
+              key={post.id}
+              href={
+                currentIsStory
+                  ? `/stories/${post.id}`
+                  : `/how-not-travel/${post.id}`
+              }
+            >
               <article className="group rounded-2xl border border-border bg-background transition hover:shadow-lg">
                 <div className="relative h-48 overflow-hidden rounded-t-2xl">
                   <img
@@ -63,7 +81,7 @@ export function RelatedPosts({ currentBlogId }: RelatedPostsProps) {
 
                 <div className="p-5">
                   <div className="mb-3 flex flex-wrap gap-2">
-                    {post.tags.slice(0, 2).map((tag) => (
+                    {(post.tags ?? []).slice(0, 2).map((tag) => (
                       <Badge
                         key={tag}
                         variant="secondary"
@@ -84,7 +102,16 @@ export function RelatedPosts({ currentBlogId }: RelatedPostsProps) {
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {post.readingTime} min read
+                      {post.readingTime ||
+                        Math.max(
+                          1,
+                          Math.ceil(
+                            (post.content || "")
+                              .replace(/<[^>]*>/g, "")
+                              .split(/\s+/).length / 200
+                          )
+                        )}{" "}
+                      min read
                     </span>
                     <ArrowRight className="h-4 w-4 text-[color:var(--color-brand)] transition group-hover:translate-x-1" />
                   </div>

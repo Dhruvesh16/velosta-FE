@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, Share2, Bookmark, Trash2, Flag } from "lucide-react";
+import { Share2, Bookmark, Trash2, Flag, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -55,8 +55,6 @@ type BlogDetailProps = {
 
 export function BlogDetail({ blog }: BlogDetailProps) {
   const router = useRouter();
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(blog.likes);
   const [loading, setLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
@@ -64,15 +62,6 @@ export function BlogDetail({ blog }: BlogDetailProps) {
   const [reportDescription, setReportDescription] = useState("");
   const [reportLoading, setReportLoading] = useState(false);
   const { user } = useUser();
-
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    setLikeCount((c) => (isLiked ? c - 1 : c + 1));
-    toast.success(isLiked ? "Like removed" : "You liked this post!", {
-      position: "bottom-right",
-      autoClose: 2000,
-    });
-  };
 
   const handleShare = () => {
     if (typeof navigator !== "undefined" && (navigator as any).share) {
@@ -262,22 +251,16 @@ export function BlogDetail({ blog }: BlogDetailProps) {
                     })}{" "}
                     • {blog.readingTime || 5} min read
                   </p>
+                  {blog.likes > 0 && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Heart className="h-3.5 w-3.5" />
+                      {blog.likes} likes
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLike}
-                  className={isLiked ? "text-[color:var(--color-brand)]" : ""}
-                >
-                  <Heart
-                    className="h-5 w-5"
-                    fill={isLiked ? "currentColor" : "none"}
-                  />
-                </Button>
-
                 <Button variant="ghost" size="sm" onClick={handleShare}>
                   <Share2 className="h-5 w-5" />
                 </Button>

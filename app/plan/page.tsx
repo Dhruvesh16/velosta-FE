@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Playfair_Display, Dancing_Script } from "next/font/google";
-import { Sparkles, ArrowRight, MapPin, Compass, Send, X } from "lucide-react";
+import { Sparkles, ArrowRight, Compass, X } from "lucide-react";
 import { useUser } from "@/app/utils/context";
 
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["500", "600", "700"] });
@@ -34,15 +34,6 @@ const C = {
   mist: "#D9E2E1",
 };
 
-// Conversational prompts the AI rotates through in the input placeholder
-const PROMPT_HINTS = [
-  "A misty 3-day escape to Coorg with my partner…",
-  "Two weeks across Rajasthan on a moderate budget…",
-  "Backpacking through the North-East in October…",
-  "A solo wellness retreat in Rishikesh…",
-  "Family trip to Andaman with snorkelling included…",
-];
-
 export default function PlanIntroPage() {
   const router = useRouter();
   const { user, accessToken, loading: authLoading } = useUser();
@@ -57,8 +48,6 @@ export default function PlanIntroPage() {
   // Typewriter effect for AI bubble — feels like a real conversation
   const [typed, setTyped] = useState("");
   const [showInput, setShowInput] = useState(false);
-  const [intent, setIntent] = useState("");
-  const [hintIdx, setHintIdx] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
 
@@ -76,14 +65,6 @@ export default function PlanIntroPage() {
     return () => window.clearInterval(id);
   }, [greeting]);
 
-  // Cycle the placeholder so it feels alive
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setHintIdx((p) => (p + 1) % PROMPT_HINTS.length);
-    }, 4200);
-    return () => window.clearInterval(id);
-  }, []);
-
   const goToPlanner = () => {
     if (submitting || authLoading) return;
 
@@ -94,17 +75,7 @@ export default function PlanIntroPage() {
     }
 
     setSubmitting(true);
-    const trimmed = intent.trim();
-    if (trimmed && typeof window !== "undefined") {
-      try {
-        window.sessionStorage.setItem("velosta:planIntent", trimmed);
-      } catch {
-        /* sessionStorage may be unavailable (private mode) — non-fatal */
-      }
-    }
-    // If user typed intent, skip onboarding and go straight to planner
-    const dest = trimmed ? "/velosta-ai?fromPlan=1" : "/velosta-ai";
-    window.setTimeout(() => router.push(dest), 180);
+    window.setTimeout(() => router.push("/velosta-ai"), 180);
   };
 
   return (
@@ -233,87 +204,26 @@ export default function PlanIntroPage() {
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 className="mt-7 sm:mt-9 ml-0 sm:ml-[calc(2.75rem+1rem)]"
               >
-                {/* Input pill */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    goToPlanner();
-                  }}
-                  className="relative"
-                >
-                  <div
-                    className="flex items-center gap-2 rounded-full pl-5 pr-2 py-2 shadow-[0_4px_18px_-10px_rgba(11,31,42,0.25)] focus-within:shadow-[0_6px_22px_-10px_rgba(217,119,87,0.45)] transition-all duration-300"
+                {/* Primary CTA */}
+                <div className="flex justify-center">
+                  <motion.button
+                    type="button"
+                    onClick={goToPlanner}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.97 }}
+                    disabled={submitting}
+                    className="group inline-flex items-center justify-center gap-2.5 rounded-full px-7 sm:px-9 py-3.5 sm:py-4 text-[14px] sm:text-[15px] font-semibold disabled:opacity-70"
                     style={{
-                      background: "rgba(255,255,255,0.95)",
-                      border: "1px solid rgba(11,31,42,0.08)",
+                      background: C.navy,
+                      color: "#fff",
+                      boxShadow: "0 14px 32px -10px rgba(11,31,42,0.4)",
                     }}
                   >
-                    <MapPin
-                      className="h-4 w-4 shrink-0"
-                      style={{ color: C.teal }}
-                      aria-hidden="true"
-                    />
-                    <input
-                      type="text"
-                      value={intent}
-                      onChange={(e) => setIntent(e.target.value)}
-                      placeholder={PROMPT_HINTS[hintIdx]}
-                      aria-label="Describe your dream trip"
-                      maxLength={240}
-                      className="flex-1 min-w-0 bg-transparent outline-none text-[14px] sm:text-[15px] placeholder:transition-opacity placeholder:duration-300"
-                      style={{
-                        color: C.navy,
-                      }}
-                    />
-                    <button
-                      type="submit"
-                      aria-label="Continue to planner"
-                      className="shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-white shadow-md active:scale-95 transition-transform"
-                      style={{
-                        background: `linear-gradient(135deg, ${C.coralStart}, ${C.coral})`,
-                      }}
-                    >
-                      <Send className="h-4 w-4" strokeWidth={2.4} />
-                    </button>
-                  </div>
-                </form>
-
-                {/* Divider word */}
-                <div className="flex items-center gap-3 my-6 sm:my-7">
-                  <div
-                    className="flex-1 h-px"
-                    style={{ background: "rgba(11,31,42,0.10)" }}
-                  />
-                  <span
-                    className="text-[10.5px] font-semibold uppercase tracking-[0.24em]"
-                    style={{ color: "rgba(11,31,42,0.40)" }}
-                  >
-                    or
-                  </span>
-                  <div
-                    className="flex-1 h-px"
-                    style={{ background: "rgba(11,31,42,0.10)" }}
-                  />
+                    <Sparkles className="h-4 w-4" />
+                    Start your journey
+                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  </motion.button>
                 </div>
-
-                {/* Primary CTA */}
-                <motion.button
-                  type="button"
-                  onClick={goToPlanner}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  disabled={submitting}
-                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-full px-7 sm:px-9 py-3.5 sm:py-4 text-[14px] sm:text-[15px] font-semibold disabled:opacity-70"
-                  style={{
-                    background: C.navy,
-                    color: "#fff",
-                    boxShadow: "0 14px 32px -10px rgba(11,31,42,0.4)",
-                  }}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Start generating my itinerary
-                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                </motion.button>
 
                 {/* Trust line */}
                 <p

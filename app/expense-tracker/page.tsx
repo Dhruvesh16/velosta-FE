@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Playfair_Display } from "next/font/google";
 import {
   Plus,
@@ -15,6 +15,7 @@ import {
   Mail,
   Sparkles,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { useUser } from "@/app/utils/context";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Navbar from "@/components/navbar";
+import {
+  sendExpenseInviteEmail,
+  sendTripClosedEmails,
+  sendTripStartedEmail,
+} from "@/lib/services/trips-service";
 
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
@@ -64,9 +70,19 @@ type Trip = {
   members: Member[];
   expenses: Expense[];
   createdAt: string;
+  closedAt?: string;
+  ownerEmail?: string;
 };
 
 const STORAGE_KEY = "velosta-cost-splitter-v1";
+
+const normalizeEmail = (value?: string | null) => (value || "").trim().toLowerCase();
+
+function isTripMember(trip: Trip, email?: string | null): boolean {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return false;
+  return trip.members.some((m) => normalizeEmail(m.email) === normalized);
+}
 
 /* ──────────────────────────────────────────────────────────── */
 /* Persistence                                                  */
@@ -160,11 +176,13 @@ function computeSettlements(trip: Trip): Settlement[] {
 /* ──────────────────────────────────────────────────────────── */
 export default function CostSplitterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { accessToken, loading, user } = useUser();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [newTripOpen, setNewTripOpen] = useState(false);
+  const viewerEmail = normalizeEmail(user?.email);
 
   // Auth gate
   useEffect(() => {
@@ -177,18 +195,71 @@ export default function CostSplitterPage() {
   useEffect(() => {
     const t = loadTrips();
     setTrips(t);
-    if (t.length > 0) setActiveId(t[0].id);
+    const visible = t.filter((trip) => isTripMember(trip, user?.email));
+    if (visible.length > 0) setActiveId(visible[0].id);
     setHydrated(true);
-  }, []);
+  }, [user?.email]);
+
+  // Join-trip via emailed link (query param: ?join=<base64-json>)
+  useEffect(() => {
+    const raw = searchParams?.get("join");
+    if (!raw) return;
+    try {
+      const json = atob(raw);
+      const payload = JSON.parse(json) as {
+        name?: string;
+        members?: Member[];
+        expenses?: Expense[];
+      };
+      const tripName = (payload.name || "Shared Trip").trim();
+      if (!tripName) return;
+      const memberEmails = (payload.members || []).map((m) => normalizeEmail(m.email));
+      if (!viewerEmail || !memberEmails.includes(viewerEmail)) {
+        window.alert("You are not a member of this trip.");
+        return;
+      }
+      setTrips((prev) => {
+        const exists = prev.some((t) => t.name.toLowerCase() === tripName.toLowerCase());
+        if (exists) return prev;
+        const trip: Trip = {
+          id: uid(),
+          name: tripName,
+          members: Array.isArray(payload.members) ? payload.members : [],
+          expenses: Array.isArray(payload.expenses) ? payload.expenses : [],
+          createdAt: new Date().toISOString(),
+          ownerEmail: viewerEmail,
+        };
+        setActiveId(trip.id);
+        return [trip, ...prev];
+      });
+    } catch {
+      // ignore malformed join payload
+    }
+  }, [searchParams, viewerEmail]);
 
   // Persist on every change after hydration
   useEffect(() => {
     if (hydrated) saveTrips(trips);
   }, [trips, hydrated]);
 
+  const visibleTrips = useMemo(
+    () => trips.filter((t) => isTripMember(t, viewerEmail)),
+    [trips, viewerEmail]
+  );
+
+  useEffect(() => {
+    if (!activeId) {
+      setActiveId(visibleTrips[0]?.id ?? null);
+      return;
+    }
+    if (!visibleTrips.some((t) => t.id === activeId)) {
+      setActiveId(visibleTrips[0]?.id ?? null);
+    }
+  }, [visibleTrips, activeId]);
+
   const activeTrip = useMemo(
-    () => trips.find((t) => t.id === activeId) ?? null,
-    [trips, activeId]
+    () => visibleTrips.find((t) => t.id === activeId) ?? null,
+    [visibleTrips, activeId]
   );
 
   const updateTrip = (id: string, updater: (t: Trip) => Trip) => {
@@ -197,10 +268,15 @@ export default function CostSplitterPage() {
 
   const handleCreateTrip = (name: string) => {
     // Auto-add the creator as the first member
+    const creatorEmail = normalizeEmail(user?.email);
+    if (!creatorEmail) {
+      window.alert("Please sign in with a valid email before creating a trip.");
+      return;
+    }
+    const creatorName =
+      user?.name?.trim() || creatorEmail.split("@")[0] || "You";
     const creatorMember: Member | null =
-      user?.name
-        ? { id: uid(), name: user.name, email: user.email ?? "" }
-        : null;
+      { id: uid(), name: creatorName, email: creatorEmail };
 
     const trip: Trip = {
       id: uid(),
@@ -208,16 +284,29 @@ export default function CostSplitterPage() {
       members: creatorMember ? [creatorMember] : [],
       expenses: [],
       createdAt: new Date().toISOString(),
+      ownerEmail: creatorEmail,
     };
     setTrips((prev) => [trip, ...prev]);
     setActiveId(trip.id);
     setNewTripOpen(false);
+    if (user?.email) {
+      sendTripStartedEmail({
+        email: user.email,
+        name: user.name || "traveller",
+        tripName: trip.name,
+      }).catch((err) => {
+        console.warn("trip-started email failed", err);
+      });
+    }
   };
 
   const handleDeleteTrip = (id: string) => {
     setTrips((prev) => {
       const next = prev.filter((t) => t.id !== id);
-      if (activeId === id) setActiveId(next[0]?.id ?? null);
+      if (activeId === id) {
+        const nextVisible = next.filter((trip) => isTripMember(trip, viewerEmail));
+        setActiveId(nextVisible[0]?.id ?? null);
+      }
       return next;
     });
   };
@@ -284,12 +373,12 @@ export default function CostSplitterPage() {
       {/* ── Body ── */}
       <section className="pb-16 sm:pb-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          {trips.length === 0 ? (
+          {visibleTrips.length === 0 ? (
             <EmptyTrips onCreate={() => setNewTripOpen(true)} />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
               <TripsSidebar
-                trips={trips}
+                trips={visibleTrips}
                 activeId={activeId}
                 onSelect={setActiveId}
                 onDelete={handleDeleteTrip}
@@ -297,6 +386,7 @@ export default function CostSplitterPage() {
               {activeTrip ? (
                 <TripWorkspace
                   trip={activeTrip}
+                  viewerEmail={viewerEmail}
                   onUpdate={(u) => updateTrip(activeTrip.id, u)}
                 />
               ) : (
@@ -441,23 +531,43 @@ function TripsSidebar({
 /* ──────────────────────────────────────────────────────────── */
 function TripWorkspace({
   trip,
+  viewerEmail,
   onUpdate,
 }: {
   trip: Trip;
+  viewerEmail: string;
   onUpdate: (updater: (t: Trip) => Trip) => void;
 }) {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [isClosingTrip, setIsClosingTrip] = useState(false);
 
   const totalSpent = trip.expenses.reduce((s, e) => s + e.amount, 0);
   const settlements = useMemo(() => computeSettlements(trip), [trip]);
   const balances = useMemo(() => computeBalances(trip), [trip]);
 
   const addMember = (name: string, email: string) => {
-    onUpdate((t) => ({
-      ...t,
-      members: [...t.members, { id: uid(), name: name.trim(), email: email.trim() }],
-    }));
+    const nextTrip = {
+      ...trip,
+      members: [...trip.members, { id: uid(), name: name.trim(), email: email.trim() }],
+    };
+    onUpdate(() => nextTrip);
+    const invitePayload = {
+      name: nextTrip.name,
+      members: nextTrip.members,
+      expenses: nextTrip.expenses,
+    };
+    const encoded = btoa(JSON.stringify(invitePayload));
+    const joinUrl = `${window.location.origin}/expense-tracker?join=${encodeURIComponent(encoded)}`;
+    sendExpenseInviteEmail({
+      email: email.trim(),
+      recipientName: name.trim(),
+      inviterName: "A Velosta traveller",
+      tripName: trip.name,
+      joinUrl,
+    }).catch((err) => {
+      console.warn("invite email failed", err);
+    });
     setAddMemberOpen(false);
   };
 
@@ -491,6 +601,68 @@ function TripWorkspace({
     onUpdate((t) => ({ ...t, expenses: t.expenses.filter((e) => e.id !== id) }));
   };
 
+  const formatBalance = (bal: number) => {
+    const amount = Math.abs(bal).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+    if (bal > 0.01) return `You should receive ₹${amount}`;
+    if (bal < -0.01) return `You need to pay ₹${amount}`;
+    return "All settled (₹0)";
+  };
+
+  const settlementSummaryText =
+    settlements.length === 0
+      ? "Everyone is settled up. No pending transfers."
+      : settlements
+          .map((s) => {
+            const from = trip.members.find((m) => m.id === s.from)?.name ?? "Member";
+            const to = trip.members.find((m) => m.id === s.to)?.name ?? "Member";
+            return `${from} pays ${to} ₹${s.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+          })
+          .join("\n");
+
+  const closeTrip = async () => {
+    if (isClosingTrip) return;
+    if (!isTripMember(trip, viewerEmail)) {
+      window.alert("Only trip members can close this trip.");
+      return;
+    }
+    if (trip.members.length === 0) {
+      window.alert("Add members before closing the trip.");
+      return;
+    }
+    const recipients = trip.members
+      .filter((m) => !!m.email)
+      .map((m) => ({
+        email: m.email,
+        name: m.name,
+        personalBalance: formatBalance(balances[m.id] ?? 0),
+      }));
+    if (recipients.length === 0) {
+      window.alert("No member emails found. Add emails to send closure summary.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Close "${trip.name}" and email final expenditure summary to ${recipients.length} member(s)?`
+    );
+    if (!confirmed) return;
+    setIsClosingTrip(true);
+    try {
+      const totalSpentText = `₹${totalSpent.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+      const result = await sendTripClosedEmails({
+        tripName: trip.name,
+        totalSpent: totalSpentText,
+        settlementSummary: settlementSummaryText,
+        members: recipients,
+      });
+      onUpdate((t) => ({ ...t, closedAt: new Date().toISOString() }));
+      window.alert(`Trip closed. Summary emails queued for ${result.sent}/${result.total} members.`);
+    } catch (err) {
+      console.error("close trip email failed", err);
+      window.alert("Failed to send close-trip emails. Please try again.");
+    } finally {
+      setIsClosingTrip(false);
+    }
+  };
+
   return (
     <div className="space-y-6 min-w-0">
       {/* Trip header card */}
@@ -512,17 +684,41 @@ function TripWorkspace({
             >
               {trip.name}
             </h2>
+            {trip.closedAt ? (
+              <p className="mt-2 text-[12px] font-medium" style={{ color: "var(--color-teal)" }}>
+                Closed on {new Date(trip.closedAt).toLocaleDateString("en-IN")}
+              </p>
+            ) : null}
           </div>
-          <div className="flex flex-col items-end">
-            <p className="text-[11px] uppercase tracking-[0.14em]" style={{ color: "rgba(11,31,42,0.5)" }}>
-              Total spent
-            </p>
-            <p
-              className={`${playfair.className} text-[34px] leading-none mt-1`}
-              style={{ color: "var(--color-navy)" }}
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-col items-end">
+              <p className="text-[11px] uppercase tracking-[0.14em]" style={{ color: "rgba(11,31,42,0.5)" }}>
+                Total spent
+              </p>
+              <p
+                className={`${playfair.className} text-[34px] leading-none mt-1`}
+                style={{ color: "var(--color-navy)" }}
+              >
+                ₹{totalSpent.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <Button
+              onClick={closeTrip}
+              disabled={isClosingTrip || !!trip.closedAt || !isTripMember(trip, viewerEmail)}
+              className="h-9 px-4 rounded-full text-[12px] font-semibold"
+              style={{ background: "var(--color-teal)", color: "var(--color-cream)" }}
             >
-              ₹{totalSpent.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-            </p>
+              {isClosingTrip ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  Closing…
+                </>
+              ) : trip.closedAt ? (
+                "Trip closed"
+              ) : (
+                "Close trip"
+              )}
+            </Button>
           </div>
         </div>
 

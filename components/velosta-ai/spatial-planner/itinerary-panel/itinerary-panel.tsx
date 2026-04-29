@@ -3,7 +3,7 @@ import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Map, FileDown, RotateCcw, MapPin, Utensils, Camera, Bed,
-  Sun, Sunset, Moon, Coffee, Navigation, Copy, BedDouble, UtensilsCrossed,
+  Sun, Sunset, Moon, Coffee, Navigation, Save, BedDouble, UtensilsCrossed,
   Send, Sparkles, ChevronDown, ChevronUp, Loader2, ArrowLeft, Share2, Settings,
   MessageCircle, Compass, X, ExternalLink,
 } from "lucide-react";
@@ -20,8 +20,9 @@ import {
 import { generatePlannerStreamAsync } from "@/lib/services/planner-service";
 import LocationCard from "./location-card";
 import SuggestionsPanel from "./suggestions-panel";
-import { exportItineraryPDF, shareItinerary } from "@/lib/services/index";
+import { exportItineraryPDF } from "@/lib/services/index";
 import type { ActivityRow } from "@/lib/types/planner.types";
+import { createSharedTrip, saveTripSnapshot } from "@/lib/services/trips-service";
 
 // ── Google Maps navigation helper ────────────────────────────────────────
 function buildGoogleMapsUrl(rows: ActivityRow[], destination: string): string {
@@ -146,6 +147,7 @@ export default function ItineraryPanel() {
   const [actionToast, setActionToast] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isSavingTrip, setIsSavingTrip] = useState(false);
   const [showStartNewConfirm, setShowStartNewConfirm] = useState(false);
   const aiInputRef = useRef<HTMLInputElement>(null);  const { setMobileTab } = useUIStore();
   const { selectedPackage } = useOnboardingStore();
@@ -203,22 +205,50 @@ export default function ItineraryPanel() {
   }
 
   async function handleShare() {
-    if (!itineraryData || isSharing) return;
+    if (!itineraryData || isSharing || !accessToken) return;
     setIsSharing(true);
     try {
-      const result = await shareItinerary(itineraryData, tripData);
-      const label =
-        result === "shared"
-          ? "Shared"
-          : result === "downloaded"
-          ? "Downloaded"
-          : "Copied to clipboard";
-      setActionToast(label);
+      const title =
+        window.prompt("Name this shared trip", itineraryData.destination || "My Velosta trip")?.trim();
+      if (!title) return;
+      const payload = { itineraryData, tripData } as Record<string, unknown>;
+      const data = await createSharedTrip(title, payload);
+      const token = data.sharedTrip.shareToken;
+      const url = `${window.location.origin}/saved-trips/shared/${token}`;
+      if (navigator.share) {
+        await navigator.share({
+          title,
+          text: "View this Velosta trip",
+          url,
+        });
+        setActionToast("Link shared");
+      } else {
+        await navigator.clipboard.writeText(url);
+        setActionToast("Share link copied");
+      }
     } catch (err) {
       console.error("[itinerary] share failed", err);
       setActionToast("Share failed");
     } finally {
       setIsSharing(false);
+      setTimeout(() => setActionToast(null), 1800);
+    }
+  }
+
+  async function handleSaveTrip() {
+    if (!itineraryData || isSavingTrip) return;
+    setIsSavingTrip(true);
+    try {
+      const title =
+        window.prompt("Save trip as", itineraryData.destination || "My Velosta trip")?.trim();
+      if (!title) return;
+      await saveTripSnapshot(title, { itineraryData, tripData } as Record<string, unknown>);
+      setActionToast("Trip saved");
+    } catch (err) {
+      console.error("[itinerary] save failed", err);
+      setActionToast("Save failed");
+    } finally {
+      setIsSavingTrip(false);
       setTimeout(() => setActionToast(null), 1800);
     }
   }
@@ -487,8 +517,21 @@ export default function ItineraryPanel() {
             )}
           </button>
           <button
+            onClick={handleSaveTrip}
+            disabled={isSavingTrip || !itineraryData || !accessToken}
+            className="p-1.5 rounded-md hover:bg-[#0B1F2A]/5 transition-colors text-[#0B1F2A]/45 hover:text-[#0B1F2A]/85 disabled:opacity-40"
+            title="Save trip"
+            aria-label="Save trip"
+          >
+            {isSavingTrip ? (
+              <Loader2 size={13} strokeWidth={1.8} className="animate-spin" />
+            ) : (
+              <Save size={13} strokeWidth={1.8} />
+            )}
+          </button>
+          <button
             onClick={handleShare}
-            disabled={isSharing || !itineraryData}
+            disabled={isSharing || !itineraryData || !accessToken}
             className="p-1.5 rounded-md hover:bg-[#0B1F2A]/5 transition-colors text-[#0B1F2A]/45 hover:text-[#0B1F2A]/85 disabled:opacity-40"
             title="Share itinerary"
             aria-label="Share itinerary"

@@ -5,19 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useUser } from "@/app/utils/context";
 import { PenLine, Compass, Heart, Calendar } from "lucide-react";
-import authorAvatar from "../../public/icons/people.png";
 
 const STORY_TAG = "_story";
-
-const RANDOM_NAMES = [
-  "Rugved", "Vaisitha", "Dhuvesh", "Vikas", "Priya",
-  "Arjun", "Ananya", "Rohan", "Kavya", "Aditya",
-];
-
-const getRandomName = (id: string) => {
-  const hash = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  return RANDOM_NAMES[hash % RANDOM_NAMES.length];
-};
 
 type BlogPost = {
   id: string;
@@ -88,12 +77,27 @@ function EmptyState({ isSignedIn }: { isSignedIn: boolean }) {
 }
 
 function StoryCard({ post }: { post: BlogPost }) {
-  const displayName = getRandomName(post.id);
+  const displayName = post.authorName?.trim() || "Traveler";
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const visibleTags = post.tags.filter((t) => t !== STORY_TAG);
   const readingMins = Math.max(
     1,
     Math.ceil(post.content.replace(/<[^>]*>/g, "").split(/\s+/).length / 200)
   );
+
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "T";
+
+  const avatarUrl = (post.authorAvatar || "").trim();
+  const hasAvatar =
+    !!avatarUrl &&
+    avatarUrl !== "null" &&
+    avatarUrl !== "undefined" &&
+    !avatarFailed;
 
   return (
     <article className="group flex flex-col rounded-2xl overflow-hidden bg-white border border-[var(--color-mist)] shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-[var(--color-brand)]/20">
@@ -115,13 +119,20 @@ function StoryCard({ post }: { post: BlogPost }) {
 
       <div className="flex flex-col flex-1 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <Image
-            src={post.authorAvatar || authorAvatar.src}
-            alt={displayName}
-            width={36}
-            height={36}
-            className="rounded-full object-cover border-2 border-[var(--color-sand)]"
-          />
+          {hasAvatar ? (
+            <Image
+              src={avatarUrl}
+              alt={displayName}
+              width={36}
+              height={36}
+              onError={() => setAvatarFailed(true)}
+              className="rounded-full object-cover border-2 border-[var(--color-sand)]"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--color-sand)] bg-[var(--color-brand)]/10 text-xs font-semibold text-[var(--color-brand)]">
+              {initials}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[var(--color-navy)] truncate">
               {displayName}

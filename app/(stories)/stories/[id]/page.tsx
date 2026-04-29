@@ -1,4 +1,3 @@
-import { BlogComments } from "@/components/blog/blog-comments";
 import { BlogDetail } from "@/components/blog/blog-detail";
 import { RelatedPosts } from "@/components/blog/related-posts";
 import Footer from "@/components/footer";
@@ -43,9 +42,6 @@ export default async function StoryPage({ params }: Props) {
       <Navbar />
       <div className="mt-24">
         <BlogDetail blog={blog} />
-        <div className="mx-auto max-w-3xl px-4 py-6">
-          <BlogComments blogId={id} />
-        </div>
         <RelatedPosts currentPostId={id} />
       </div>
       <Footer />

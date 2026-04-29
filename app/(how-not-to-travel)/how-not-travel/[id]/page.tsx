@@ -1,5 +1,3 @@
-import ProtectedRoute from "@/app/utils/protected-routes";
-import { BlogComments } from "@/components/blog/blog-comments";
 import { BlogDetail } from "@/components/blog/blog-detail";
 import { RelatedPosts } from "@/components/blog/related-posts";
 import Footer from "@/components/footer";

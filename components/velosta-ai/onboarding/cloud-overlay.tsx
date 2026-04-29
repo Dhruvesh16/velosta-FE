@@ -649,8 +649,8 @@ export default function CloudOverlay({
               </div>
             </motion.div>
 
-            {/* ═══ RIGHT — compass + message, centered in remaining space ═══ */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-0 px-8">
+            {/* ═══ CENTER STAGE — compass + message centered on full viewport ═══ */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-0 px-8 pointer-events-none">
               {/* Compass */}
               <div className="relative mb-6">
                 <motion.div

@@ -163,9 +163,19 @@ export default function Page() {
   const featuredRef = useRef(null);
   const [storyPosts, setStoryPosts] = useState([]);
   const [hnttPosts, setHnttPosts] = useState([]);
+  const [brokenAvatars, setBrokenAvatars] = useState({});
+  const getInitials = (name) =>
+    (name || "Traveler")
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => (part[0] || "").toUpperCase())
+      .join("") || "T";
+
 
   useEffect(() => {
-    const base = process.env.NEXT_PUBLIC_URL || "";
+    const base =
+      process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_URL || "";
     async function fetchPosts() {
       try {
         const res = await fetch(`${base}/api/travel-blog/all-blogs`);
@@ -1145,6 +1155,12 @@ export default function Page() {
                   const rotations = [-1.8, 1.2, -0.6, 1.6];
                   const rotate = rotations[i % rotations.length];
                   const firstTag = post.tags?.find((tag) => tag !== "_story") || "";
+                  const avatarUrl = (post.authorAvatar || "").trim();
+                  const hasAvatar =
+                    !!avatarUrl &&
+                    avatarUrl !== "null" &&
+                    avatarUrl !== "undefined" &&
+                    !brokenAvatars[post.id];
                   return (
                     <motion.article
                       key={post.id}
@@ -1208,10 +1224,27 @@ export default function Page() {
                             className="h-10 w-10 shrink-0 overflow-hidden rounded-full"
                             style={{ border: "1.5px solid rgba(245,239,230,0.35)", boxShadow: "0 4px 12px rgba(11,31,42,0.3)" }}
                           >
-                            <img src={post.authorAvatar || "/travel-blog-image.jpg"} alt={post.authorName} loading="lazy" className="h-full w-full object-cover" />
+                            {hasAvatar ? (
+                              <img
+                                src={avatarUrl}
+                                alt={post.authorName || "Traveler"}
+                                loading="lazy"
+                                className="h-full w-full object-cover"
+                                onError={() =>
+                                  setBrokenAvatars((prev) => ({
+                                    ...prev,
+                                    [post.id]: true,
+                                  }))
+                                }
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-white/90 text-[11px] font-semibold text-[#2F6F73]">
+                                {getInitials(post.authorName)}
+                              </div>
+                            )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: "rgba(245,239,230,0.95)" }}>{post.authorName}</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: "rgba(245,239,230,0.95)" }}>{post.authorName || "Traveler"}</p>
                             <p className={`${playfair.className} mt-0.5 truncate text-[12px] italic`} style={{ color: "rgba(245,239,230,0.55)" }}>
                               {new Date(post.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                             </p>
@@ -1396,7 +1429,7 @@ export default function Page() {
                       style={{ borderColor: "rgba(11,31,42,0.08)" }}
                     >
                       <span className="text-[12px]" style={{ color: "rgba(11,31,42,0.5)" }}>
-                        {post.authorName}
+                        {post.authorName || "Traveler"}
                       </span>
                       <Link
                         href={`/how-not-travel/${post.id}`}

@@ -132,14 +132,32 @@ if [[ -n "$FE_URL" ]]; then
     --data-file=- --project="$PROJECT"
   log "fe-url stored in Secret Manager"
 
-  # Update gateway CORS to include the real FE URL
-  log "Updating gateway CORS_ORIGINS with FE URL + custom domains..."
+  # Update gateway with full service URLs + CORS so FE deploys never
+  # accidentally leave backend proxy vars in a drifted state.
+  log "Updating gateway env (service URLs + CORS)..."
+  AUTH_URL=$(gcloud run services describe velosta-auth --region="$REGION" --project="$PROJECT" --format="value(status.url)" 2>/dev/null || echo "")
+  TRIPS_URL=$(gcloud run services describe velosta-trips --region="$REGION" --project="$PROJECT" --format="value(status.url)" 2>/dev/null || echo "")
+  PLANNER_URL=$(gcloud run services describe velosta-planner --region="$REGION" --project="$PROJECT" --format="value(status.url)" 2>/dev/null || echo "")
+  VENDORS_URL=$(gcloud run services describe velosta-vendors --region="$REGION" --project="$PROJECT" --format="value(status.url)" 2>/dev/null || echo "")
   CORS_ORIGINS="${PUBLIC_WEB_ORIGINS},${FE_URL},http://localhost:3000"
-  gcloud run services update velosta-gateway \
-    --region="$REGION" \
-    --project="$PROJECT" \
-    --update-env-vars "^|^CORS_ORIGINS=${CORS_ORIGINS}" \
-    --quiet 2>/dev/null || log "  (gateway not yet deployed — CORS will be set on next BE deploy)"
+
+  GATEWAY_ENV="^|^SERVICE_NAME=gateway|SERVICE_PORT=8000|JWT_ALGORITHM=HS256|JWT_ACCESS_TTL_MIN=60|JWT_REFRESH_TTL_DAYS=30|LOG_LEVEL=INFO"
+  [[ -n "$AUTH_URL"    ]] && GATEWAY_ENV+="|AUTH_SERVICE_URL=${AUTH_URL}"
+  [[ -n "$TRIPS_URL"   ]] && GATEWAY_ENV+="|TRIPS_SERVICE_URL=${TRIPS_URL}"
+  [[ -n "$PLANNER_URL" ]] && GATEWAY_ENV+="|PLANNER_SERVICE_URL=${PLANNER_URL}"
+  [[ -n "$VENDORS_URL" ]] && GATEWAY_ENV+="|VENDORS_SERVICE_URL=${VENDORS_URL}"
+  GATEWAY_ENV+="|CORS_ORIGINS=${CORS_ORIGINS}"
+
+  if gcloud run services describe velosta-gateway --region="$REGION" --project="$PROJECT" >/dev/null 2>&1; then
+    gcloud run services update velosta-gateway \
+      --region="$REGION" \
+      --project="$PROJECT" \
+      --set-env-vars "$GATEWAY_ENV" \
+      --quiet
+    ok "Gateway env updated from FE deploy"
+  else
+    log "  (gateway not yet deployed — env will be set on next BE deploy)"
+  fi
 fi
 
 # ── Health check ──────────────────────────────────────────────────────────────

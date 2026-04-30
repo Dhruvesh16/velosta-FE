@@ -1,15 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Playfair_Display } from "next/font/google";
-import { Sparkles, CheckCircle2 } from "lucide-react";
-import { authApi } from "@/lib/api";
+import { Sparkles, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
 import { useUser } from "@/app/utils/context";
 import {
   useOnboardingStore,
   type TravelProfileAnswers,
 } from "@/lib/stores/onboarding-store";
+import {
+  markTravelProfilePendingSync,
+  syncTravelProfileToServer,
+} from "@/lib/services/travel-profile-sync";
 
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["500", "600"] });
 
@@ -73,12 +76,43 @@ export default function TravelPersonalityQuestionnaire() {
   const { completeTravelProfile } = useOnboardingStore();
   const { accessToken } = useUser();
   const [answers, setAnswers] = useState<Partial<TravelProfileAnswers>>(EMPTY);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState<1 | -1>(1);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const answeredCount = useMemo(
     () => QUESTIONS.filter((q) => answers[q.key]).length,
     [answers]
   );
   const done = answeredCount === QUESTIONS.length;
+  const currentQuestion = QUESTIONS[currentIndex];
+  const hasAnswerForCurrent = !!answers[currentQuestion.key];
+  const onLastQuestion = currentIndex === QUESTIONS.length - 1;
+
+  const goNext = () => {
+    if (onLastQuestion) return;
+    setDirection(1);
+    setCurrentIndex((prev) => Math.min(prev + 1, QUESTIONS.length - 1));
+  };
+
+  const goBack = () => {
+    if (currentIndex === 0) return;
+    setDirection(-1);
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const saveProfile = async () => {
+    const finalAnswers = answers as TravelProfileAnswers;
+    completeTravelProfile(finalAnswers);
+    if (!accessToken) {
+      markTravelProfilePendingSync(finalAnswers);
+      return;
+    }
+    const synced = await syncTravelProfileToServer(finalAnswers);
+    if (!synced) {
+      setSyncMsg("Saved locally. We'll auto-sync this once your session is stable.");
+    }
+  };
 
   return (
     <div className="fixed inset-0 overflow-y-auto bg-[#FBF8F3]">
@@ -108,22 +142,34 @@ export default function TravelPersonalityQuestionnaire() {
             </div>
           </div>
 
-          <div className="space-y-6">
-            {QUESTIONS.map((q, idx) => (
-              <section key={q.key} className="rounded-2xl border border-[#0B1F2A]/8 p-4 md:p-5">
+          <div className="min-h-[280px]">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.section
+                key={currentQuestion.key}
+                initial={{ opacity: 0, x: direction > 0 ? 42 : -42, scale: 0.98 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: direction > 0 ? -42 : 42, scale: 0.98 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="rounded-2xl border border-[#0B1F2A]/8 p-4 md:p-5"
+              >
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2F6F73]/80">
-                  Question {idx + 1}
+                  Question {currentIndex + 1}
                 </p>
-                <h2 className="mt-1 text-[15px] font-semibold text-[#0B1F2A]">{q.title}</h2>
+                <h2 className="mt-1 text-[15px] font-semibold text-[#0B1F2A]">
+                  {currentQuestion.title}
+                </h2>
                 <div className="mt-3 grid gap-2">
-                  {q.options.map((opt) => {
-                    const active = answers[q.key] === opt.id;
+                  {currentQuestion.options.map((opt) => {
+                    const active = answers[currentQuestion.key] === opt.id;
                     return (
                       <button
                         key={String(opt.id)}
                         type="button"
                         onClick={() =>
-                          setAnswers((prev) => ({ ...prev, [q.key]: opt.id }))
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [currentQuestion.key]: opt.id,
+                          }))
                         }
                         className={`w-full rounded-xl border px-3.5 py-2.5 text-left text-sm transition-all ${
                           active
@@ -136,40 +182,53 @@ export default function TravelPersonalityQuestionnaire() {
                     );
                   })}
                 </div>
-              </section>
-            ))}
+              </motion.section>
+            </AnimatePresence>
           </div>
 
           <div className="mt-7 flex items-center justify-between">
             <p className="text-xs text-[#0B1F2A]/45">
               {answeredCount}/{QUESTIONS.length} answered
             </p>
-            <button
-              type="button"
-              disabled={!done}
-              onClick={async () => {
-                const finalAnswers = answers as TravelProfileAnswers;
-                completeTravelProfile(finalAnswers);
-                if (accessToken) {
-                  try {
-                    await authApi.updateProfile({
-                      travel_preferences: finalAnswers,
-                    });
-                  } catch {
-                    // Non-blocking; local state is already saved.
-                  }
-                }
-              }}
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
-              style={{
-                background: "linear-gradient(135deg, #D97757, #B85F44)",
-                boxShadow: "0 14px 30px -12px rgba(217,119,87,0.5)",
-              }}
-            >
-              <CheckCircle2 size={15} />
-              Save my travel style
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={goBack}
+                disabled={currentIndex === 0}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#0B1F2A]/15 px-4 py-2.5 text-xs font-semibold text-[#0B1F2A]/70 disabled:opacity-40"
+              >
+                <ArrowLeft size={14} />
+                Back
+              </button>
+              {onLastQuestion ? (
+                <button
+                  type="button"
+                  disabled={!done}
+                  onClick={saveProfile}
+                  className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                  style={{
+                    background: "linear-gradient(135deg, #D97757, #B85F44)",
+                    boxShadow: "0 14px 30px -12px rgba(217,119,87,0.5)",
+                  }}
+                >
+                  <CheckCircle2 size={15} />
+                  Save my travel style
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!hasAnswerForCurrent}
+                  onClick={goNext}
+                  className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, #D97757, #B85F44)" }}
+                >
+                  Next
+                  <ArrowRight size={14} />
+                </button>
+              )}
+            </div>
           </div>
+          {syncMsg && <p className="mt-3 text-xs text-[#0B1F2A]/55">{syncMsg}</p>}
         </motion.div>
       </div>
     </div>

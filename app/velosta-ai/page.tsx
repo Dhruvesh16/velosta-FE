@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { authApi } from "@/lib/api";
 import { useUser } from "@/app/utils/context";
+import {
+  readTravelProfilePendingSync,
+  syncTravelProfileToServer,
+} from "@/lib/services/travel-profile-sync";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { usePlannerStore } from "@/lib/stores/planner-store";
 import { useMapStore } from "@/lib/stores/map-store";
@@ -86,6 +90,12 @@ export default function PlanPage() {
           hydrateTravelProfile(serverPrefs);
           setFlowStep("landing");
           return;
+        }
+        if (!cancelled) {
+          const pending = readTravelProfilePendingSync();
+          if (pending) {
+            await syncTravelProfileToServer(pending);
+          }
         }
       } catch {
         // Fall back to persisted local state.

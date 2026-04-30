@@ -117,6 +117,13 @@ export interface AuthUser {
   email: string;
   name: string | null;
   avatarUrl?: string | null;
+  travelPreferences?: {
+    climatePreference: "cool_breezy" | "warm_sunny" | "doesnt_matter";
+    pacePreference: "packed" | "slow_relaxed" | "both";
+    randomPlaceComfort: "yes" | "depends" | "not_really";
+    placeEnergy: "adventurous" | "chill_calm" | "doesnt_matter";
+    socialSpotFocus: "absolutely" | "sometimes" | "not_my_thing";
+  } | null;
   twoFaMethod?: "email_otp" | "totp";
   hasPassword?: boolean;
 }
@@ -196,7 +203,11 @@ export const authApi = {
 
   // ── Profile ──────────────────────────────────────────────────────────────
 
-  updateProfile: (input: { name?: string; avatar_url?: string }) =>
+  updateProfile: (input: {
+    name?: string;
+    avatar_url?: string;
+    travel_preferences?: AuthUser["travelPreferences"];
+  }) =>
     api.patch<{ user: AuthUser }>("/api/auth/profile", input),
 
   uploadAvatar: async (file: File): Promise<{ user: AuthUser; avatarUrl: string }> => {

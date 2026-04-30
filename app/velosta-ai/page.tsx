@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { authApi } from "@/lib/api";
+import { useUser } from "@/app/utils/context";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { usePlannerStore } from "@/lib/stores/planner-store";
 import { useMapStore } from "@/lib/stores/map-store";
@@ -29,6 +31,13 @@ const ManualItineraryBuilder = dynamic(
   () => import("@/components/velosta-ai/onboarding/manual-itinerary-builder"),
   { ssr: false }
 );
+const TravelPersonalityQuestionnaire = dynamic(
+  () =>
+    import(
+      "@/components/velosta-ai/onboarding/travel-personality-questionnaire"
+    ),
+  { ssr: false }
+);
 
 /* Premium cinematic transition — depth + slide, not flat fade */
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -41,14 +50,24 @@ const STEP_TRANSITION = {
 
 export default function PlanPage() {
   const searchParams = useSearchParams();
-  const { flowStep, selectedTier, selectedDestination, setFlowStep } = useOnboardingStore();
+  const {
+    flowStep,
+    selectedTier,
+    selectedDestination,
+    setFlowStep,
+    travelProfileCompleted,
+    hydrateTravelProfile,
+  } = useOnboardingStore();
   const { setTripData, itineraryData } = usePlannerStore();
   const { markers } = useMapStore();
+  const { accessToken } = useUser();
 
   // When coming from /plan with a typed intent, skip onboarding and go straight to planner.
   // For ALL other entries, reset to "landing" so stale persisted flowStep never shows
   // an empty planner shell to the user.
   useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
     if (searchParams?.get("fromPlan") === "1") {
       try {
         const hasIntent = !!window.sessionStorage.getItem("velosta:planIntent");
@@ -58,11 +77,33 @@ export default function PlanPage() {
         }
       } catch { /* ignore */ }
     }
-    // Fresh visit (no typed intent) — always start from the landing scene so
-    // a stale localStorage flowStep can never strand the user in an empty planner.
-    setFlowStep("landing");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    if (accessToken) {
+      try {
+        const me = await authApi.me();
+        const serverPrefs = me?.user?.travelPreferences ?? null;
+        if (!cancelled && serverPrefs) {
+          hydrateTravelProfile(serverPrefs);
+          setFlowStep("landing");
+          return;
+        }
+      } catch {
+        // Fall back to persisted local state.
+      }
+    }
+
+    if (!cancelled) {
+      // Fresh visit (no typed intent) — first-time users see questionnaire;
+      // everyone else starts from landing scene so stale flow cannot strand user.
+      setFlowStep(travelProfileCompleted ? "landing" : "questionnaire");
+    }
+  };
+
+    void init();
+    return () => {
+      cancelled = true;
+    };
+  }, [travelProfileCompleted, accessToken, searchParams, setFlowStep, hydrateTravelProfile]);
 
   // Pre-seed trip context (destination + budget) when entering planner.
   // NOTE: We intentionally DO NOT seed map markers from any static package.
@@ -103,6 +144,12 @@ export default function PlanPage() {
             {flowStep === "landing" && (
               <motion.div key="landing" {...STEP_TRANSITION} className="fixed inset-0">
                 <CloudLandingScene />
+              </motion.div>
+            )}
+
+            {flowStep === "questionnaire" && (
+              <motion.div key="questionnaire" {...STEP_TRANSITION}>
+                <TravelPersonalityQuestionnaire />
               </motion.div>
             )}
 

@@ -19,6 +19,7 @@ import {
   commitItineraryToStores,
   enrichItineraryInBackground,
 } from "@/lib/services/itinerary-hydrator";
+import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import CloudOverlay from "./cloud-overlay";
@@ -52,6 +53,7 @@ export default function TripInputs() {
     userLocation: storeOrigin,
     travelerType,
     travelerCount,
+    travelProfile,
   } = useOnboardingStore();
   const { accessToken } = useUser();
 
@@ -242,12 +244,14 @@ export default function TripInputs() {
     let autoMsg = `Plan a ${days}-day trip to ${destination.name}`;
     if (budget) autoMsg += ` with a budget of ${budget}`;
     autoMsg += ` for ${travelerCount} ${travelerType} traveler(s).${originStr} Generate the full itinerary now.`;
+    const profilePrompt = buildTravelProfilePrompt(travelProfile);
+    const fullPrompt = `${autoMsg}${profilePrompt}`;
 
     let didSucceed = false;
     try {
       const response = await generatePlannerStreamAsync(
         {
-          userSaid: autoMsg,
+          userSaid: fullPrompt,
           conversationHistory: [],
           currentItinerary: null,
           isModificationRequest: false,
@@ -337,6 +341,10 @@ export default function TripInputs() {
     setGeneratedItinerary,
     setGeneratingItinerary,
     selectDestination,
+    travelerCount,
+    travelerType,
+    storeOrigin,
+    travelProfile,
   ]);
 
   const isReady = (selectedPlace || locationText.trim()) && duration > 0;

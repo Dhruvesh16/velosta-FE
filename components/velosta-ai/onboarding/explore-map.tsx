@@ -30,6 +30,7 @@ import {
   commitItineraryToStores,
   enrichItineraryInBackground,
 } from "@/lib/services/itinerary-hydrator";
+import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import CloudOverlay from "./cloud-overlay";
@@ -89,6 +90,7 @@ export default function ExploreMapView() {
     startManualBuild,
     setUserLocation,
     setDuration: setStoreDuration,
+    travelProfile,
   } = useOnboardingStore();
   const { accessToken } = useUser();
 
@@ -348,10 +350,12 @@ export default function ExploreMapView() {
       const autoMsg = `Plan a ${duration}-day trip to ${locationStr} with a budget of ₹${budget.toLocaleString(
         "en-IN"
       )} for ${travelerCount} ${tripType} traveler(s)${interestStr}.${originStr} Generate the full itinerary now.`;
+      const profilePrompt = buildTravelProfilePrompt(travelProfile);
+      const fullPrompt = `${autoMsg}${profilePrompt}`;
 
       // Stash for any downstream consumer (e.g. mobile chat panel)
       try {
-        sessionStorage.setItem("velosta:auto-prompt", autoMsg);
+        sessionStorage.setItem("velosta:auto-prompt", fullPrompt);
       } catch {
         /* sessionStorage may be blocked — non-fatal */
       }
@@ -391,7 +395,7 @@ export default function ExploreMapView() {
       try {
         const response = await generatePlannerStreamAsync(
           {
-            userSaid: autoMsg,
+            userSaid: fullPrompt,
             conversationHistory: [],
             currentItinerary: null,
             isModificationRequest: false,
@@ -484,6 +488,7 @@ export default function ExploreMapView() {
       selectDestination,
       startManualBuild,
       planningMode,
+      travelProfile,
     ]
   );
 

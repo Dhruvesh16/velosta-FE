@@ -23,6 +23,7 @@ const C = {
 };
 
 export type FlowStep =
+  | "questionnaire"
   | "landing"
   | "budget"
   | "packages"

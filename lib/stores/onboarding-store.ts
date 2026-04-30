@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 export type FlowStep =
+  | "questionnaire"
   | "landing"
   | "budget"
   | "packages"
@@ -14,6 +15,14 @@ export type FlowStep =
   | "planner";
 
 export type PlanningMode = "ai" | "manual";
+
+export interface TravelProfileAnswers {
+  climatePreference: "cool_breezy" | "warm_sunny" | "doesnt_matter";
+  pacePreference: "packed" | "slow_relaxed" | "both";
+  randomPlaceComfort: "yes" | "depends" | "not_really";
+  placeEnergy: "adventurous" | "chill_calm" | "doesnt_matter";
+  socialSpotFocus: "absolutely" | "sometimes" | "not_my_thing";
+}
 
 export interface UserLocation {
   name: string;
@@ -341,6 +350,8 @@ export interface CustomDestination {
 interface OnboardingState {
   flowStep: FlowStep;
   planningMode: PlanningMode;
+  travelProfileCompleted: boolean;
+  travelProfile: TravelProfileAnswers | null;
   selectedTier: BudgetTier | null;
   selectedPackage: TravelPackage | null;
   selectedDestination: string | null;
@@ -360,6 +371,8 @@ interface OnboardingState {
 
   setFlowStep: (step: FlowStep) => void;
   setPlanningMode: (mode: PlanningMode) => void;
+  completeTravelProfile: (answers: TravelProfileAnswers) => void;
+  hydrateTravelProfile: (answers: TravelProfileAnswers | null) => void;
   selectTier: (tier: BudgetTier) => void;
   selectPackage: (pkg: TravelPackage) => void;
   selectDestination: (destination: string) => void;
@@ -384,6 +397,8 @@ export const useOnboardingStore = create<OnboardingState>()(
     (set) => ({
   flowStep: "landing",
   planningMode: "ai",
+  travelProfileCompleted: false,
+  travelProfile: null,
   selectedTier: null,
   selectedPackage: null,
   selectedDestination: null,
@@ -402,6 +417,17 @@ export const useOnboardingStore = create<OnboardingState>()(
 
   setFlowStep: (step) => set({ flowStep: step }),
   setPlanningMode: (mode) => set({ planningMode: mode }),
+  completeTravelProfile: (answers) =>
+    set({
+      travelProfileCompleted: true,
+      travelProfile: answers,
+      flowStep: "budget",
+    }),
+  hydrateTravelProfile: (answers) =>
+    set({
+      travelProfileCompleted: !!answers,
+      travelProfile: answers,
+    }),
 
   selectTier: (tier) =>
     set({ selectedTier: tier, flowStep: "packages" }),
@@ -446,6 +472,8 @@ export const useOnboardingStore = create<OnboardingState>()(
     set({
       flowStep: "landing",
       planningMode: "ai",
+      travelProfileCompleted: false,
+      travelProfile: null,
       selectedTier: null,
       selectedPackage: null,
       selectedDestination: null,
@@ -469,6 +497,8 @@ export const useOnboardingStore = create<OnboardingState>()(
     partialize: (state) => ({
       flowStep: state.flowStep,
       planningMode: state.planningMode,
+      travelProfileCompleted: state.travelProfileCompleted,
+      travelProfile: state.travelProfile,
       selectedTier: state.selectedTier,
       selectedPackage: state.selectedPackage,
       selectedDestination: state.selectedDestination,

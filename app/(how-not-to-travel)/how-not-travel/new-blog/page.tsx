@@ -17,7 +17,7 @@ export default function NewTravelBlogPage() {
             category="_hntt"
             redirectAfterPublish="/how-not-travel"
             heading="Share a Travel Mishap"
-            subheading="Warn fellow travellers — your honest story about what went wrong could save someone else's trip."
+            subheading="Warn fellow travellers, your honest story about what went wrong could save someone else's trip."
             accentVar="--color-teal"
             contextLabel="How n̶o̶t̶ to Travel"
           />

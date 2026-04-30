@@ -168,6 +168,8 @@ export function generatePlannerStream(
   }
 ): AbortController {
   const ac = new AbortController();
+  const STREAM_IDLE_TIMEOUT_MS = 25000;
+  const STREAM_MAX_DURATION_MS = 4 * 60 * 1000;
 
   (async () => {
     // Always refresh token before starting a long-running stream
@@ -198,10 +200,44 @@ export function generatePlannerStream(
       const decoder = new TextDecoder();
       let buf = "";
       let didEmitDone = false;
+      let finished = false;
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      const hardDeadlineTimer = setTimeout(() => {
+        if (finished) return;
+        finished = true;
+        try {
+          reader.cancel();
+        } catch {
+          /* noop */
+        }
+        callbacks.onError(new Error("stream_timeout"));
+      }, STREAM_MAX_DURATION_MS);
+
+      const clearIdleTimer = () => {
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+          idleTimer = null;
+        }
+      };
+      const armIdleTimer = () => {
+        clearIdleTimer();
+        idleTimer = window.setTimeout(() => {
+          if (finished) return;
+          finished = true;
+          try {
+            reader.cancel();
+          } catch {
+            /* noop */
+          }
+          callbacks.onError(new Error("stream_idle_timeout"));
+        }, STREAM_IDLE_TIMEOUT_MS);
+      };
+      armIdleTimer();
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        armIdleTimer();
         buf += decoder.decode(value, { stream: true });
 
         // SSE events are delimited by double newline
@@ -224,9 +260,16 @@ export function generatePlannerStream(
             if (msg.type === "token" && msg.text) {
               callbacks.onToken(msg.text);
             } else if (msg.type === "done" && "itinerary" in msg) {
+              finished = true;
+              clearIdleTimer();
+              clearTimeout(hardDeadlineTimer);
               didEmitDone = true;
               callbacks.onDone(msg.itinerary as PlannerResponse);
+              return;
             } else if (msg.type === "error") {
+              finished = true;
+              clearIdleTimer();
+              clearTimeout(hardDeadlineTimer);
               // Server signalled a recoverable failure — abort the read
               // loop so the promise wrapper triggers the non-stream fallback
               // immediately instead of waiting for the connection to close.
@@ -242,8 +285,11 @@ export function generatePlannerStream(
         }
       }
 
+      clearIdleTimer();
+      clearTimeout(hardDeadlineTimer);
       // Stream closed without a done event — fall back to non-stream endpoint
       if (!didEmitDone) {
+        finished = true;
         callbacks.onError(new Error("stream_incomplete"));
       }
     } catch (err) {

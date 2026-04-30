@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Playfair_Display, Dancing_Script } from "next/font/google";
 import { Sparkles, ArrowRight, Compass, X } from "lucide-react";
 import { useUser } from "@/app/utils/context";
+import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["500", "600", "700"] });
 const dancing = Dancing_Script({ subsets: ["latin"], weight: ["500", "600"] });
@@ -37,6 +38,7 @@ const C = {
 export default function PlanIntroPage() {
   const router = useRouter();
   const { user, accessToken, loading: authLoading } = useUser();
+  const { setPlanningMode } = useOnboardingStore();
 
   const firstName = useMemo(() => {
     if (!user?.name) return null;
@@ -65,7 +67,7 @@ export default function PlanIntroPage() {
     return () => window.clearInterval(id);
   }, [greeting]);
 
-  const goToPlanner = () => {
+  const goToPlanner = (mode: "ai" | "manual") => {
     if (submitting || authLoading) return;
 
     // Gate: must be signed in
@@ -74,6 +76,7 @@ export default function PlanIntroPage() {
       return;
     }
 
+    setPlanningMode(mode);
     setSubmitting(true);
     window.setTimeout(() => router.push("/velosta-ai"), 180);
   };
@@ -204,11 +207,11 @@ export default function PlanIntroPage() {
                 transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 className="mt-7 sm:mt-9 ml-0 sm:ml-[calc(2.75rem+1rem)]"
               >
-                {/* Primary CTA */}
-                <div className="flex justify-center">
+                {/* Primary CTAs */}
+                <div className="flex flex-col items-center gap-3">
                   <motion.button
                     type="button"
-                    onClick={goToPlanner}
+                    onClick={() => goToPlanner("ai")}
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.97 }}
                     disabled={submitting}
@@ -220,7 +223,25 @@ export default function PlanIntroPage() {
                     }}
                   >
                     <Sparkles className="h-4 w-4" />
-                    Start your journey
+                    Start your journey with Velosta AI
+                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={() => goToPlanner("manual")}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.97 }}
+                    disabled={submitting}
+                    className="group inline-flex items-center justify-center gap-2.5 rounded-full px-7 sm:px-9 py-3.5 sm:py-4 text-[14px] sm:text-[15px] font-semibold disabled:opacity-70 border"
+                    style={{
+                      background: "rgba(255,255,255,0.82)",
+                      color: C.navy,
+                      borderColor: "rgba(47,111,115,0.35)",
+                      boxShadow: "0 12px 28px -12px rgba(11,31,42,0.22)",
+                    }}
+                  >
+                    Build your own customised itinerary with the help of Velosta AI
                     <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                   </motion.button>
                 </div>

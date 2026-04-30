@@ -10,14 +10,15 @@ export async function GET(req: NextRequest) {
   const lat = searchParams.get("lat");
   const destination = searchParams.get("destination") || "";
 
-  if (!name || !lng || !lat || !GOOGLE_KEY) {
+  const cleanedName = (name || "").trim();
+  if (!cleanedName || !lng || !lat || !GOOGLE_KEY) {
     return NextResponse.json(null, { status: 400 });
   }
 
   // Skip generic activity names — these will only resolve to a random
   // business near the bias point, polluting the marker positions.
   const generic = /^(breakfast|lunch|dinner|brunch|snack|meal|return to|check[- ]?(in|out)|free time|rest|transfer|arrive|depart)\b|\b(at )?hotel\s*$|\bscenic\s+spot\b/i;
-  if (generic.test(name.trim()) || name.trim().length < 6) {
+  if (generic.test(cleanedName) || cleanedName.length < 6) {
     return NextResponse.json(null);
   }
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     // Step 1: Text Search to find the place. 25 km radius gives enough
     // coverage for island-hopping itineraries (e.g. Havelock Island is
     // ~37 km from Port Blair) without pulling POIs from neighboring cities.
-    const query = destination ? `${name}, ${destination}` : name;
+    const query = destination ? `${cleanedName}, ${destination}` : cleanedName;
     const searchUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
     searchUrl.searchParams.set("query", query);
     searchUrl.searchParams.set("location", `${lat},${lng}`);
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       placeId,
-      name: result.name ?? name,
+      name: result.name ?? cleanedName,
       rating: result.rating ?? place.rating,
       userRatingsTotal: result.user_ratings_total ?? place.user_ratings_total,
       types: result.types ?? place.types,

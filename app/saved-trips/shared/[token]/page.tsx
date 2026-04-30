@@ -25,6 +25,7 @@ type SnapshotDay = {
 type ParsedStop = {
   id: string;
   day: number;
+  rowIndex: number;
   activity: string;
   description: string;
   time: string;
@@ -34,6 +35,45 @@ type ParsedStop = {
 function num(value: unknown): number | null {
   const n = typeof value === "string" ? Number(value) : typeof value === "number" ? value : NaN;
   return Number.isFinite(n) ? n : null;
+}
+
+function isValidLngLat([lng, lat]: [number, number]): boolean {
+  return Number.isFinite(lng) && Number.isFinite(lat) && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
+}
+
+function haversineKm(a: [number, number], b: [number, number]): number {
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const [lng1, lat1] = a;
+  const [lng2, lat2] = b;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLng / 2);
+  const q =
+    s1 * s1 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * s2 * s2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(q), Math.sqrt(1 - q));
+}
+
+function sanitizeStops(rawStops: ParsedStop[]): ParsedStop[] {
+  const valid = rawStops.filter((s) => isValidLngLat(s.coordinates));
+  if (valid.length <= 2) return valid;
+
+  // Robust center using medians to reduce impact from outliers.
+  const lngs = valid.map((s) => s.coordinates[0]).sort((a, b) => a - b);
+  const lats = valid.map((s) => s.coordinates[1]).sort((a, b) => a - b);
+  const mid = Math.floor(valid.length / 2);
+  const center: [number, number] = [lngs[mid], lats[mid]];
+
+  const distances = valid
+    .map((s) => haversineKm(center, s.coordinates))
+    .sort((a, b) => a - b);
+  const p75 = distances[Math.floor(distances.length * 0.75)] ?? 0;
+  // Adaptive cap: handles city trips while still allowing multi-city plans.
+  const distanceCapKm = Math.max(25, Math.min(300, p75 * 2.5 || 80));
+
+  const cleaned = valid.filter((s) => haversineKm(center, s.coordinates) <= distanceCapKm);
+  return cleaned.length >= 2 ? cleaned : valid;
 }
 
 function parseSnapshot(snapshot: Record<string, unknown> | undefined): ParsedStop[] {
@@ -51,7 +91,13 @@ function parseSnapshot(snapshot: Record<string, unknown> | undefined): ParsedSto
       const coord = Array.isArray(row.coordinates) && row.coordinates.length === 2 ? row.coordinates : null;
       const coordinates: [number, number] | null =
         coord && Number.isFinite(coord[0]) && Number.isFinite(coord[1])
-          ? [coord[0], coord[1]]
+          ? // Snapshot payloads may carry either [lng,lat] or [lat,lng].
+            // Pick the variant that forms a valid lng/lat pair.
+            (isValidLngLat([coord[0], coord[1]])
+              ? [coord[0], coord[1]]
+              : isValidLngLat([coord[1], coord[0]])
+              ? [coord[1], coord[0]]
+              : null)
           : lat !== null && lng !== null
           ? [lng, lat]
           : null;
@@ -59,6 +105,7 @@ function parseSnapshot(snapshot: Record<string, unknown> | undefined): ParsedSto
       stops.push({
         id: `${day}-${rIdx}-${row.activity || "stop"}`,
         day,
+        rowIndex: rIdx,
         activity: row.activity || "Activity",
         description: row.description || "",
         time: row.time || "",
@@ -66,7 +113,8 @@ function parseSnapshot(snapshot: Record<string, unknown> | undefined): ParsedSto
       });
     });
   });
-  return stops;
+  // Keep original itinerary order after cleaning.
+  return sanitizeStops(stops).sort((a, b) => (a.day - b.day) || (a.rowIndex - b.rowIndex));
 }
 
 export default function SharedTripPage() {
@@ -115,23 +163,39 @@ export default function SharedTripPage() {
         new mapboxgl.Marker({ element: marker }).setLngLat(s.coordinates).addTo(map);
       });
       if (stops.length > 1) {
-        map.addSource("route", {
-          type: "geojson",
-          data: {
-            type: "Feature",
-            properties: {},
-            geometry: {
-              type: "LineString",
-              coordinates: stops.map((s) => s.coordinates),
-            },
-          },
-        });
-        map.addLayer({
-          id: "route-line",
-          type: "line",
-          source: "route",
-          paint: { "line-color": "#2F6F73", "line-width": 3.5, "line-opacity": 0.85 },
-        });
+        const dayColors = ["#2F6F73", "#D97757", "#7A4A36", "#3A6A4E", "#2A3A52", "#A88452"];
+        const grouped = new Map<number, ParsedStop[]>();
+        stops.forEach((s) => grouped.set(s.day, [...(grouped.get(s.day) || []), s]));
+
+        [...grouped.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .forEach(([day, dayStops], idx) => {
+            if (dayStops.length < 2) return;
+            const sourceId = `route-day-${day}`;
+            const layerId = `route-day-line-${day}`;
+            map.addSource(sourceId, {
+              type: "geojson",
+              data: {
+                type: "Feature",
+                properties: {},
+                geometry: {
+                  type: "LineString",
+                  coordinates: dayStops.map((s) => s.coordinates),
+                },
+              },
+            });
+            map.addLayer({
+              id: layerId,
+              type: "line",
+              source: sourceId,
+              paint: {
+                "line-color": dayColors[idx % dayColors.length],
+                "line-width": 3.5,
+                "line-opacity": 0.82,
+              },
+            });
+          });
+
         map.fitBounds(bounds, { padding: 60, duration: 0 });
       } else {
         map.flyTo({ center: stops[0].coordinates, zoom: 13, duration: 0 });

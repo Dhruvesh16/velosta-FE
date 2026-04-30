@@ -28,6 +28,7 @@ export type FlowStep =
   | "packages"
   | "trip-inputs"
   | "explore"
+  | "manual-builder"
   | "planner";
 
 type Props = {

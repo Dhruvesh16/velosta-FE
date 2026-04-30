@@ -25,6 +25,10 @@ const ExploreMapView = dynamic(
   () => import("@/components/velosta-ai/onboarding/explore-map"),
   { ssr: false }
 );
+const ManualItineraryBuilder = dynamic(
+  () => import("@/components/velosta-ai/onboarding/manual-itinerary-builder"),
+  { ssr: false }
+);
 
 /* Premium cinematic transition — depth + slide, not flat fade */
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -123,6 +127,12 @@ export default function PlanPage() {
             {flowStep === "explore" && (
               <motion.div key="explore" {...STEP_TRANSITION} className="fixed inset-0">
                 <ExploreMapView />
+              </motion.div>
+            )}
+
+            {flowStep === "manual-builder" && (
+              <motion.div key="manual-builder" {...STEP_TRANSITION} className="fixed inset-0">
+                <ManualItineraryBuilder />
               </motion.div>
             )}
 

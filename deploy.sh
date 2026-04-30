@@ -21,6 +21,7 @@ PROJECT="${GCP_PROJECT:-versatile-digit-476220-g6}"
 REGION="${GCP_REGION:-asia-south1}"
 AR_HOST="${GCP_AR_HOST:-${REGION}-docker.pkg.dev/${PROJECT}/velosta}"
 SA_EMAIL="${GCP_SA_EMAIL:-velosta-sa@${PROJECT}.iam.gserviceaccount.com}"
+PUBLIC_WEB_ORIGINS="${PUBLIC_WEB_ORIGINS:-https://velosta.com,https://www.velosta.com}"
 IMAGE_REPO="velosta/fe"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_FULL="${AR_HOST}/${IMAGE_REPO}:${IMAGE_TAG}"
@@ -132,11 +133,12 @@ if [[ -n "$FE_URL" ]]; then
   log "fe-url stored in Secret Manager"
 
   # Update gateway CORS to include the real FE URL
-  log "Updating gateway CORS_ORIGINS with FE URL..."
+  log "Updating gateway CORS_ORIGINS with FE URL + custom domains..."
+  CORS_ORIGINS="${PUBLIC_WEB_ORIGINS},${FE_URL},http://localhost:3000"
   gcloud run services update velosta-gateway \
     --region="$REGION" \
     --project="$PROJECT" \
-    --update-env-vars "^|^CORS_ORIGINS=${FE_URL},http://localhost:3000" \
+    --update-env-vars "^|^CORS_ORIGINS=${CORS_ORIGINS}" \
     --quiet 2>/dev/null || log "  (gateway not yet deployed — CORS will be set on next BE deploy)"
 fi
 

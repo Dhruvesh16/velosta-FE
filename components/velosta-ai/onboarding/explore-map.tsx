@@ -74,6 +74,7 @@ function getBudgetColor(fit: "perfect" | "stretch" | "over") {
 export default function ExploreMapView() {
   const {
     setFlowStep,
+    planningMode,
     budgetAmount,
     duration: storeDuration,
     travelerType: storeTravelerType,
@@ -85,6 +86,7 @@ export default function ExploreMapView() {
     setGeneratedItinerary,
     setGeneratingItinerary,
     selectDestination,
+    startManualBuild,
     setUserLocation,
     setDuration: setStoreDuration,
   } = useOnboardingStore();
@@ -355,6 +357,13 @@ export default function ExploreMapView() {
       }
 
       setGenerationError(null);
+      if (planningMode === "manual") {
+        // Manual planning path: skip AI generation and continue to
+        // day-wise drag/drop builder with the selected destination context.
+        startManualBuild(dest.name);
+        setSelectedDest(null);
+        return;
+      }
       const runId =
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
@@ -473,6 +482,8 @@ export default function ExploreMapView() {
       setUserLocation,
       setStoreDuration,
       selectDestination,
+      startManualBuild,
+      planningMode,
     ]
   );
 
@@ -1298,7 +1309,9 @@ export default function ExploreMapView() {
                         Generating...
                       </span>
                     ) : (
-                      "Build Itinerary →"
+                      planningMode === "manual"
+                        ? "Build My Custom Itinerary →"
+                        : "Build Itinerary →"
                     )}
                   </motion.button>
                 </div>

@@ -223,11 +223,13 @@ async function googlePlacesLookup(
   destination?: string
 ): Promise<[number, number] | null> {
   if (typeof window === "undefined") return null;
+  const cleaned = (placeName || "").trim();
+  if (!cleaned) return null;
   const cacheKey = `gp|${placeName}|${proximity.join(",")}|${destination ?? ""}`;
   if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey)!;
   try {
     const params = new URLSearchParams({
-      name: placeName,
+      name: cleaned,
       lng: String(proximity[0]),
       lat: String(proximity[1]),
     });

@@ -4,7 +4,16 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-export type FlowStep = "landing" | "budget" | "packages" | "trip-inputs" | "explore" | "planner";
+export type FlowStep =
+  | "landing"
+  | "budget"
+  | "packages"
+  | "trip-inputs"
+  | "explore"
+  | "manual-builder"
+  | "planner";
+
+export type PlanningMode = "ai" | "manual";
 
 export interface UserLocation {
   name: string;
@@ -331,6 +340,7 @@ export interface CustomDestination {
 
 interface OnboardingState {
   flowStep: FlowStep;
+  planningMode: PlanningMode;
   selectedTier: BudgetTier | null;
   selectedPackage: TravelPackage | null;
   selectedDestination: string | null;
@@ -349,9 +359,11 @@ interface OnboardingState {
   isGeneratingItinerary: boolean;
 
   setFlowStep: (step: FlowStep) => void;
+  setPlanningMode: (mode: PlanningMode) => void;
   selectTier: (tier: BudgetTier) => void;
   selectPackage: (pkg: TravelPackage) => void;
   selectDestination: (destination: string) => void;
+  startManualBuild: (destination: string) => void;
   setCustomDestination: (dest: CustomDestination | null) => void;
   setUserLocation: (location: UserLocation) => void;
   setDuration: (days: number) => void;
@@ -371,6 +383,7 @@ export const useOnboardingStore = create<OnboardingState>()(
   persist(
     (set) => ({
   flowStep: "landing",
+  planningMode: "ai",
   selectedTier: null,
   selectedPackage: null,
   selectedDestination: null,
@@ -388,6 +401,7 @@ export const useOnboardingStore = create<OnboardingState>()(
   isGeneratingItinerary: false,
 
   setFlowStep: (step) => set({ flowStep: step }),
+  setPlanningMode: (mode) => set({ planningMode: mode }),
 
   selectTier: (tier) =>
     set({ selectedTier: tier, flowStep: "packages" }),
@@ -402,6 +416,9 @@ export const useOnboardingStore = create<OnboardingState>()(
 
   selectDestination: (destination) =>
     set({ selectedDestination: destination, flowStep: "planner" }),
+
+  startManualBuild: (destination) =>
+    set({ selectedDestination: destination, flowStep: "manual-builder" }),
 
   setCustomDestination: (dest) => set({ customDestination: dest }),
 
@@ -428,6 +445,7 @@ export const useOnboardingStore = create<OnboardingState>()(
   reset: () =>
     set({
       flowStep: "landing",
+      planningMode: "ai",
       selectedTier: null,
       selectedPackage: null,
       selectedDestination: null,
@@ -450,6 +468,7 @@ export const useOnboardingStore = create<OnboardingState>()(
     storage: createJSONStorage(() => localStorage),
     partialize: (state) => ({
       flowStep: state.flowStep,
+      planningMode: state.planningMode,
       selectedTier: state.selectedTier,
       selectedPackage: state.selectedPackage,
       selectedDestination: state.selectedDestination,

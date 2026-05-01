@@ -168,8 +168,10 @@ export function generatePlannerStream(
   }
 ): AbortController {
   const ac = new AbortController();
-  const STREAM_IDLE_TIMEOUT_MS = 25000;
-  const STREAM_MAX_DURATION_MS = 4 * 60 * 1000;
+  // Long itineraries (e.g. 21-30 day plans) can stream for several minutes.
+  // Keep the connection alive longer before treating it as a hard timeout.
+  const STREAM_IDLE_TIMEOUT_MS = 45_000;
+  const STREAM_MAX_DURATION_MS = 12 * 60 * 1000;
 
   (async () => {
     // Always refresh token before starting a long-running stream

@@ -38,6 +38,13 @@ const DURATION_OPTIONS = [
   { value: 14, label: "14 days" },
 ];
 
+function generationTimeoutMs(days: number): number {
+  if (days >= 30) return 12 * 60 * 1000;
+  if (days >= 21) return 10 * 60 * 1000;
+  if (days >= 14) return 8 * 60 * 1000;
+  return 5 * 60 * 1000;
+}
+
 export default function TripInputs() {
   const {
     selectedTier,
@@ -75,6 +82,7 @@ export default function TripInputs() {
   // Safety timeout — force-close the overlay if generation never finishes
   useEffect(() => {
     if (!isLoadingDestinations) return;
+    const timeoutMs = generationTimeoutMs(duration ?? 3);
     const safetyTimer = window.setTimeout(() => {
       setGeneratingItinerary(false);
       setLoadingDestinations(false);
@@ -82,9 +90,9 @@ export default function TripInputs() {
       setCraftingPlace("");
       setGenerationDone(false);
       setError("Generation timed out. Please try again.");
-    }, 5 * 60 * 1000);
+    }, timeoutMs);
     return () => window.clearTimeout(safetyTimer);
-  }, [isLoadingDestinations, setGeneratingItinerary, setLoadingDestinations]);
+  }, [duration, isLoadingDestinations, setGeneratingItinerary, setLoadingDestinations]);
 
   const handleViewItinerary = useCallback(() => {
     setLoadingDestinations(false);

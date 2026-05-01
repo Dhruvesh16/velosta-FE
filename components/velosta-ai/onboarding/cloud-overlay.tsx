@@ -705,11 +705,6 @@ function PlaceStoriesBar({
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    const placeWords = (place || "")
-      .toLowerCase()
-      .split(/\s+/)
-      .map((w) => w.trim())
-      .filter((w) => w.length > 2);
 
     async function load() {
       try {
@@ -744,10 +739,8 @@ function PlaceStoriesBar({
           ...blogs.map((row: any) => ({ ...row, _kind: "blog" as const })),
         ];
 
-        const scored = merged
+        const normalized = merged
           .map((row: any) => {
-            const hay = `${row.title || ""} ${row.summary || ""} ${row.location || ""} ${(row.tags || []).join(" ")}`.toLowerCase();
-            const score = placeWords.reduce((acc, w) => (hay.includes(w) ? acc + 1 : acc), 0);
             return {
               id: String(row.id),
               type: row._kind,
@@ -755,17 +748,15 @@ function PlaceStoriesBar({
               summary: String(row.summary || "").slice(0, 140),
               authorName: String(row.authorName || "Traveler"),
               createdAt: String(row.createdAt || ""),
-              _score: score,
             };
           })
-          // If no place words match, still surface the most-recent stories
-          // (covers landing in the overlay before destination text settles).
-          .filter((r: any) => placeWords.length === 0 || r._score > 0)
-          .sort((a: any, b: any) => b._score - a._score)
-          .slice(0, 8)
-          .map(({ _score, ...rest }: any) => rest);
+          .sort((a: any, b: any) => {
+            const aTs = Date.parse(a.createdAt || "") || 0;
+            const bTs = Date.parse(b.createdAt || "") || 0;
+            return bTs - aTs;
+          });
         if (!cancelled) {
-          setItems(scored);
+          setItems(normalized);
           setActiveIdx(0);
         }
       } catch {
@@ -779,7 +770,7 @@ function PlaceStoriesBar({
       cancelled = true;
       window.clearTimeout(deferred);
     };
-  }, [visible, place]);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || items.length < 2) return;
@@ -815,7 +806,7 @@ function PlaceStoriesBar({
   return (
     <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[10002] w-[min(92vw,560px)] pointer-events-none">
       <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-[#F5D189]">
-        Stories for {place || "your destination"}
+        Travel stories and blogs
       </p>
       <div className="relative h-28">
         {stack
@@ -936,36 +927,20 @@ export default function CloudOverlay({
               </div>
 
               {/* Panel header */}
-              <div className="shrink-0 px-5 pt-8 pb-3">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex gap-1">
-                    {[0, 1, 2].map((i) => (
-                      <motion.span
-                        key={i}
-                        className="block w-1 h-1 rounded-full bg-[#D97757]"
-                        animate={{ opacity: [0.25, 1, 0.25], scale: [0.7, 1.2, 0.7] }}
-                        transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-[9.5px] uppercase tracking-[0.26em] text-[#0B1F2A]/35 font-semibold">
-                    Building itinerary
-                  </span>
-                </div>
-                <div
-                  className="w-full h-px"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, rgba(217,119,87,0.30) 0%, rgba(217,119,87,0.06) 60%, transparent 100%)",
-                  }}
-                />
+              <div
+                className="shrink-0 px-5 pt-7 pb-3 relative z-10"
+                style={{
+                  background: "#FBF8F3",
+                  borderBottom: "1px solid rgba(11,31,42,0.08)",
+                }}
+              >
+                <p className="text-[12px] font-semibold tracking-[0.14em] uppercase text-[#0B1F2A]">
+                  Velosta AI
+                </p>
               </div>
 
               {/* Streaming day cards — fills remaining height */}
-              <div
-                className="flex-1 min-h-0 overflow-y-auto px-4 pb-4"
-                style={{ scrollbarWidth: "none" }}
-              >
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-3" style={{ scrollbarWidth: "none" }}>
                 <StreamingDays active={visible} liveTokenBuffer={liveTokenBuffer} />
               </div>
 

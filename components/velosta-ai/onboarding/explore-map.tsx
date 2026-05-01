@@ -59,6 +59,13 @@ const TRAVELER_TYPES = [
 
 const DURATION_OPTIONS = [2, 3, 5, 7, 10, 14];
 
+function generationTimeoutMs(days: number): number {
+  if (days >= 30) return 12 * 60 * 1000;
+  if (days >= 21) return 10 * 60 * 1000;
+  if (days >= 14) return 8 * 60 * 1000;
+  return 5 * 60 * 1000;
+}
+
 /** Map pin row: static catalog entry or AI-discovered place (same shape as Destination). */
 type ExploreDestination = Destination & {
   source?: "ai";
@@ -215,6 +222,7 @@ export default function ExploreMapView() {
   // Safety timeout — if generation somehow never resolves, force-close the overlay
   useEffect(() => {
     if (!isGenerating) return;
+    const timeoutMs = generationTimeoutMs(duration ?? 3);
     const safetyTimer = window.setTimeout(() => {
       setIsGenerating(false);
       setGenerationDone(false);
@@ -222,9 +230,9 @@ export default function ExploreMapView() {
       setStreamBuffer(undefined);
       setCraftingPlace("");
       setGenerationError("Generation timed out. Please try again.");
-    }, 5 * 60 * 1000);
+    }, timeoutMs);
     return () => window.clearTimeout(safetyTimer);
-  }, [isGenerating, setGeneratingItinerary]);
+  }, [duration, isGenerating, setGeneratingItinerary]);
 
   const handleViewItinerary = useCallback(() => {
     const destName = (pendingDestRef.current as any)?.name as string | undefined;

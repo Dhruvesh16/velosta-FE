@@ -39,6 +39,10 @@ type Props = {
 
 export default function FlowChrome({ currentStep: _currentStep, onExit }: Props) {
   const reduced = useReducedMotion();
+  const showBrandMark =
+    _currentStep !== "explore" &&
+    _currentStep !== "manual-builder" &&
+    _currentStep !== "planner";
 
   return (
     <>
@@ -79,40 +83,42 @@ export default function FlowChrome({ currentStep: _currentStep, onExit }: Props)
       </div>
 
       {/* Brand mark — top-left. Hidden on mobile (each page owns its own header on small screens) */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-        className="pointer-events-auto fixed left-6 top-6 z-50 hidden md:block sm:left-10 sm:top-8"
-      >
-        <Link
-          href="/"
-          className="group inline-flex items-center gap-3"
-          onClick={(e) => {
-            if (onExit) {
-              e.preventDefault();
-              onExit();
-            }
-          }}
+      {showBrandMark && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+          className="pointer-events-auto fixed left-6 top-6 z-50 hidden md:block sm:left-10 sm:top-8"
         >
-          <span
-            className={`${playfair.className} text-[22px] tracking-[-0.01em]`}
-            style={{ color: C.navy }}
+          <Link
+            href="/"
+            className="group inline-flex items-center gap-3"
+            onClick={(e) => {
+              if (onExit) {
+                e.preventDefault();
+                onExit();
+              }
+            }}
           >
-            Velosta
-          </span>
-          <span
-            className="hidden h-3 w-px sm:block"
-            style={{ backgroundColor: "rgba(11,31,42,0.25)" }}
-          />
-          <span
-            className="hidden text-[10px] font-medium uppercase tracking-[0.32em] sm:inline"
-            style={{ color: C.teal }}
-          >
-            AI Planner
-          </span>
-        </Link>
-      </motion.div>
+            <span
+              className={`${playfair.className} text-[22px] tracking-[-0.01em]`}
+              style={{ color: C.navy }}
+            >
+              Velosta
+            </span>
+            <span
+              className="hidden h-3 w-px sm:block"
+              style={{ backgroundColor: "rgba(11,31,42,0.25)" }}
+            />
+            <span
+              className="hidden text-[10px] font-medium uppercase tracking-[0.32em] sm:inline"
+              style={{ color: C.teal }}
+            >
+              AI Planner
+            </span>
+          </Link>
+        </motion.div>
+      )}
 
       {/* Step rail intentionally removed for a cleaner crafting experience. */}
     </>

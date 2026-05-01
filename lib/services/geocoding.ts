@@ -109,6 +109,41 @@ function isWithinRange(
 const geocodeCache = new Map<string, [number, number] | null>();
 // Resolved country-code cache (keyed by raw destination string)
 const destCountryCache = new Map<string, string | null>();
+const INDIA_REGION_HINTS = [
+  "india",
+  "karnataka",
+  "kerala",
+  "goa",
+  "maharashtra",
+  "tamil nadu",
+  "andhra pradesh",
+  "telangana",
+  "delhi",
+  "rajasthan",
+  "himachal",
+  "uttarakhand",
+  "jammu",
+  "ladakh",
+  "punjab",
+  "gujarat",
+  "west bengal",
+  "assam",
+  "sikkim",
+  "odisha",
+  "madhya pradesh",
+  "chhattisgarh",
+  "bihar",
+  "jharkhand",
+  "andaman",
+  "nicobar",
+  "lakshadweep",
+];
+
+function inferDestinationCountryBias(destination: string): string | undefined {
+  const d = destination.toLowerCase();
+  if (INDIA_REGION_HINTS.some((hint) => d.includes(hint))) return "in";
+  return undefined;
+}
 
 /**
  * Geocode via Mapbox Geocoding API. Returns [lng, lat] or null.
@@ -270,6 +305,17 @@ export async function resolveDestination(
 ): Promise<{ coords: [number, number]; country: string | null } | null> {
   const raw = destination.trim();
   if (!raw) return null;
+  const inferredCountryBias = inferDestinationCountryBias(raw);
+
+  // 0. If destination text strongly hints India, try India-biased lookup first
+  // to avoid ambiguous global matches for names that exist in multiple countries.
+  if (inferredCountryBias) {
+    const biased = await geocodePlaceWithCountry(raw, inferredCountryBias);
+    if (biased) {
+      destCountryCache.set(raw, biased.country ?? inferredCountryBias);
+      return biased;
+    }
+  }
 
   // 1. Worldwide first
   const worldwide = await geocodePlaceWithCountry(raw);

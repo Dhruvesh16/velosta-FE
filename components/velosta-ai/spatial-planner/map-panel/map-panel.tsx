@@ -268,28 +268,6 @@ export default function MapPanel() {
     const activeDayMarkers = mapSafeMarkers.filter((m) => m.dayIndex === activeDay);
     if (activeDayMarkers.length > 0) return activeDayMarkers;
 
-    // Permanent safety-net: if filtering removed all pins for the active day
-    // (common with transport-heavy or broad-country itineraries), fall back to
-    // raw itinerary coordinates so the map never appears empty.
-    const day = itinerary[activeDay];
-    if (day?.rows?.length) {
-      const fallback = day.rows
-        .filter((r) => Array.isArray(r.coordinates) && isValidLngLat(r.coordinates))
-        .map((r, idx) => ({
-          id: r.id ?? `fallback-${activeDay}-${idx}`,
-          coordinates: r.coordinates as [number, number],
-          label: r.activity || "Stop",
-          dayIndex: activeDay,
-          activityIndex: idx,
-          pricing: r.pricing,
-          time: r.time,
-          type: toMapMarkerType(r.activity || "Stop"),
-        }));
-      if (fallback.length > 0) {
-        return dedupeNearbyMarkers(fallback, 0.03);
-      }
-    }
-
     // Outbound day can contain mostly transport/origin-country rows.
     // Fall back to the first day that has destination-side points so
     // the map never appears blank for international journeys.

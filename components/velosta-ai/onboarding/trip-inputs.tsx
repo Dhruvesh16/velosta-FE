@@ -264,6 +264,8 @@ export default function TripInputs() {
           currentItinerary: null,
           isModificationRequest: false,
           destinationHint: destination.name,
+          desiredDays: days,
+          desiredBudget: selectedTier.max,
         },
         (token) => setStreamBuffer((prev) => (prev ?? "") + token)
       );

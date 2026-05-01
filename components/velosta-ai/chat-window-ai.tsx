@@ -10,22 +10,50 @@ import { generatePlannerResponse } from "@/lib/services/planner-service";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import { ItineraryPDFExport } from "./itinerary-pdf-export";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  isItinerary?: boolean;
-  itineraryData?: any;
-}
-
-interface TripData {
-  destination?: string;
-  budget?: string;
-}
+import { usePlannerStore } from "@/lib/stores/planner-store";
+import {
+  useUIStore,
+  type PlannerChatMessage as Message,
+  type PlannerChatTripData as TripData,
+} from "@/lib/stores/ui-store";
 
 interface ChatWindowProps {
   onItinerary?: (itinerary: any, tripData: TripData) => void;
+}
+
+function extractRequestedBudget(text: string): number | null {
+  const lower = text.toLowerCase();
+  const re = /(?:₹|rs\.?\s*)?\s*(\d+(?:\.\d+)?)\s*(k|thousand|lakh|lac)?\b/g;
+  let match: RegExpExecArray | null = null;
+  let best: number | null = null;
+  while ((match = re.exec(lower)) !== null) {
+    const base = Number(match[1]);
+    if (!Number.isFinite(base) || base <= 0) continue;
+    const unit = match[2];
+    const value =
+      unit === "k" || unit === "thousand"
+        ? base * 1000
+        : unit === "lakh" || unit === "lac"
+          ? base * 100000
+          : base;
+    if (value >= 1000) best = Math.round(value);
+  }
+  return best;
+}
+
+function extractRequestedDays(text: string): number | null {
+  const lower = text.toLowerCase();
+  const dayMatch = lower.match(/\b(\d+)\s*(?:day|days)\b/);
+  if (dayMatch) {
+    const n = Number(dayMatch[1]);
+    if (Number.isFinite(n) && n >= 1 && n <= 30) return n;
+  }
+  const weekMatch = lower.match(/\b(\d+)\s*(?:week|weeks)\b/);
+  if (weekMatch) {
+    const n = Number(weekMatch[1]) * 7;
+    if (Number.isFinite(n) && n >= 1 && n <= 30) return n;
+  }
+  return null;
 }
 
 function buildStrictPlanIntentPrompt(rawIntent: string): string {
@@ -41,13 +69,19 @@ function buildStrictPlanIntentPrompt(rawIntent: string): string {
   const daysLine = hasDayHint
     ? "Use the duration from my request exactly."
     : "If my request doesn't specify duration, plan for 5 days by default.";
+  const daysMatch = cleaned.match(/\b(\d+)\s*day(?:s)?\b/i);
+  const requestedDays = daysMatch ? Number(daysMatch[1]) : null;
+  const rowsLine =
+    requestedDays !== null && requestedDays >= 15
+      ? "For 15+ day plans, keep each day concise (3-4 activities/day) so all days are included."
+      : "Return a full day-by-day plan with 4-6 activities per day.";
 
   return [
     cleaned,
     "",
     "Generate a complete trip itinerary now (not a clarifying reply).",
     daysLine,
-    "Return a full day-by-day plan with 4-6 activities per day.",
+    rowsLine,
     "Use real, specific place names (attractions, restaurants, and stays), not generic placeholders.",
   ].join("\n");
 }
@@ -117,18 +151,25 @@ function ItineraryCard({ data, tripData }: { data: any; tripData: TripData }) {
 
 export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSignInGate, setShowSignInGate] = useState(false);
-  const [conversationHistory, setConversationHistory] = useState<
-    Array<{ role: string; content: string }>
-  >([]);
-  const [currentItinerary, setCurrentItinerary] = useState<any>(null);
-  const [tripData, setTripData] = useState<TripData>({});
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { accessToken, user } = useUser();
-  const { selectedDestination, generatedItinerary, setGeneratedItinerary } = useOnboardingStore();
+  const { selectedDestination, generatedItinerary, setGeneratedItinerary, duration, budgetAmount } =
+    useOnboardingStore();
+  const { itineraryData: plannerItineraryData, tripData: plannerTripData } = usePlannerStore();
+  const {
+    plannerChatMessages: messages,
+    plannerChatConversationHistory: conversationHistory,
+    plannerChatCurrentItinerary: currentItinerary,
+    plannerChatTripData: tripData,
+    setPlannerChatMessages,
+    appendPlannerChatMessage,
+    setPlannerChatConversationHistory,
+    setPlannerChatCurrentItinerary,
+    setPlannerChatTripData,
+  } = useUIStore();
   const autoSentRef = useRef(false);
   const autoIntentSentRef = useRef(false);
 
@@ -147,33 +188,57 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
           ? `Hey ${name}! I'm Velosta AI — your spatial travel planner. Tell me where you want to go, your rough budget, and how many days you have. I'll build the perfect itinerary for you.`
           : `Hey! I'm Velosta AI — your spatial travel planner. Tell me where you want to go, your rough budget, and how many days you have. I'll build the perfect itinerary for you.`;
 
-      setMessages([{ id: "greeting", role: "assistant", content: greeting }]);
+      setPlannerChatMessages([{ id: "greeting", role: "assistant", content: greeting }]);
     }
-  }, [user?.name, selectedDestination, messages.length]);
+  }, [user?.name, selectedDestination, messages.length, setPlannerChatMessages]);
+
+  // Keep chat context in sync with planner store so modification prompts
+  // always have itinerary state (prevents "please share budget/duration again").
+  useEffect(() => {
+    if (!plannerItineraryData) return;
+    setPlannerChatCurrentItinerary(plannerItineraryData);
+    if (plannerTripData.destination || plannerTripData.budget) {
+      setPlannerChatTripData({
+        destination: plannerTripData.destination,
+        budget: plannerTripData.budget,
+      });
+    }
+  }, [
+    plannerItineraryData,
+    plannerTripData.destination,
+    plannerTripData.budget,
+    setPlannerChatCurrentItinerary,
+    setPlannerChatTripData,
+  ]);
 
   useEffect(() => {
     if (autoSentRef.current || !generatedItinerary || !selectedDestination) return;
     autoSentRef.current = true;
     const data = generatedItinerary;
-    setCurrentItinerary(data);
+    setPlannerChatCurrentItinerary(data);
     const extractedTripData: TripData = {
       destination: data.destination,
       budget: data.totalEstimatedCost || data.totalBudget,
     };
-    setTripData(extractedTripData);
+    setPlannerChatTripData(extractedTripData);
     onItinerary?.(data, extractedTripData);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `a-itin-${Date.now()}`,
-        role: "assistant",
-        content: data.summary || `Here's your ${data.destination} itinerary!`,
-        isItinerary: true,
-        itineraryData: data,
-      },
-    ]);
+    appendPlannerChatMessage({
+      id: `a-itin-${Date.now()}`,
+      role: "assistant",
+      content: data.summary || `Here's your ${data.destination} itinerary!`,
+      isItinerary: true,
+      itineraryData: data,
+    });
     setGeneratedItinerary(null);
-  }, [generatedItinerary, selectedDestination, onItinerary, setGeneratedItinerary]);
+  }, [
+    generatedItinerary,
+    selectedDestination,
+    onItinerary,
+    setGeneratedItinerary,
+    appendPlannerChatMessage,
+    setPlannerChatCurrentItinerary,
+    setPlannerChatTripData,
+  ]);
 
   const sendText = useCallback(
     async (text: string) => {
@@ -183,12 +248,34 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
         return;
       }
 
-      setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", content: text }]);
+      appendPlannerChatMessage({ id: `u-${Date.now()}`, role: "user", content: text });
       setInput("");
       setIsLoading(true);
 
-      const updatedHistory = [...conversationHistory, { role: "user", content: text }];
-      setConversationHistory(updatedHistory);
+      const updatedHistory = [
+        ...conversationHistory,
+        { role: "user" as const, content: text },
+      ];
+      setPlannerChatConversationHistory(updatedHistory);
+
+      const budgetFromChat = tripData.budget
+        ? Number(String(tripData.budget).replace(/[^0-9.]/g, ""))
+        : null;
+      const budgetFromText = extractRequestedBudget(text);
+      const desiredBudget =
+        (Number.isFinite(budgetFromText) && (budgetFromText as number) > 0
+          ? (budgetFromText as number)
+          : Number.isFinite(budgetFromChat) && (budgetFromChat as number) > 0
+          ? (budgetFromChat as number)
+          : budgetAmount) || undefined;
+      const daysFromText = extractRequestedDays(text);
+      const desiredDays =
+        Number.isFinite(daysFromText) && (daysFromText as number) > 0
+          ? (daysFromText as number)
+          : Array.isArray((currentItinerary as any)?.itineraryTable) &&
+        (currentItinerary as any).itineraryTable.length > 0
+          ? (currentItinerary as any).itineraryTable.length
+          : duration;
 
       try {
         const data = await generatePlannerResponse({
@@ -197,30 +284,39 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
           currentItinerary: currentItinerary,
           isModificationRequest: !!currentItinerary,
           destinationHint: selectedDestination ?? undefined,
+          desiredDays,
+          desiredBudget,
         });
 
         if (data.isTextResponse) {
-          setMessages((prev) => [
-            ...prev,
-            { id: `a-${Date.now()}`, role: "assistant", content: data.message },
+          const assistantText = data.message;
+          appendPlannerChatMessage({
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            content: assistantText,
+          });
+          setPlannerChatConversationHistory([
+            ...updatedHistory,
+            { role: "assistant", content: assistantText },
           ]);
         } else if (data.itineraryTable) {
-          setCurrentItinerary(data);
+          setPlannerChatCurrentItinerary(data);
           const extractedTripData: TripData = {
             destination: data.destination,
             budget: data.totalEstimatedCost || data.totalBudget,
           };
-          setTripData(extractedTripData);
+          setPlannerChatTripData(extractedTripData);
           onItinerary?.(data, extractedTripData);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `a-${Date.now()}`,
-              role: "assistant",
-              content: data.summary || "Here's your itinerary!",
-              isItinerary: true,
-              itineraryData: data,
-            },
+          appendPlannerChatMessage({
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            content: data.summary || "Here's your itinerary!",
+            isItinerary: true,
+            itineraryData: data,
+          });
+          setPlannerChatConversationHistory([
+            ...updatedHistory,
+            { role: "assistant", content: data.summary || "Generated itinerary update." },
           ]);
         }
       } catch (err: any) {
@@ -228,16 +324,31 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
           err instanceof ApiError
             ? err.message
             : "Unable to generate itinerary. Please try again.";
-        setMessages((prev) => [
-          ...prev,
-          { id: `a-err-${Date.now()}`, role: "assistant", content: message },
-        ]);
+        appendPlannerChatMessage({
+          id: `a-err-${Date.now()}`,
+          role: "assistant",
+          content: message,
+        });
       } finally {
         setIsLoading(false);
         inputRef.current?.focus();
       }
     },
-    [isLoading, accessToken, conversationHistory, currentItinerary, selectedDestination, onItinerary]
+    [
+      isLoading,
+      accessToken,
+      conversationHistory,
+      currentItinerary,
+      selectedDestination,
+      onItinerary,
+      appendPlannerChatMessage,
+      setPlannerChatConversationHistory,
+      setPlannerChatCurrentItinerary,
+      setPlannerChatTripData,
+      duration,
+      budgetAmount,
+      tripData.budget,
+    ]
   );
 
   useEffect(() => {
@@ -333,7 +444,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
 
       <div className="shrink-0 border-t border-[#D97757]/20 bg-[#FFF9F3] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
         <p className="text-[10px] text-gray-400 text-center mb-2">
-          Chat history is not saved — export as PDF before leaving.
+          Chat history stays in this session while you switch tabs.
         </p>
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input

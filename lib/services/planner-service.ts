@@ -107,6 +107,8 @@ export interface PlannerRequest {
   currentItinerary?: unknown | null;
   isModificationRequest?: boolean;
   destinationHint?: string;
+  desiredDays?: number;
+  desiredBudget?: number;
 }
 
 interface RawPlannerEnvelope {
@@ -129,6 +131,8 @@ export async function generatePlannerResponse(
     currentItinerary: req.currentItinerary ?? null,
     isModificationRequest: req.isModificationRequest ?? false,
     destinationHint: req.destinationHint,
+    desiredDays: req.desiredDays,
+    desiredBudget: req.desiredBudget,
   });
 
   const inner = data.itinerary as PlannerResponse;
@@ -190,6 +194,8 @@ export function generatePlannerStream(
           currentItinerary: req.currentItinerary ?? null,
           isModificationRequest: req.isModificationRequest ?? false,
           destinationHint: req.destinationHint,
+          desiredDays: req.desiredDays,
+          desiredBudget: req.desiredBudget,
         }),
         signal: ac.signal,
       });

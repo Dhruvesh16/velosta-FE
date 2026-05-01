@@ -125,12 +125,6 @@ function groupByTimeOfDay(rows: ActivityRow[]): TimeSection[] {
   return sections;
 }
 
-type RefineChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
-
 function looksLikeModificationRequest(input: string): boolean {
   const text = input.toLowerCase();
   const verbs = [
@@ -162,7 +156,21 @@ function looksLikeModificationRequest(input: string): boolean {
     "route",
     "budget",
   ];
-  return verbs.some((v) => text.includes(v)) && targets.some((t) => text.includes(t));
+  if (verbs.some((v) => text.includes(v)) && targets.some((t) => text.includes(t))) return true;
+  // Catch destination-change style prompts like "how about Uttarakhand"
+  if (/\b(how about|instead|rather|switch to|make it|plan for|change to)\b/.test(text)) return true;
+  if (/\bday\s*\d+\b/.test(text)) return true;
+  return false;
+}
+
+function hasMaterialItineraryChange(current: any, next: any): boolean {
+  if (!current || !next) return false;
+  const currDest = String(current.destination || "").trim().toLowerCase();
+  const nextDest = String(next.destination || "").trim().toLowerCase();
+  if (currDest && nextDest && currDest !== nextDest) return true;
+  const currTable = JSON.stringify(current.itineraryTable || []);
+  const nextTable = JSON.stringify(next.itineraryTable || []);
+  return currTable !== nextTable;
 }
 
 export default function ItineraryPanel() {
@@ -179,8 +187,6 @@ export default function ItineraryPanel() {
   // ── AI Chat state ──
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiExpanded, setAiExpanded] = useState(false);
-  const [aiMessages, setAiMessages] = useState<RefineChatMessage[]>([]);
   const [aiStreamText, setAiStreamText] = useState("");
   const streamAccRef = useRef("");
   // Toast for export/share actions
@@ -189,7 +195,15 @@ export default function ItineraryPanel() {
   const [isSharing, setIsSharing] = useState(false);
   const [isSavingTrip, setIsSavingTrip] = useState(false);
   const [showStartNewConfirm, setShowStartNewConfirm] = useState(false);
-  const aiInputRef = useRef<HTMLInputElement>(null);  const { setMobileTab } = useUIStore();
+  const aiInputRef = useRef<HTMLInputElement>(null);
+  const {
+    setMobileTab,
+    plannerRefineMessages: aiMessages,
+    plannerRefineExpanded: aiExpanded,
+    setPlannerRefineExpanded: setAiExpanded,
+    setPlannerRefineMessages: setAiMessages,
+    appendPlannerRefineMessage,
+  } = useUIStore();
   const { selectedPackage } = useOnboardingStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -303,7 +317,7 @@ export default function ItineraryPanel() {
       setAiLoading(true);
       setAiStreamText("");
       streamAccRef.current = "";
-      const userMsg: RefineChatMessage = {
+      const userMsg = {
         id: `u-${Date.now()}`,
         role: "user",
         content: trimmed,
@@ -322,6 +336,15 @@ export default function ItineraryPanel() {
             })),
             currentItinerary: itineraryData,
             isModificationRequest: shouldModify,
+            desiredDays: Array.isArray(itineraryData.itineraryTable)
+              ? itineraryData.itineraryTable.length
+              : undefined,
+            desiredBudget: (() => {
+              const raw = tripData?.budget ?? itineraryData.totalBudget;
+              if (!raw) return undefined;
+              const n = Number(String(raw).replace(/[^0-9.]/g, ""));
+              return Number.isFinite(n) && n > 0 ? n : undefined;
+            })(),
           },
           (token) => {
             streamAccRef.current += token;
@@ -335,26 +358,21 @@ export default function ItineraryPanel() {
         setAiStreamText("");
 
         if (data.isTextResponse) {
-          setAiMessages((prev) => [
-            ...prev,
-            {
+          appendPlannerRefineMessage({
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            content: data.message,
+          });
+        } else if (data.itineraryTable) {
+          const materialChange = hasMaterialItineraryChange(itineraryData, data);
+          if (!shouldModify && !materialChange) {
+            appendPlannerRefineMessage({
               id: `a-${Date.now()}`,
               role: "assistant",
-              content: data.message,
-            },
-          ]);
-        } else if (data.itineraryTable) {
-          if (!shouldModify) {
-            setAiMessages((prev) => [
-              ...prev,
-              {
-                id: `a-${Date.now()}`,
-                role: "assistant",
-                content:
-                  data.summary ||
-                  "I can suggest options conversationally. Tell me explicitly what to change if you want me to edit the itinerary.",
-              },
-            ]);
+              content:
+                data.summary ||
+                "I can suggest options conversationally. Tell me explicitly what to change if you want me to edit the itinerary.",
+            });
             return;
           }
 
@@ -384,33 +402,27 @@ export default function ItineraryPanel() {
                   .map((m: string) => `• ${m}`)
                   .join("\n")}`
               : data.summary || "Done — I updated your itinerary and map.";
-          setAiMessages((prev) => [
-            ...prev,
-            {
-              id: `a-${Date.now()}`,
-              role: "assistant",
-              content: confirmation,
-            },
-          ]);
+          appendPlannerRefineMessage({
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            content: confirmation,
+          });
         }
       } catch (err: any) {
         setAiStreamText("");
-        setAiMessages((prev) => [
-          ...prev,
-          {
-            id: `a-${Date.now()}`,
-            role: "assistant",
-            content:
-              err.name === "AbortError"
-                ? "Request timed out. Try again."
-                : "Something went wrong. Please try again.",
-          },
-        ]);
+        appendPlannerRefineMessage({
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content:
+            err.name === "AbortError"
+              ? "Request timed out. Try again."
+              : "Something went wrong. Please try again.",
+        });
       } finally {
         setAiLoading(false);
       }
     },
-    [aiLoading, itineraryData, flyTo, setMarkers, aiMessages]
+    [aiLoading, itineraryData, flyTo, setMarkers, aiMessages, appendPlannerRefineMessage, setAiMessages]
   );
 
   const handleAiSubmit = useCallback(

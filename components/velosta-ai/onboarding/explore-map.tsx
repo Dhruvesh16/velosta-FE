@@ -667,6 +667,8 @@ export default function ExploreMapView() {
             currentItinerary: null,
             isModificationRequest: false,
             destinationHint: dest.name,
+            desiredDays: duration,
+            desiredBudget: budget,
           },
           (token) => setStreamBuffer((prev) => (prev ?? "") + token)
         );

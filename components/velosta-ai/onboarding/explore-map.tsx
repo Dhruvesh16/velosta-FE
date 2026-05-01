@@ -246,12 +246,22 @@ export default function ExploreMapView() {
   // Mobile-only UI state
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileListExpanded, setMobileListExpanded] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
 
   // ── Refs ──
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 1023px)");
+    const sync = () => setIsMobileView(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
   // ── Static catalog (fallback when signed out or discovery fails) ──
   const staticFiltered = useMemo(() => {
@@ -460,18 +470,31 @@ export default function ExploreMapView() {
       el.style.cssText = "cursor:pointer;z-index:1;";
 
       const markerBubble = document.createElement("div");
-      markerBubble.style.cssText = `
-        width:42px;height:42px;border-radius:50%;
-        background:${color};color:white;display:flex;
-        align-items:center;justify-content:center;
-        font-size:18px;border:3px solid white;
-        box-shadow:0 2px 8px rgba(0,0,0,0.3);
-        transition:transform 0.2s;
-      `;
-      markerBubble.textContent = dest.emoji;
+      if (isMobileView) {
+        // Mobile: keep markers light and precise (no bulky bubble background).
+        markerBubble.style.cssText = `
+          width:12px;height:12px;border-radius:50%;
+          background:${color};display:flex;
+          align-items:center;justify-content:center;
+          border:2px solid white;
+          box-shadow:0 1px 4px rgba(0,0,0,0.22);
+          transition:transform 0.16s;
+        `;
+      } else {
+        markerBubble.style.cssText = `
+          width:42px;height:42px;border-radius:50%;
+          background:${color};color:white;display:flex;
+          align-items:center;justify-content:center;
+          font-size:18px;border:3px solid white;
+          box-shadow:0 2px 8px rgba(0,0,0,0.3);
+          transition:transform 0.2s;
+        `;
+        markerBubble.textContent = dest.emoji;
+      }
       el.appendChild(markerBubble);
 
       el.addEventListener("mouseenter", () => {
+        if (isMobileView) return;
         markerBubble.style.transform = "scale(1.3)";
         el.style.zIndex = "10";
         setHoveredDest(dest);
@@ -519,6 +542,7 @@ export default function ExploreMapView() {
       });
 
       el.addEventListener("mouseleave", () => {
+        if (isMobileView) return;
         markerBubble.style.transform = "scale(1)";
         el.style.zIndex = "1";
         setHoveredDest(null);
@@ -552,7 +576,9 @@ export default function ExploreMapView() {
           Number.isFinite(sw.lat)
         ) {
           map.fitBounds(bounds, {
-            padding: { top: 80, bottom: 80, left: 350, right: 330 },
+            padding: isMobileView
+              ? { top: 120, bottom: 300, left: 36, right: 36 }
+              : { top: 80, bottom: 80, left: 350, right: 330 },
             maxZoom: 8,
             duration: 1000,
           });
@@ -561,7 +587,7 @@ export default function ExploreMapView() {
         // bounds empty or invalid — skip
       }
     }
-  }, [displayPlaces, budget, mapLoaded]);
+  }, [displayPlaces, budget, mapLoaded, isMobileView]);
 
   // ── Build Itinerary ──
   // Owns the entire generation lifecycle so the planner page never lands
@@ -1156,7 +1182,7 @@ export default function ExploreMapView() {
             ════════════════════════════════════════════════════════════ */}
 
         {/* Mobile top bar — back · title · filter toggle */}
-        <div className="lg:hidden absolute top-0 inset-x-0 z-30 px-4 pt-4 pb-3 flex items-center justify-between bg-gradient-to-b from-white/90 via-white/70 to-transparent backdrop-blur-md">
+        <div className="lg:hidden absolute top-0 inset-x-0 z-30 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 flex items-center justify-between bg-gradient-to-b from-white/90 via-white/70 to-transparent backdrop-blur-md">
           <button
             onClick={() => setFlowStep("budget")}
             className="p-2 rounded-full bg-white/95 shadow-sm border border-[#0B1F2A]/8"

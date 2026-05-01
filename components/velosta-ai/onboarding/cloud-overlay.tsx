@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Compass, MapPin } from "lucide-react";
+import { Sparkles, Compass, MapPin, X } from "lucide-react";
 import { Playfair_Display } from "next/font/google";
 
 const playfair = Playfair_Display({ subsets: ["latin"], weight: ["500", "600", "700"] });
@@ -701,6 +701,11 @@ function PlaceStoriesBar({
 }) {
   const [items, setItems] = useState<PlaceFeedItem[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [closed, setClosed] = useState(false);
+
+  useEffect(() => {
+    if (visible) setClosed(false);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -780,7 +785,7 @@ function PlaceStoriesBar({
     return () => clearInterval(t);
   }, [visible, items]);
 
-  if (!visible || items.length === 0) return null;
+  if (!visible || closed || items.length === 0) return null;
 
   const stack = [0, 1, 2]
     .map((offset) => items[(activeIdx + offset) % items.length])
@@ -804,11 +809,19 @@ function PlaceStoriesBar({
   };
 
   return (
-    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[10002] w-[min(92vw,560px)] pointer-events-none">
+    <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[10002] w-[min(94vw,560px)] pointer-events-none">
       <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-[#F5D189]">
         Travel stories and blogs
       </p>
-      <div className="relative h-28">
+      <div className="relative h-[106px] sm:h-28">
+        <button
+          type="button"
+          aria-label="Close stories"
+          className="pointer-events-auto absolute -top-6 right-0 z-40 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#C9983A]/40 bg-white text-[#8A6516] shadow-sm hover:bg-[#FFF7E6]"
+          onClick={() => setClosed(true)}
+        >
+          <X size={12} />
+        </button>
         {stack
           .slice()
           .reverse()
@@ -817,7 +830,7 @@ function PlaceStoriesBar({
             return (
               <motion.div
                 key={item.id}
-                className={`absolute inset-x-0 rounded-2xl border border-[#C9983A]/45 bg-white px-4 py-3 shadow-[0_12px_30px_-18px_rgba(11,31,42,0.65)] ${
+                className={`absolute inset-x-0 rounded-2xl border border-[#C9983A]/45 bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-[0_12px_30px_-18px_rgba(11,31,42,0.65)] ${
                   pos === 0 ? "pointer-events-auto cursor-pointer" : ""
                 }`}
                 animate={{
@@ -835,9 +848,9 @@ function PlaceStoriesBar({
                   </span>
                   <span className="text-[10px] text-[#7D5D1D]/70">{item.authorName}</span>
                 </div>
-                <p className="line-clamp-1 text-[14px] font-semibold text-[#8A6516]">{item.title}</p>
+                <p className="line-clamp-1 text-[13px] sm:text-[14px] font-semibold text-[#8A6516]">{item.title}</p>
                 {pos === 0 && item.summary && (
-                  <p className="line-clamp-1 text-[11px] text-[#8A6516]/75">{item.summary}</p>
+                  <p className="line-clamp-1 text-[10.5px] sm:text-[11px] text-[#8A6516]/75">{item.summary}</p>
                 )}
                 {pos === 0 && (
                   <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-[#C9983A]/80">
@@ -940,7 +953,7 @@ export default function CloudOverlay({
               </div>
 
               {/* Streaming day cards — fills remaining height */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-3" style={{ scrollbarWidth: "none" }}>
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-40 sm:pb-4 pt-3" style={{ scrollbarWidth: "none" }}>
                 <StreamingDays active={visible} liveTokenBuffer={liveTokenBuffer} />
               </div>
 

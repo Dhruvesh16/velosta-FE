@@ -48,10 +48,15 @@ function readRefreshToken(): string | null {
 }
 
 function shouldTryRefresh(
-  *,
-  auth: boolean,
-  status: number,
-  payload: any
+  {
+    auth,
+    status,
+    payload,
+  }: {
+    auth: boolean;
+    status: number;
+    payload: any;
+  }
 ): boolean {
   if (!auth) return false;
   if (status !== 401) return false;

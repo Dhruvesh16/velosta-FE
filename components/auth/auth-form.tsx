@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,10 +13,17 @@ import { GoogleLogin } from "@react-oauth/google";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { authApi, persistSession, ApiError } from "@/lib/api";
+import { completePasskeySignIn } from "@/lib/passkeys";
 import Link from "next/link";
 
 // ── Passkey sign-in button (lazy-loads @simplewebauthn/browser) ───────────────
-function PasskeySignInButton({ nextPath }: { nextPath: string }) {
+function PasskeySignInButton({
+  nextPath,
+  webauthnFieldRef,
+}: {
+  nextPath: string;
+  webauthnFieldRef: React.RefObject<HTMLInputElement | null>;
+}) {
   const [loading, setLoading] = useState(false);
   const { setUser, setAccessToken } = useUser();
   const router = useRouter();
@@ -24,13 +31,7 @@ function PasskeySignInButton({ nextPath }: { nextPath: string }) {
   const handlePasskeySignIn = async () => {
     setLoading(true);
     try {
-      const { startAuthentication } = await import("@simplewebauthn/browser");
-      const { sessionId, options } = await authApi.passkeyLoginBegin();
-      const credential = await startAuthentication({ optionsJSON: options as any });
-      const bundle = await authApi.passkeyLoginComplete({
-        session_id: sessionId,
-        credential: credential as unknown as Record<string, unknown>,
-      });
+      const bundle = await completePasskeySignIn({ webauthnFieldRef });
       persistSession(bundle);
       setAccessToken(bundle.access_token);
       setUser(bundle.user);
@@ -39,7 +40,7 @@ function PasskeySignInButton({ nextPath }: { nextPath: string }) {
     } catch (err: any) {
       if (err?.name === "NotAllowedError") {
         toast.error("Passkey sign-in was cancelled.");
-      } else if (err instanceof ApiError) {
+      } else if (err instanceof ApiError || (err && typeof err?.message === "string" && typeof err?.status === "number")) {
         toast.error(err.message);
       } else {
         toast.error("Passkey sign-in failed. Try email instead.");
@@ -79,6 +80,7 @@ interface AuthFormProps {
 }
 
 export function AuthForm({ type }: AuthFormProps) {
+  const emailPasskeyAnchorRef = useRef<HTMLInputElement | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -338,12 +340,14 @@ export function AuthForm({ type }: AuthFormProps) {
             Email Address
           </Label>
           <Input
+            ref={emailPasskeyAnchorRef}
             id="email"
             name="email"
             type="email"
             placeholder="you@example.com"
             value={formData.email}
             onChange={handleChange}
+            autoComplete={type === "signin" ? "username webauthn" : "email"}
             className="h-12 rounded-xl text-[14px] transition-colors focus-visible:ring-2 focus-visible:ring-offset-0"
             style={{
               backgroundColor: "#FBF8F3",
@@ -600,7 +604,7 @@ export function AuthForm({ type }: AuthFormProps) {
 
         {/* PASSKEY LOGIN — only on sign-in, only if browser supports WebAuthn */}
         {type === "signin" && typeof window !== "undefined" && (window as any).PublicKeyCredential && (
-          <PasskeySignInButton nextPath={nextPath} />
+          <PasskeySignInButton nextPath={nextPath} webauthnFieldRef={emailPasskeyAnchorRef} />
         )}
 
         <p

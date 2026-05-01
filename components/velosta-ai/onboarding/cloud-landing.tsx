@@ -265,7 +265,7 @@ export default function CloudLandingScene() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.75, duration: 0.8 }}
           >
-            Tell us the shape of your trip — budget, pace, the feeling you&apos;re
+            Tell us the shape of your trip: budget, pace, the feeling you&apos;re
             chasing. We&apos;ll map the rest, one destination at a time.
           </motion.p>
         </motion.div>

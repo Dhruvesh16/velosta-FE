@@ -6,7 +6,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Velosta AI — Spatial Travel Planner",
+  title: "Velosta AI · Spatial Travel Planner",
   description: "Plan your trip spatially with budget intelligence and live itinerary management.",
 };
 

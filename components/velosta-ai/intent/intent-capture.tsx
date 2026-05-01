@@ -425,7 +425,7 @@ export default function IntentCapture() {
               style={{ color: "rgba(11,31,42,0.65)" }}
             >
               Budget, pace, the feeling you&apos;re chasing. We&apos;ll match it to
-              destinations that fit — and map a route that flows.
+              destinations that fit, and map a route that flows.
             </p>
           </div>
 
@@ -563,7 +563,7 @@ export default function IntentCapture() {
             {/* ── Budget ─────────────────────────────────────── */}
             <Field
               label={budgetMode === "per_person" ? "Budget per person" : "Total trip budget"}
-              hint="Slide or type — we adapt."
+              hint="Slide or type; we adapt."
             >
               <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
                 {/*

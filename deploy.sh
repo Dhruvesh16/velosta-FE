@@ -3,7 +3,8 @@
 # Velosta — Frontend Deployment to Google Cloud Run
 #
 # Builds the Next.js Docker image locally (Docker), pushes to Artifact Registry,
-# and deploys the frontend as a public Cloud Run service.
+# deploys the frontend as a public Cloud Run service, then clears local Docker
+# builder cache to avoid stale layers and reclaim disk space.
 #
 # Usage (from FE/ root):
 #   source .gcp-env          # optional: load pre-set GCP env vars
@@ -45,6 +46,17 @@ log()  { echo -e "\033[1;36m[deploy-fe]\033[0m $*"; }
 ok()   { echo -e "\033[1;32m[  OK  ]\033[0m $*"; }
 err()  { echo -e "\033[1;31m[ FAIL ]\033[0m $*" >&2; }
 die()  { err "$*"; exit 1; }
+
+cleanup_docker_cache() {
+  if ! command -v docker >/dev/null 2>&1; then
+    log "Skipping Docker cache cleanup — docker not in PATH."
+    return 0
+  fi
+  log "Clearing local Docker builder cache..."
+  docker buildx prune --all --force >/dev/null 2>&1 || true
+  docker builder prune --all --force >/dev/null 2>&1 || true
+  ok "Docker build cache cleared"
+}
 
 sm_get() {
   gcloud secrets versions access latest --secret="$1" --project="$PROJECT" 2>/dev/null || echo ""
@@ -176,6 +188,9 @@ if [[ -n "$FE_URL" ]]; then
 fi
 
 ok "Frontend deployment complete!"
+
+cleanup_docker_cache
+
 echo ""
 echo "  Frontend URL    : ${FE_URL:-<check Cloud Run console>}"
 echo "  Health endpoint : ${FE_URL:-<url>}/api/health"

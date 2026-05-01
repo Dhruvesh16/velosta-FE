@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Playfair_Display } from "next/font/google";
-import { Sparkles, MapPin, Star } from "lucide-react";
+import { Sparkles, MapPin } from "lucide-react";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -202,38 +202,6 @@ export function AuthCard({ children, title, subtitle, mode = "signin" }: AuthCar
               </span>
             </div>
 
-            {/* Trust chip */}
-            <div
-              className="absolute bottom-[4%] left-[-4%] flex items-center gap-3 rounded-2xl bg-white p-3 pr-5"
-              style={{
-                boxShadow:
-                  "0 18px 40px -16px rgba(11,31,42,0.22), 0 4px 10px -4px rgba(11,31,42,0.06)",
-              }}
-            >
-              <span
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ backgroundColor: "rgba(217,119,87,0.12)" }}
-              >
-                <Star
-                  className="h-4 w-4 fill-current"
-                  style={{ color: c.coral }}
-                />
-              </span>
-              <div>
-                <p
-                  className={`${playfair.className} text-[17px] leading-none tracking-tight`}
-                  style={{ color: c.navy }}
-                >
-                  4.9 / 5
-                </p>
-                <p
-                  className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                  style={{ color: "rgba(11,31,42,0.5)" }}
-                >
-                  12k+ travelers
-                </p>
-              </div>
-            </div>
           </div>
         </aside>
 

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/app/utils/context";
 import { authApi, persistSession, ApiError } from "@/lib/api";
+import { completePasskeySignIn } from "@/lib/passkeys";
 import { toast } from "react-toastify";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -17,6 +18,7 @@ export function OtpForm() {
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const webauthnAnchorRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser, setAccessToken } = useUser();
@@ -126,13 +128,7 @@ export function OtpForm() {
   const handlePasskeySignIn = async () => {
     setLoading(true);
     try {
-      const { startAuthentication } = await import("@simplewebauthn/browser");
-      const { sessionId, options } = await authApi.passkeyLoginBegin();
-      const credential = await startAuthentication({ optionsJSON: options as any });
-      const bundle = await authApi.passkeyLoginComplete({
-        session_id: sessionId,
-        credential: credential as unknown as Record<string, unknown>,
-      });
+      const bundle = await completePasskeySignIn();
       persistSession(bundle);
       setAccessToken(bundle.access_token);
       setUser(bundle.user);
@@ -142,7 +138,10 @@ export function OtpForm() {
       if (err?.name === "NotAllowedError") {
         toast.error("Passkey sign-in was cancelled.");
       } else {
-        const msg = err instanceof ApiError ? err.message : "Passkey sign-in failed.";
+        const msg =
+          err instanceof ApiError || (err && typeof err?.message === "string" && typeof err?.status === "number")
+            ? err.message
+            : "Passkey sign-in failed.";
         toast.error(msg);
       }
     } finally {
@@ -154,6 +153,17 @@ export function OtpForm() {
     <>
       <ToastContainer />
       <form onSubmit={handleSubmit} className="space-y-6">
+        {isTotp && hasPasskey && (
+          <input
+            ref={webauthnAnchorRef}
+            type="text"
+            name="webauthn-anchor"
+            autoComplete="username webauthn"
+            tabIndex={-1}
+            aria-hidden
+            className="pointer-events-none fixed left-[-9999px] top-auto h-px w-px overflow-hidden border-0 opacity-0"
+          />
+        )}
         {/* OTP digit inputs */}
         <div className="flex justify-center gap-3" onPaste={handlePaste}>
           {digits.map((digit, i) => (

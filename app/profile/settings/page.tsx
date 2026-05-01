@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { compressAvatarForUpload } from "@/lib/compress-avatar";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const navy = "#0B1F2A";
@@ -121,12 +122,17 @@ function ProfileSection() {
       // Upload avatar first if a new file was selected
       if (pendingFile) {
         try {
-          const res = await authApi.uploadAvatar(pendingFile);
+          const toUpload = await compressAvatarForUpload(pendingFile);
+          const res = await authApi.uploadAvatar(toUpload);
           updatedUser = res.user;
-        } catch (err: any) {
-          // If upload endpoint not configured, just skip and save name only
-          if (err?.code !== "not_configured") throw err;
-          toast.info("Avatar upload is not yet enabled on this server.");
+        } catch (err: unknown) {
+          if (err instanceof ApiError && err.code === "not_configured") {
+            toast.error(
+              "Photo upload needs a Google Cloud Storage bucket. Set Secret Manager secret gcs-avatar-bucket to the bucket name, grant the Cloud Run service account access to the bucket, redeploy velosta-auth, then try again. Your display name will still be saved."
+            );
+          } else {
+            throw err;
+          }
         }
       }
 
@@ -185,7 +191,7 @@ function ProfileSection() {
           <input
             ref={fileRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,image/gif"
             className="hidden"
             onChange={handleFileChange}
           />

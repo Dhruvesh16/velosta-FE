@@ -3,7 +3,7 @@
 
 import type { DiscoveredDestination } from "@/lib/stores/onboarding-store";
 import { verifyDestinationCoords } from "@/lib/services/geocoding";
-import { api, ApiError, authApi, persistSession } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 
 export interface DiscoverParams {
   budget: { min: number; max: number; label: string };
@@ -43,29 +43,11 @@ export async function fetchDiscoveredDestinations(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const token =
-        typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null;
-      const res = await fetch("/api/planner/discover-destinations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      const payload = (await res.json().catch(() => ({}))) as any;
-      if (!res.ok || payload?.ok === false) {
-        const err = payload?.error ?? {};
-        throw new ApiError(
-          err.message || `Request failed with ${res.status}`,
-          err.code || "request_failed",
-          res.status,
-          err.details
-        );
-      }
-      return (payload?.data ?? payload) as { destinations: unknown[] };
+      return await api.post<{ destinations: unknown[] }>(
+        "/api/planner/discover-destinations",
+        body,
+        { signal: controller.signal }
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -90,18 +72,7 @@ export async function fetchDiscoveredDestinations(
         data = await requestDiscover(65000);
       }
     } catch (err) {
-      const expired =
-        err instanceof ApiError &&
-        err.status === 401 &&
-        /token expired/i.test(err.message);
-      if (!expired || typeof window === "undefined") throw err;
-
-      const refreshToken = window.localStorage.getItem("refreshToken");
-      if (!refreshToken) throw err;
-
-      const refreshed = await authApi.refresh(refreshToken);
-      persistSession(refreshed);
-      data = await requestDiscover(45000);
+      throw err;
     }
 
     if (!Array.isArray(data.destinations)) {

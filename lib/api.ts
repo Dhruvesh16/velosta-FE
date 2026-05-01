@@ -42,6 +42,29 @@ function readToken(): string | null {
   return window.localStorage.getItem("accessToken");
 }
 
+function readRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("refreshToken");
+}
+
+function shouldTryRefresh(
+  *,
+  auth: boolean,
+  status: number,
+  payload: any
+): boolean {
+  if (!auth) return false;
+  if (status !== 401) return false;
+  const msg = String(payload?.error?.message ?? "").toLowerCase();
+  const code = String(payload?.error?.code ?? "").toLowerCase();
+  return (
+    msg.includes("token") ||
+    msg.includes("unauthorized") ||
+    code.includes("token") ||
+    code.includes("unauthorized")
+  );
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   opts: FetchOpts = {}
@@ -54,36 +77,56 @@ export async function apiFetch<T = unknown>(
     ...((headers as Record<string, string>) || {}),
   };
 
-  if (auth) {
-    const token = readToken();
-    if (token) finalHeaders.Authorization = `Bearer ${token}`;
-  }
-
   const url = path.startsWith("http")
     ? path
     : `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      ...rest,
-      headers: finalHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  } catch (err) {
-    throw new ApiError(
-      "Could not reach the Velosta server. Check that the backend is running.",
-      "network_error",
-      0,
-      { original: String(err) }
-    );
-  }
+  const runRequest = async (accessToken?: string | null) => {
+    const reqHeaders: Record<string, string> = { ...finalHeaders };
+    if (auth) {
+      const token = accessToken ?? readToken();
+      if (token) reqHeaders.Authorization = `Bearer ${token}`;
+    }
 
-  let payload: any = null;
-  try {
-    payload = await res.json();
-  } catch {
-    /* empty body or non-JSON */
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        ...rest,
+        headers: reqHeaders,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (err) {
+      throw new ApiError(
+        "Could not reach the Velosta server. Check that the backend is running.",
+        "network_error",
+        0,
+        { original: String(err) }
+      );
+    }
+
+    let payload: any = null;
+    try {
+      payload = await res.json();
+    } catch {
+      /* empty body or non-JSON */
+    }
+
+    return { res, payload };
+  };
+
+  let { res, payload } = await runRequest();
+
+  if (shouldTryRefresh({ auth, status: res.status, payload })) {
+    const refreshToken = readRefreshToken();
+    if (refreshToken) {
+      try {
+        const bundle = await authApi.refresh(refreshToken);
+        persistSession(bundle);
+        ({ res, payload } = await runRequest(bundle.access_token));
+      } catch {
+        // Let original auth failure surface below
+      }
+    }
   }
 
   if (!res.ok || (payload && payload.ok === false)) {

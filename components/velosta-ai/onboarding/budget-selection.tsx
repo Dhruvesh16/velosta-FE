@@ -35,7 +35,7 @@ const INTERESTS = [
   { id: "culture", label: "Culture", emoji: "🏛️" },
   { id: "adventure", label: "Adventure", emoji: "🏔️" },
   { id: "relaxation", label: "Relaxation", emoji: "🧘" },
-  { id: "food", label: "Food & dining", emoji: "🍜" },
+  { id: "food", label: "Food", emoji: "🍜" },
   { id: "nightlife", label: "Nightlife", emoji: "🌃" },
   { id: "photography", label: "Photography", emoji: "📸" },
   { id: "shopping", label: "Shopping", emoji: "🛍️" },

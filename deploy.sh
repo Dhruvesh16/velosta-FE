@@ -2,8 +2,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Velosta — Frontend Deployment to Google Cloud Run
 #
-# Builds the Next.js Docker image, pushes to Artifact Registry, and deploys
-# the frontend as a public Cloud Run service.
+# Builds the Next.js Docker image locally (Docker), pushes to Artifact Registry,
+# and deploys the frontend as a public Cloud Run service.
 #
 # Usage (from FE/ root):
 #   source .gcp-env          # optional: load pre-set GCP env vars
@@ -12,7 +12,10 @@
 # Options:
 #   --skip-build   Skip docker build & push (re-deploy current image)
 #
-# Prerequisites: gcloud CLI, docker
+# Build uses your machine (fast) instead of Google Cloud Build. Image is pushed
+# with `docker push` to Artifact Registry (same destination as before).
+#
+# Prerequisites: gcloud CLI, Docker (BuildKit recommended)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -22,6 +25,8 @@ REGION="${GCP_REGION:-asia-south1}"
 AR_HOST="${GCP_AR_HOST:-${REGION}-docker.pkg.dev/${PROJECT}/velosta}"
 SA_EMAIL="${GCP_SA_EMAIL:-velosta-sa@${PROJECT}.iam.gserviceaccount.com}"
 PUBLIC_WEB_ORIGINS="${PUBLIC_WEB_ORIGINS:-https://velosta.com,https://www.velosta.com}"
+# Canonical browser URL baked into the Next.js client (OAuth redirects, links).
+NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-https://velosta.com}"
 IMAGE_REPO="velosta/fe"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 IMAGE_FULL="${AR_HOST}/${IMAGE_REPO}:${IMAGE_TAG}"
@@ -50,6 +55,9 @@ gcloud auth print-access-token &>/dev/null || die "Not authenticated. Run: gclou
 gcloud projects describe "$PROJECT" --project="$PROJECT" >/dev/null 2>&1 || \
   die "No access to project '$PROJECT'. Set GCP_PROJECT to a project you can access."
 
+command -v docker >/dev/null 2>&1 || die "Docker is required for local builds. Install Docker and try again."
+command -v npm >/dev/null 2>&1 || die "npm is required for frontend build. Install Node.js/npm and try again."
+
 # ── Fetch config from Secret Manager ─────────────────────────────────────────
 log "Fetching config from Secret Manager..."
 GATEWAY_URL=$(sm_get gateway-url)
@@ -63,43 +71,32 @@ ok "Gateway URL: $GATEWAY_URL"
 # Script runs from FE/ root — no path adjustment needed
 FE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ── Build & push ──────────────────────────────────────────────────────────────
+# ── Build & push (local Docker → Artifact Registry) ───────────────────────────
 if [[ "$SKIP_BUILD" == "false" ]]; then
-  log "Building image via Cloud Build: $IMAGE_FULL"
+  log "Building image locally and pushing: $IMAGE_FULL"
   cd "$FE_DIR"
 
-  # Generate a temporary cloudbuild config with build-time env vars baked in.
-  # NEXT_PUBLIC_* vars must be ARG/ENV at build time — Cloud Run env vars are ignored.
-  CLOUDBUILD_TMP="$(mktemp /tmp/cloudbuild-fe-XXXX.yaml)"
-  cat > "$CLOUDBUILD_TMP" <<YAML
-steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - build
-      - --build-arg
-      - NEXT_PUBLIC_API_BASE_URL=${GATEWAY_URL}
-      - --build-arg
-      - NEXT_PUBLIC_URL=https://velosta.com
-      - --build-arg
-      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - --build-arg
-      - NEXT_PUBLIC_MAPBOX_TOKEN=${MAPBOX_TOKEN}
-      - --build-arg
-      - NEXT_PUBLIC_SITE_NAME=Velosta
-      - -t
-      - ${IMAGE_FULL}
-      - .
-images:
-  - ${IMAGE_FULL}
-options:
-  logging: CLOUD_LOGGING_ONLY
-YAML
+  log "Running local npm build..."
+  npm run build
 
-  gcloud builds submit . \
-    --config="$CLOUDBUILD_TMP" \
-    --timeout=600 \
-    --project="$PROJECT"
-  rm -f "$CLOUDBUILD_TMP"
+  log "Configuring Docker credential helper for Artifact Registry..."
+  gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+  # NEXT_PUBLIC_* must be build args — Next.js inlines them; Cloud Run env alone is not enough.
+  export DOCKER_BUILDKIT=1
+  docker build \
+    --file Dockerfile \
+    --platform "${DOCKER_PLATFORM:-linux/amd64}" \
+    --tag "$IMAGE_FULL" \
+    --build-arg "NEXT_PUBLIC_API_BASE_URL=${GATEWAY_URL}" \
+    --build-arg "NEXT_PUBLIC_URL=${NEXT_PUBLIC_SITE_URL}" \
+    --build-arg "NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}" \
+    --build-arg "NEXT_PUBLIC_MAPBOX_TOKEN=${MAPBOX_TOKEN}" \
+    --build-arg "NEXT_PUBLIC_SITE_NAME=Velosta" \
+    .
+
+  log "Pushing image to Artifact Registry..."
+  docker push "$IMAGE_FULL"
   ok "Image pushed: $IMAGE_FULL"
 fi
 
@@ -183,6 +180,10 @@ echo ""
 echo "  Frontend URL    : ${FE_URL:-<check Cloud Run console>}"
 echo "  Health endpoint : ${FE_URL:-<url>}/api/health"
 echo "  Image           : $IMAGE_FULL"
+echo ""
+echo "  Build tips:"
+echo "    • Override public URL: NEXT_PUBLIC_SITE_URL=https://your-domain ./deploy.sh"
+echo "    • Apple Silicon → Cloud Run (amd64): DOCKER_PLATFORM=linux/amd64 ./deploy.sh"
 echo ""
 echo "  IMPORTANT — Post-deployment:"
 echo "    1. Add ${FE_URL} as an authorized JavaScript origin in Google OAuth console"

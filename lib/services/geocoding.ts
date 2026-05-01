@@ -445,10 +445,10 @@ export async function enrichItineraryWithCoordinates(
           // 3. LLM coord if it survived the soft filter
           if (llmInRange) return row.coordinates as [number, number];
 
-          // 4. Last resort: pin to destination centre so the marker stays
-          //    visible inside the trip area instead of disappearing or
-          //    flying to a random match across the globe.
-          return destCenter;
+          // 4. Last resort: return null instead of pinning everything to the
+          //    destination centroid. Centroid fallback makes many rows stack
+          //    into one point, which breaks map readability and journey tours.
+          return null;
         })
       );
 

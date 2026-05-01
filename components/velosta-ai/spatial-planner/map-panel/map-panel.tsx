@@ -59,38 +59,8 @@ function injectMarkerStylesOnce() {
       box-shadow: 0 0 0 3px rgba(251,248,243,0.95), 0 8px 22px rgba(11,31,42,0.45), 0 0 0 4.5px rgba(11,31,42,0.22) !important;
     }
     .velosta-marker-scale { transition: transform 0.16s ease; }
-    /* The anchor-dot sits exactly on the geographic coordinate — used as the
-       low-zoom representation, hidden at city/street zoom. */
-    .velosta-marker-anchor-dot {
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.18s ease, transform 0.18s ease;
-    }
-    /* Zoom-bucket scaling driven by ONE class on the map container. */
-    .velosta-zoom-mid     .velosta-marker-scale { transform: scale(0.78); }
-    /* Compact + mid: collapse the pin to a dot AT the geographic anchor,
-       so coastal markers no longer appear to float into the water when
-       zoomed out. Mirrors Google Maps' low-zoom pin behaviour. */
-    .velosta-zoom-compact .velosta-marker-scale,
-    .velosta-zoom-mid     .velosta-marker-scale {
-      opacity: 0;
-      visibility: hidden;
-      transform: scale(0.6);
-    }
-    .velosta-zoom-compact .velosta-marker-anchor-dot,
-    .velosta-zoom-mid     .velosta-marker-anchor-dot {
-      opacity: 1;
-      visibility: visible;
-    }
-    .velosta-zoom-compact .velosta-marker-anchor-dot {
-      transform: translate(-50%, 50%) scale(0.75);
-    }
-    /* Selected anchor-dot — slightly larger + ring so it reads at low zoom. */
-    .velosta-marker--selected .velosta-marker-anchor-dot {
-      box-shadow: 0 0 0 2px rgba(251,248,243,0.95), 0 0 0 4px rgba(11,31,42,0.55), 0 2px 6px rgba(11,31,42,0.5) !important;
-    }
-    .velosta-zoom-compact .velosta-marker-label,
-    .velosta-zoom-mid     .velosta-marker-label { opacity: 0; visibility: hidden; }
+    /* Keep marker visuals stable across all zoom levels; no pin↔dot morphing. */
+    .velosta-marker-anchor-dot { display: none; }
   `;
   document.head.appendChild(style);
 }
@@ -161,6 +131,30 @@ function filterCoordOutliers<T extends { coordinates: [number, number] }>(
   return { kept, dropped };
 }
 
+function isValidLngLat([lng, lat]: [number, number]): boolean {
+  return Number.isFinite(lng) && Number.isFinite(lat) && lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90;
+}
+
+function isTransportLabel(label: string): boolean {
+  return /\b(flight|in-?flight|airport|train|rail|metro|bus|taxi|cab|ferry|transfer|depart|departure|arrival|arrive|travel to|travel from|return journey)\b/i.test(
+    label
+  );
+}
+
+function dedupeNearbyMarkers<T extends { coordinates: [number, number] }>(
+  markers: T[],
+  minSeparationKm = 0.08
+): T[] {
+  const kept: T[] = [];
+  for (const marker of markers) {
+    const tooClose = kept.some(
+      (k) => distanceKm(k.coordinates, marker.coordinates) < minSeparationKm
+    );
+    if (!tooClose) kept.push(marker);
+  }
+  return kept;
+}
+
 // Map styles — Mapbox Standard v3 brings Apple-Maps-grade 3D vector
 // rendering with built-in light presets, animated water, and procedural
 // 3D landmarks. The classic v12 fallbacks remain for users who want a
@@ -215,6 +209,25 @@ export default function MapPanel() {
   const { user } = useUser() as { user: { name?: string } | null };
   const plannerChatOpen = useUIStore((s) => s.plannerChatOpen);
 
+  // Raw planner data can include transport/meta rows with weak coordinates,
+  // especially for international plans. Keep the map focused on real visitable
+  // places to avoid drifty preview tours and off-screen jump lines.
+  const mapSafeMarkers = useMemo(() => {
+    const base = markers.filter((m) => isValidLngLat(m.coordinates) && !isTransportLabel(m.label));
+    const byDay = new globalThis.Map<number, typeof base>();
+    base.forEach((m) => {
+      const arr = byDay.get(m.dayIndex) ?? [];
+      arr.push(m);
+      byDay.set(m.dayIndex, arr);
+    });
+    const flattened: typeof base = [];
+    byDay.forEach((arr) => {
+      const { kept } = filterCoordOutliers(arr, 400);
+      flattened.push(...dedupeNearbyMarkers(kept));
+    });
+    return flattened;
+  }, [markers]);
+
   const initialCenter: [number, number] = useMemo(() => {
     if (selectedPackage) return [selectedPackage.coordinates[0], selectedPackage.coordinates[1]];
     return [viewport.longitude, viewport.latitude];
@@ -241,21 +254,28 @@ export default function MapPanel() {
   // Show current day's markers — or ALL markers during the journey animation
   // so every stop is visible on the map as the tour flies through each day.
   const filteredMarkers = useMemo(() => {
-    if (markers.length === 0) return markers;
-    if (isPreviewPlaying) return markers;
-    return markers.filter((m) => m.dayIndex === activeDay);
-  }, [markers, activeDay, isPreviewPlaying]);
+    if (mapSafeMarkers.length === 0) return mapSafeMarkers;
+    if (isPreviewPlaying) return mapSafeMarkers;
+    const activeDayMarkers = mapSafeMarkers.filter((m) => m.dayIndex === activeDay);
+    if (activeDayMarkers.length > 0) return activeDayMarkers;
+    // Outbound day can contain mostly transport/origin-country rows.
+    // Fall back to the first day that has destination-side points so
+    // the map never appears blank for international journeys.
+    const fallbackDay = mapSafeMarkers[0]?.dayIndex;
+    if (fallbackDay === undefined) return [];
+    return mapSafeMarkers.filter((m) => m.dayIndex === fallbackDay);
+  }, [mapSafeMarkers, activeDay, isPreviewPlaying, markers]);
 
   // Current day's markers for navigation
   const currentDayMarkers = useMemo(() => {
-    const sel = markers.find((m) => m.id === selectedMarker);
+    const sel = mapSafeMarkers.find((m) => m.id === selectedMarker);
     if (!sel) return filteredMarkers;
-    return markers.filter((m) => m.dayIndex === sel.dayIndex);
-  }, [markers, filteredMarkers, selectedMarker]);
+    return mapSafeMarkers.filter((m) => m.dayIndex === sel.dayIndex);
+  }, [mapSafeMarkers, filteredMarkers, selectedMarker]);
 
   const selectedMarkerData = useMemo(
-    () => markers.find((m) => m.id === selectedMarker) ?? null,
-    [markers, selectedMarker]
+    () => mapSafeMarkers.find((m) => m.id === selectedMarker) ?? null,
+    [mapSafeMarkers, selectedMarker]
   );
 
   const currentStopIndex = useMemo(() => {
@@ -280,7 +300,11 @@ export default function MapPanel() {
   const PREVIEW_ZOOM_THRESHOLD = 9.5;
   const firstName = user?.name?.split(" ")[0] ?? null;
   const tripDestination = selectedDestination || selectedPackage?.destination || "Your Journey";
-  const showPreviewCard = !isPreviewPlaying && currentZoom > 0 && currentZoom < PREVIEW_ZOOM_THRESHOLD && markers.length > 0;
+  const showPreviewCard =
+    !isPreviewPlaying &&
+    currentZoom > 0 &&
+    currentZoom < PREVIEW_ZOOM_THRESHOLD &&
+    mapSafeMarkers.length > 0;
 
   // ── Journey Preview Tour ─────────────────────────────────────────────
   const stopPreview = useCallback(() => {
@@ -296,13 +320,13 @@ export default function MapPanel() {
 
   const runPreviewTour = useCallback(async () => {
     const map = mapRef.current;
-    if (!map || markers.length === 0) return;
+    if (!map || mapSafeMarkers.length === 0) return;
 
     previewCancelRef.current = false;
     setIsPreviewPlaying(true);
 
     // Sort all markers: day first, then activity index within each day
-    const sorted = [...markers].sort((a, b) =>
+    const sorted = [...mapSafeMarkers].sort((a, b) =>
       a.dayIndex !== b.dayIndex ? a.dayIndex - b.dayIndex : a.activityIndex - b.activityIndex
     );
 
@@ -331,9 +355,9 @@ export default function MapPanel() {
       });
     }
 
-    if (!previewCancelRef.current && markers.length > 0) {
+    if (!previewCancelRef.current && mapSafeMarkers.length > 0) {
       const bounds = new mapboxgl.LngLatBounds();
-      markers.forEach((m) => bounds.extend(m.coordinates));
+      mapSafeMarkers.forEach((m) => bounds.extend(m.coordinates));
       map.fitBounds(bounds, {
         padding: { top: 80, bottom: 120, left: 60, right: 60 },
         duration: PREFERS_REDUCED_MOTION ? 0 : 1500,
@@ -348,7 +372,7 @@ export default function MapPanel() {
     setPreviewCurrent(null);
     setActiveMarker(null);
     previewTimeoutRef.current = null;
-  }, [markers, setActiveMarker]);
+  }, [mapSafeMarkers, setActiveMarker]);
 
   const goToPrev = useCallback(() => {
     if (currentStopIndex <= 0) return;
@@ -657,9 +681,10 @@ export default function MapPanel() {
       bearing: selectedPackage ? -17 : 0,
       // antialias is GPU-expensive; only opt in on capable hardware.
       antialias: !LOW_END,
-      // `globe` is beautiful but ~30-40% more renderer work than `mercator`.
-      // Drop to mercator on weak devices so panning stays at 60fps.
-      projection: { name: LOW_END ? "mercator" : "globe" },
+      // Keep mercator projection for stable, Google-Maps-like pin anchoring.
+      // Globe projection introduces extra reprojection during camera motion
+      // that can make HTML markers look like they drift while zooming/panning.
+      projection: { name: "mercator" },
       // Smoother inertial pan/zoom feel — closer to Apple Maps
       maxPitch: LOW_END ? 60 : 75,
       // Cap pixel ratio on huge retina screens — full DPR on 3x phones is
@@ -702,36 +727,6 @@ export default function MapPanel() {
 
     map.on("style.load", onStyleLoad);
 
-    // ── Zoom-aware marker declutter ──────────────────────────────────────
-    // Previously this ran a `querySelectorAll` over every marker on every
-    // single `zoom` event (which fires continuously during a gesture) and
-    // wrote inline styles on each one — the single biggest cause of pan/
-    // zoom jank. We now:
-    //   1. compute a discrete "zoom bucket" (compact / mid / full)
-    //   2. toggle ONE class on the map container — the injected stylesheet
-    //      handles the rest via descendant selectors. This is O(1) DOM work
-    //      per frame regardless of marker count.
-    //   3. rAF-throttle so we never do work twice in the same frame.
-    let lastBucket: "compact" | "mid" | "full" | null = null;
-    let rafId = 0;
-    const applyMarkerScale = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        const z = map.getZoom();
-        const bucket: "compact" | "mid" | "full" =
-          z < 9 ? "compact" : z < 11 ? "mid" : "full";
-        if (bucket === lastBucket) return;
-        lastBucket = bucket;
-        const root = map.getContainer();
-        root.classList.toggle("velosta-zoom-compact", bucket === "compact");
-        root.classList.toggle("velosta-zoom-mid", bucket === "mid");
-      });
-    };
-    map.on("zoom", applyMarkerScale);
-    map.on("zoomend", applyMarkerScale);
-    map.on("idle", applyMarkerScale);
-
     // ── Track zoom level for preview card visibility ─────────────────────
     // Only update React state on zoomend/idle (not every frame) to avoid
     // re-renders during the zoom gesture itself.
@@ -742,14 +737,10 @@ export default function MapPanel() {
     map.on("load", () => setCurrentZoom(map.getZoom()));
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
       markersByIdRef.current.clear();
       map.off("style.load", onStyleLoad);
-      map.off("zoom", applyMarkerScale);
-      map.off("zoomend", applyMarkerScale);
-      map.off("idle", applyMarkerScale);
       map.off("zoomend", onZoomSettled);
       map.off("idle", onZoomSettled);
       map.remove();
@@ -1009,7 +1000,7 @@ export default function MapPanel() {
     const currentGen = ++markerGenRef.current;
 
     // ── AI itinerary markers ─────────────────────────────────────────
-    if (markers.length > 0) {
+    if (mapSafeMarkers.length > 0) {
       filteredMarkers.forEach((md) => {
         const dayColor = getDayColor(md.dayIndex);
         // Constant size — selection emphasis is delivered via CSS class
@@ -1120,7 +1111,7 @@ export default function MapPanel() {
     // NOTE: `selectedMarker` and `activeMarkerId` deliberately excluded.
     // Selection visuals are applied by a separate effect that just toggles
     // a CSS class on the affected marker — no DOM rebuild on click.
-  }, [mapLoaded, styleTick, filteredMarkers, itinerary, selectedPackage, setActiveMarker, setActiveDay, markers, activeDay, fetchRouteCoords, buildMarkerElement, addRouteLine, FLY_PITCH, FLY_DURATION]);
+  }, [mapLoaded, styleTick, filteredMarkers, itinerary, selectedPackage, setActiveMarker, setActiveDay, mapSafeMarkers, activeDay, fetchRouteCoords, buildMarkerElement, addRouteLine, FLY_PITCH, FLY_DURATION]);
 
   // ── Selection visuals (no DOM rebuild) ─────────────────────────────────
   // Toggling a class on the active marker is O(1) per click and avoids
@@ -1382,12 +1373,12 @@ export default function MapPanel() {
                       {itinerary.length} day{itinerary.length !== 1 ? "s" : ""}
                     </span>
                   )}
-                  {itinerary.length > 0 && markers.length > 0 && (
+                  {itinerary.length > 0 && mapSafeMarkers.length > 0 && (
                     <span className="w-1 h-1 rounded-full bg-[#FBF8F3]/18 shrink-0" />
                   )}
-                  {markers.length > 0 && (
+                  {mapSafeMarkers.length > 0 && (
                     <span className="text-[12px] text-[#FBF8F3]/45 font-medium">
-                      {markers.length} stop{markers.length !== 1 ? "s" : ""}
+                      {mapSafeMarkers.length} stop{mapSafeMarkers.length !== 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
@@ -1398,7 +1389,7 @@ export default function MapPanel() {
                 <div className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   <div className="flex flex-col gap-0">
                     {itinerary.map((day, idx) => {
-                      const dayStops = markers.filter((m) => m.dayIndex === idx).length;
+                      const dayStops = mapSafeMarkers.filter((m) => m.dayIndex === idx).length;
                       const color = DAY_COLORS[idx % DAY_COLORS.length];
                       return (
                         <div

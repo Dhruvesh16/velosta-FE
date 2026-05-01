@@ -68,7 +68,7 @@ const INTERESTS = [
   { id: "culture", label: "Culture" },
   { id: "adventure", label: "Adventure" },
   { id: "relaxation", label: "Slow travel" },
-  { id: "food", label: "Food & wine" },
+  { id: "food", label: "Food" },
   { id: "nightlife", label: "Nightlife" },
   { id: "photography", label: "Photography" },
   { id: "wellness", label: "Wellness" },
@@ -487,13 +487,21 @@ export default function IntentCapture() {
                   className="text-[10px] font-semibold uppercase tracking-[0.24em]"
                   style={{ color: C.teal }}
                 >
-                  Today&apos;s match
+                  Your trip sketch
                 </p>
                 <p
                   className={`${playfair.className} mt-0.5 text-[15px]`}
                   style={{ color: C.navy, fontWeight: 500 }}
                 >
-                  <span className="italic">Coastal Goa</span> · 4 nights · ₹6.5k
+                  ₹{budgetText} · {duration}{" "}
+                  {duration === 1 ? "day" : "days"} ·{" "}
+                  {TRAVELER_TYPES.find((t) => t.id === travelerType)?.label ?? "Travelers"}
+                  {selectedInterests.length > 0
+                    ? ` · ${selectedInterests
+                        .map((id) => INTERESTS.find((x) => x.id === id)?.label ?? id)
+                        .slice(0, 3)
+                        .join(", ")}`
+                    : ""}
                 </p>
               </div>
             </div>
@@ -675,12 +683,13 @@ export default function IntentCapture() {
                   step={500}
                   value={Math.min(budget, sliderMax)}
                   onChange={(e) => handleSliderChange(Number(e.target.value))}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  className="absolute inset-x-0 top-1/2 z-10 h-8 w-full -translate-y-1/2 cursor-ew-resize opacity-0"
+                  style={{ touchAction: "pan-y" }}
                   aria-label={`Budget slider (${sliderMin.toLocaleString("en-IN")}–${sliderMax.toLocaleString("en-IN")}). Type for higher values.`}
                 />
                 <div
                   aria-hidden
-                  className="absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full"
+                  className="pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full"
                   style={{
                     left: `calc(${sliderPct}% - 10px)`,
                     backgroundColor: C.coral,

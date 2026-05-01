@@ -22,9 +22,10 @@ import {
   IndianRupee,
   SlidersHorizontal,
 } from "lucide-react";
-import { useOnboardingStore } from "@/lib/stores/onboarding-store";
+import { useOnboardingStore, type DiscoveredDestination } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
 import { DESTINATIONS, type Destination } from "@/lib/data/destinations";
+import { fetchDiscoveredDestinations } from "@/lib/services/destination-service";
 import { generatePlannerStreamAsync } from "@/lib/services/planner-service";
 import {
   commitItineraryToStores,
@@ -58,7 +59,100 @@ const TRAVELER_TYPES = [
 
 const DURATION_OPTIONS = [2, 3, 5, 7, 10, 14];
 
-function getBudgetFit(dest: Destination, budget: number): "perfect" | "stretch" | "over" {
+/** Map pin row: static catalog entry or AI-discovered place (same shape as Destination). */
+type ExploreDestination = Destination & {
+  source?: "ai";
+  aiBudgetFit?: "perfect" | "stretch" | "premium";
+};
+
+const EMOJI_BY_CATEGORY: Record<string, string> = {
+  nature: "🌿",
+  culture: "🏛️",
+  adventure: "🏔️",
+  relaxation: "🧘",
+  food: "🍜",
+  nightlife: "🌃",
+  photography: "📸",
+  shopping: "🛍️",
+  wellness: "💆",
+};
+
+function emojiForInterests(ids: string[]): string {
+  for (const id of ids) {
+    if (EMOJI_BY_CATEGORY[id]) return EMOJI_BY_CATEGORY[id];
+  }
+  return "📍";
+}
+
+function parseInrRange(label: string, budgetFallback: number): { costMin: number; costMax: number } {
+  const normalized = label.replace(/,/g, "").replace(/₹/g, "");
+  const nums = normalized.match(/\d+/g);
+  if (!nums?.length) {
+    const b = budgetFallback;
+    return { costMin: Math.round(b * 0.65), costMax: Math.round(b * 1.25) };
+  }
+  const values = nums.map((s) => {
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? n : 0;
+  });
+  const scaled = values.map((v) => (v > 0 && v < 800 ? v * 1000 : v));
+  if (scaled.length >= 2) {
+    return {
+      costMin: Math.round(Math.min(scaled[0], scaled[1])),
+      costMax: Math.round(Math.max(scaled[0], scaled[1])),
+    };
+  }
+  const v = scaled[0];
+  return { costMin: Math.round(v * 0.85), costMax: Math.round(v * 1.15) };
+}
+
+function discoveredToExploreDestination(
+  d: DiscoveredDestination,
+  ctx: { budget: number; categories: string[]; tripType: string }
+): ExploreDestination {
+  const { costMin, costMax } = parseInrRange(d.estimatedCost, ctx.budget);
+  const days = Math.max(1, d.recommendedDays);
+  const hl =
+    d.highlights.length > 0
+      ? d.highlights
+      : d.tagline
+        ? [d.tagline]
+        : ["Curated pick for your trip"];
+  const topPlaces = hl.slice(0, 5).map((name, i) => ({
+    name,
+    desc: i === 0 ? d.tagline || "" : "",
+    cost: "—",
+    rating: 4.5,
+    emoji: emojiForInterests(ctx.categories),
+  }));
+  const bestFor = ctx.tripType
+    ? Array.from(new Set([ctx.tripType, "solo", "couple", "friends", "family"]))
+    : ["solo", "couple", "friends", "family"];
+  return {
+    id: d.id,
+    name: d.name,
+    state: d.state,
+    coordinates: d.coordinates,
+    emoji: emojiForInterests(ctx.categories),
+    durationMin: Math.max(1, days - 1),
+    durationMax: Math.min(14, days + 2),
+    costMin,
+    costMax,
+    highlights: hl,
+    topPlaces,
+    bestFor,
+    categories: [...ctx.categories],
+    source: "ai",
+    aiBudgetFit: d.budgetFit,
+  };
+}
+
+function getBudgetFit(dest: ExploreDestination, budget: number): "perfect" | "stretch" | "over" {
+  if (dest.source === "ai" && dest.aiBudgetFit) {
+    if (dest.aiBudgetFit === "premium") return "over";
+    if (dest.aiBudgetFit === "stretch") return "stretch";
+    return "perfect";
+  }
   if (dest.costMax <= budget) return "perfect";
   if (dest.costMin <= budget) return "stretch";
   return "over";
@@ -91,6 +185,10 @@ export default function ExploreMapView() {
     setUserLocation,
     setDuration: setStoreDuration,
     travelProfile,
+    discoveredDestinations,
+    setDiscoveredDestinations,
+    isLoadingDestinations,
+    setLoadingDestinations,
   } = useOnboardingStore();
   const { accessToken } = useUser();
 
@@ -102,8 +200,10 @@ export default function ExploreMapView() {
   const [categories, setCategories] = useState<string[]>([...storeInterests]);
   const [isSatellite, setIsSatellite] = useState(false);
   // ── UI state ──
-  const [hoveredDest, setHoveredDest] = useState<Destination | null>(null);
-  const [selectedDest, setSelectedDest] = useState<Destination | null>(null);
+  const [hoveredDest, setHoveredDest] = useState<ExploreDestination | null>(null);
+  const [selectedDest, setSelectedDest] = useState<ExploreDestination | null>(null);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
+  const [discoverRequestKey, setDiscoverRequestKey] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationDone, setGenerationDone] = useState(false);
   const [craftingPlace, setCraftingPlace] = useState<string>("");
@@ -144,8 +244,8 @@ export default function ExploreMapView() {
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
 
-  // ── Filter destinations ──
-  const filtered = useMemo(() => {
+  // ── Static catalog (fallback when signed out or discovery fails) ──
+  const staticFiltered = useMemo(() => {
     return DESTINATIONS.filter((d) => {
       if (d.costMin > budget) return false;
       if (d.durationMin > duration) return false;
@@ -156,14 +256,117 @@ export default function ExploreMapView() {
     });
   }, [budget, duration, tripType, categories]);
 
+  const displayPlaces = useMemo((): ExploreDestination[] => {
+    if (accessToken) {
+      return discoveredDestinations.map((d) =>
+        discoveredToExploreDestination(d, { budget, categories, tripType })
+      );
+    }
+    return staticFiltered;
+  }, [accessToken, discoveredDestinations, staticFiltered, budget, categories, tripType]);
+
+  // ── AI discovery (signed-in): preferences + travel profile → map pins ──
+  const discoverDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!accessToken) {
+      setDiscoverError(null);
+      setLoadingDestinations(false);
+      return;
+    }
+    // Cover debounce window so the explore UI does not mount before the first request starts.
+    setLoadingDestinations(true);
+    setDiscoverError(null);
+    if (discoverDebounceRef.current) clearTimeout(discoverDebounceRef.current);
+    discoverDebounceRef.current = setTimeout(() => {
+      discoverDebounceRef.current = null;
+      const loc = userLocation ?? {
+        name: "India",
+        coordinates: [78.9629, 20.5937] as [number, number],
+      };
+      const profileCtx = buildTravelProfilePrompt(travelProfile);
+      void (async () => {
+        try {
+          const list = await fetchDiscoveredDestinations({
+            budget: {
+              min: Math.max(1000, Math.round(budget * 0.35)),
+              max: Math.max(budget, 1000),
+              label: `Up to ₹${budget.toLocaleString("en-IN")} per person`,
+            },
+            duration,
+            userLocation: loc,
+            interests: categories,
+            travelerType: tripType,
+            travelerCount,
+            travelProfileContext: profileCtx,
+            destinationHint: customDestination?.name,
+          });
+          setDiscoveredDestinations(list);
+        } catch (e) {
+          console.error("[explore-map] discover destinations:", e);
+          setDiscoveredDestinations([]);
+          setDiscoverError("Personalized picks unavailable right now. Please retry.");
+        } finally {
+          setLoadingDestinations(false);
+        }
+      })();
+    }, 650);
+    return () => {
+      if (discoverDebounceRef.current) {
+        clearTimeout(discoverDebounceRef.current);
+        discoverDebounceRef.current = null;
+      }
+    };
+  }, [
+    accessToken,
+    budget,
+    duration,
+    tripType,
+    travelerCount,
+    categories,
+    userLocation,
+    travelProfile,
+    customDestination?.name,
+    discoverRequestKey,
+    setDiscoveredDestinations,
+    setLoadingDestinations,
+  ]);
+
+  /** Full-screen loader only until the first AI batch arrives (not on filter refetch). */
+  const waitingForAiPlaces =
+    !!accessToken &&
+    discoveredDestinations.length === 0 &&
+    !discoverError &&
+    isLoadingDestinations;
+
+  const discoverErrorFullPage =
+    !!accessToken &&
+    !isLoadingDestinations &&
+    discoveredDestinations.length === 0 &&
+    !!discoverError;
+
+  /** Map container is in the DOM only after loading / error gates — init must re-run when this becomes true. */
+  const mapHostVisible =
+    !!MAPBOX_TOKEN && !waitingForAiPlaces && !discoverErrorFullPage;
+
   const sliderPct = ((budget - 1000) / (50000 - 1000)) * 100;
 
-  // ── Initialize map ──
+  // ── Initialize map (after gates — ref exists; first mount used to skip when ref was null) ──
   useEffect(() => {
-    if (!mapContainerRef.current || !MAPBOX_TOKEN) return;
+    if (!mapHostVisible) {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        setMapLoaded(false);
+      }
+      return;
+    }
+
+    const el = mapContainerRef.current;
+    if (!el || mapRef.current) return;
+
     mapboxgl.accessToken = MAPBOX_TOKEN;
     const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
+      container: el,
       style: "mapbox://styles/mapbox/streets-v12",
       center: userLocation?.coordinates ?? [78.9629, 20.5937],
       zoom: userLocation ? 6 : 4.5,
@@ -178,10 +381,16 @@ export default function ExploreMapView() {
     });
     return () => {
       map.remove();
-      mapRef.current = null;
+      if (mapRef.current === map) {
+        mapRef.current = null;
+      }
+      setMapLoaded(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    mapHostVisible,
+    userLocation?.coordinates?.[0],
+    userLocation?.coordinates?.[1],
+  ]);
 
   // ── Toggle satellite ──
   useEffect(() => {
@@ -211,7 +420,7 @@ export default function ExploreMapView() {
 
     const bounds = new mapboxgl.LngLatBounds();
 
-    filtered.forEach((dest) => {
+    displayPlaces.forEach((dest) => {
       const fit = getBudgetFit(dest, budget);
       const color = getBudgetColor(fit);
 
@@ -298,9 +507,9 @@ export default function ExploreMapView() {
       bounds.extend(dest.coordinates);
     });
 
-    if (filtered.length === 1) {
-      map.flyTo({ center: filtered[0].coordinates, zoom: 8, duration: 1000 });
-    } else if (filtered.length > 1) {
+    if (displayPlaces.length === 1) {
+      map.flyTo({ center: displayPlaces[0].coordinates, zoom: 8, duration: 1000 });
+    } else if (displayPlaces.length > 1) {
       try {
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
@@ -320,14 +529,14 @@ export default function ExploreMapView() {
         // bounds empty or invalid — skip
       }
     }
-  }, [filtered, budget, mapLoaded]);
+  }, [displayPlaces, budget, mapLoaded]);
 
   // ── Build Itinerary ──
   // Owns the entire generation lifecycle so the planner page never lands
   // empty: hydrate context → sign-in gate → call planner → push into stores
   // → advance to planner step.
   const handleBuildItinerary = useCallback(
-    async (dest: Destination, locationOverride?: string) => {
+    async (dest: ExploreDestination, locationOverride?: string) => {
       // Hydrate planner store with the user's chosen context
       setUserLocation({ name: dest.name, coordinates: dest.coordinates });
       setStoreDuration(duration);
@@ -497,7 +706,7 @@ export default function ExploreMapView() {
     if (!customDestination || !mapLoaded || isGenerating) return;
     // Parse fullName (e.g. "Goa, India" or "Manali, Himachal Pradesh, India")
     const parts = customDestination.fullName.split(",").map((p) => p.trim());
-    const syntheticDest: Destination = {
+    const syntheticDest: ExploreDestination = {
       id: "custom-intent",
       name: customDestination.name,
       state: parts[1] ?? "",
@@ -545,6 +754,41 @@ export default function ExploreMapView() {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gray-100">
         <p className="text-red-500">Mapbox token missing.</p>
+      </div>
+    );
+  }
+
+  if (waitingForAiPlaces) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[#FBF8F3]">
+        <div className="flex flex-col items-center gap-3 text-center px-6">
+          <Loader2 size={22} className="animate-spin text-[#2F6F73]" />
+          <p className="text-sm font-medium text-[#0B1F2A]">
+            Finding personalized places for your trip...
+          </p>
+          <p className="text-xs text-[#0B1F2A]/55 max-w-sm">
+            We are using your budget, duration, trip type, and preferences to generate
+            destination picks.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (discoverErrorFullPage) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[#FBF8F3]">
+        <div className="max-w-md rounded-2xl border border-[#0B1F2A]/10 bg-white p-6 text-center shadow-sm">
+          <p className="text-base font-semibold text-[#0B1F2A]">Could not fetch AI places</p>
+          <p className="mt-2 text-sm text-[#0B1F2A]/65">{discoverError}</p>
+          <button
+            onClick={() => setDiscoverRequestKey((v) => v + 1)}
+            className="mt-4 rounded-xl px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: "linear-gradient(135deg, #D97757, #B85F44)" }}
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -746,8 +990,17 @@ export default function ExploreMapView() {
           <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/80">
             <p className="text-xs font-semibold text-gray-600 mb-2">
               Matching destinations:{" "}
-              <span className="text-[#2F6F73]">{filtered.length}</span>
+              <span className="text-[#2F6F73]">{displayPlaces.length}</span>
             </p>
+            {accessToken && isLoadingDestinations ? (
+              <p className="text-[10px] text-[#2F6F73]/85 flex items-center gap-1.5 mb-2">
+                <Loader2 size={12} className="animate-spin shrink-0" aria-hidden />
+                Updating suggestions…
+              </p>
+            ) : null}
+            {discoverError ? (
+              <p className="text-[10px] text-amber-800/90 mb-2 leading-snug">{discoverError}</p>
+            ) : null}
             <div className="flex items-center gap-3 text-[10px] text-gray-400">
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Within budget
@@ -794,12 +1047,12 @@ export default function ExploreMapView() {
               Curated for your trip
             </h3>
             <p className="text-[11.5px] text-[#0B1F2A]/55 mt-1.5">
-              {filtered.length} {filtered.length === 1 ? "place" : "places"} match your filters
+              {displayPlaces.length} {displayPlaces.length === 1 ? "place" : "places"} match your filters
             </p>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {filtered.length === 0 ? (
+            {displayPlaces.length === 0 ? (
               <div className="p-8 text-center">
                 <div
                   className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
@@ -818,7 +1071,7 @@ export default function ExploreMapView() {
                 </p>
               </div>
             ) : (
-              filtered.map((dest) => {
+              displayPlaces.map((dest) => {
                 const fit = getBudgetFit(dest, budget);
                 const color = getBudgetColor(fit);
                 const active = hoveredDest?.id === dest.id;
@@ -884,7 +1137,7 @@ export default function ExploreMapView() {
               Discover
             </p>
             <h2 className="font-serif text-[14px] font-semibold text-[#0B1F2A] leading-tight">
-              {filtered.length} {filtered.length === 1 ? "place" : "places"}
+              {displayPlaces.length} {displayPlaces.length === 1 ? "place" : "places"}
             </h2>
           </div>
           <button
@@ -924,7 +1177,7 @@ export default function ExploreMapView() {
           </button>
 
           <div className="flex-1 overflow-y-auto pb-4">
-            {filtered.length === 0 ? (
+            {displayPlaces.length === 0 ? (
               <div className="p-8 text-center">
                 <p className="text-[13px] font-medium text-[#0B1F2A]">No matches yet</p>
                 <p className="text-[11.5px] text-[#0B1F2A]/50 mt-1">
@@ -932,7 +1185,7 @@ export default function ExploreMapView() {
                 </p>
               </div>
             ) : (
-              filtered.map((dest) => {
+              displayPlaces.map((dest) => {
                 const fit = getBudgetFit(dest, budget);
                 const color = getBudgetColor(fit);
                 return (
@@ -1126,7 +1379,7 @@ export default function ExploreMapView() {
                       background: "linear-gradient(135deg, #D97757, #B85F44)",
                     }}
                   >
-                    Show {filtered.length} {filtered.length === 1 ? "place" : "places"}
+                    Show {displayPlaces.length} {displayPlaces.length === 1 ? "place" : "places"}
                   </button>
                 </div>
               </motion.div>

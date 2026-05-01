@@ -125,6 +125,46 @@ function groupByTimeOfDay(rows: ActivityRow[]): TimeSection[] {
   return sections;
 }
 
+type RefineChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
+
+function looksLikeModificationRequest(input: string): boolean {
+  const text = input.toLowerCase();
+  const verbs = [
+    "add",
+    "remove",
+    "delete",
+    "replace",
+    "swap",
+    "move",
+    "change",
+    "update",
+    "modify",
+    "optimize",
+    "rearrange",
+    "reschedule",
+    "include",
+    "exclude",
+  ];
+  const targets = [
+    "itinerary",
+    "day",
+    "days",
+    "stop",
+    "stops",
+    "hotel",
+    "restaurant",
+    "activity",
+    "place",
+    "route",
+    "budget",
+  ];
+  return verbs.some((v) => text.includes(v)) && targets.some((t) => text.includes(t));
+}
+
 export default function ItineraryPanel() {
   const {
     itinerary,
@@ -140,7 +180,7 @@ export default function ItineraryPanel() {
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiExpanded, setAiExpanded] = useState(false);
-  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [aiMessages, setAiMessages] = useState<RefineChatMessage[]>([]);
   const [aiStreamText, setAiStreamText] = useState("");
   const streamAccRef = useRef("");
   // Toast for export/share actions
@@ -257,22 +297,31 @@ export default function ItineraryPanel() {
   const submitAi = useCallback(
     async (text: string) => {
       if (!text || aiLoading || !itineraryData) return;
+      const trimmed = text.trim();
+      if (!trimmed) return;
       setAiInput("");
       setAiLoading(true);
-      setAiMessage(null);
       setAiStreamText("");
       streamAccRef.current = "";
+      const userMsg: RefineChatMessage = {
+        id: `u-${Date.now()}`,
+        role: "user",
+        content: trimmed,
+      };
+      const nextHistory = [...aiMessages, userMsg];
+      setAiMessages(nextHistory);
+      const shouldModify = looksLikeModificationRequest(trimmed);
 
       try {
         const data = await generatePlannerStreamAsync(
           {
-            userSaid: text,
-            conversationHistory: [
-              { role: "assistant", content: `[Current itinerary for ${itineraryData.destination}]` },
-              { role: "user", content: text },
-            ],
+            userSaid: trimmed,
+            conversationHistory: nextHistory.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
             currentItinerary: itineraryData,
-            isModificationRequest: true,
+            isModificationRequest: shouldModify,
           },
           (token) => {
             streamAccRef.current += token;
@@ -286,8 +335,29 @@ export default function ItineraryPanel() {
         setAiStreamText("");
 
         if (data.isTextResponse) {
-          setAiMessage(data.message);
+          setAiMessages((prev) => [
+            ...prev,
+            {
+              id: `a-${Date.now()}`,
+              role: "assistant",
+              content: data.message,
+            },
+          ]);
         } else if (data.itineraryTable) {
+          if (!shouldModify) {
+            setAiMessages((prev) => [
+              ...prev,
+              {
+                id: `a-${Date.now()}`,
+                role: "assistant",
+                content:
+                  data.summary ||
+                  "I can suggest options conversationally. Tell me explicitly what to change if you want me to edit the itinerary.",
+              },
+            ]);
+            return;
+          }
+
           const extractedTripData = {
             destination: data.destination,
             budget: data.totalEstimatedCost || data.totalBudget,
@@ -308,24 +378,39 @@ export default function ItineraryPanel() {
           }));
           setMarkers(itineraryToMarkers(enriched));
 
-          setAiMessage(
+          const confirmation =
             data.modificationsApplied?.length > 0
-              ? `Changes applied:\n${data.modificationsApplied.map((m: string) => `• ${m}`).join("\n")}`
-              : data.summary || "Itinerary updated!"
-          );
+              ? `Changes applied:\n${data.modificationsApplied
+                  .map((m: string) => `• ${m}`)
+                  .join("\n")}`
+              : data.summary || "Done — I updated your itinerary and map.";
+          setAiMessages((prev) => [
+            ...prev,
+            {
+              id: `a-${Date.now()}`,
+              role: "assistant",
+              content: confirmation,
+            },
+          ]);
         }
       } catch (err: any) {
         setAiStreamText("");
-        setAiMessage(
-          err.name === "AbortError"
-            ? "Request timed out. Try again."
-            : "Something went wrong. Please try again."
-        );
+        setAiMessages((prev) => [
+          ...prev,
+          {
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            content:
+              err.name === "AbortError"
+                ? "Request timed out. Try again."
+                : "Something went wrong. Please try again.",
+          },
+        ]);
       } finally {
         setAiLoading(false);
       }
     },
-    [aiLoading, itineraryData, flyTo, setMarkers]
+    [aiLoading, itineraryData, flyTo, setMarkers, aiMessages]
   );
 
   const handleAiSubmit = useCallback(
@@ -808,19 +893,36 @@ export default function ItineraryPanel() {
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              {(aiStreamText || aiMessage || (aiLoading && !aiStreamText)) && (
+              {(aiMessages.length > 0 || aiLoading) && (
                 <div className="px-4 pb-2">
-                  <div className="text-[11px] text-[#0B1F2A]/75 bg-[#F5EFE6]/70 border border-[#D97757]/20 rounded-lg px-3 py-2 whitespace-pre-line leading-relaxed">
-                    {aiStreamText || aiMessage}
-                    {aiLoading && aiStreamText && (
-                      <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-[#D97757] animate-pulse rounded-sm align-middle" />
-                    )}
-                    {aiLoading && !aiStreamText && (
-                      <span className="flex items-center gap-1 text-[#0B1F2A]/40">
-                        <span className="animate-bounce" style={{ animationDelay: "0ms" }}>●</span>
-                        <span className="animate-bounce" style={{ animationDelay: "120ms" }}>●</span>
-                        <span className="animate-bounce" style={{ animationDelay: "240ms" }}>●</span>
-                      </span>
+                  <div className="max-h-44 overflow-y-auto space-y-2 rounded-lg border border-[#D97757]/20 bg-[#F5EFE6]/45 px-2.5 py-2">
+                    {aiMessages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`text-[11px] leading-relaxed whitespace-pre-line rounded-lg px-3 py-2 ${
+                          m.role === "user"
+                            ? "ml-8 bg-[#0B1F2A]/90 text-white"
+                            : "mr-8 bg-white text-[#0B1F2A]/80 border border-[#0B1F2A]/8"
+                        }`}
+                      >
+                        {m.content}
+                      </div>
+                    ))}
+                    {aiLoading && (
+                      <div className="mr-8 rounded-lg border border-[#0B1F2A]/8 bg-white px-3 py-2 text-[11px] text-[#0B1F2A]/70">
+                        {aiStreamText ? (
+                          <>
+                            {aiStreamText}
+                            <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-[#D97757] animate-pulse rounded-sm align-middle" />
+                          </>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[#0B1F2A]/40">
+                            <span className="animate-bounce" style={{ animationDelay: "0ms" }}>●</span>
+                            <span className="animate-bounce" style={{ animationDelay: "120ms" }}>●</span>
+                            <span className="animate-bounce" style={{ animationDelay: "240ms" }}>●</span>
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

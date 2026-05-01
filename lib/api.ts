@@ -9,7 +9,9 @@
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
-  "http://localhost:8000";
+  (typeof window !== "undefined"
+    ? window.location.origin.replace(/\/$/, "")
+    : "http://localhost:8000");
 
 export class ApiError extends Error {
   code: string;

@@ -20,6 +20,59 @@ function parseCostNum(s: string | undefined): number {
   return m ? parseFloat(m[0]) : 0;
 }
 
+function toNum(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v.trim());
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function toLngLat(a: number, b: number): [number, number] | null {
+  // Canonical [lng, lat]
+  if (a >= -180 && a <= 180 && b >= -90 && b <= 90) return [a, b];
+  // [lat, lng] → swap
+  if (a >= -90 && a <= 90 && b >= -180 && b <= 180) return [b, a];
+  return null;
+}
+
+/** Robustly parse row coordinates from multiple LLM output shapes. */
+function parseRowCoordinates(rawRow: any): [number, number] | undefined {
+  const rawCoords = rawRow.coordinates;
+
+  // 1) coordinates as [x, y]
+  if (Array.isArray(rawCoords) && rawCoords.length >= 2) {
+    const a = toNum(rawCoords[0]);
+    const b = toNum(rawCoords[1]);
+    if (a != null && b != null) {
+      const ll = toLngLat(a, b);
+      if (ll) return ll;
+    }
+  }
+
+  // 2) coordinates as object {lat,lng} / {latitude,longitude} / {lon,lat}
+  if (rawCoords && typeof rawCoords === "object") {
+    const c = rawCoords as Record<string, unknown>;
+    const lat = toNum(c.lat ?? c.latitude);
+    const lng = toNum(c.lng ?? c.lon ?? c.long ?? c.longitude);
+    if (lat != null && lng != null) {
+      const ll = toLngLat(lng, lat);
+      if (ll) return ll;
+    }
+  }
+
+  // 3) top-level row fields
+  const lat = toNum(rawRow.lat ?? rawRow.latitude);
+  const lng = toNum(rawRow.lng ?? rawRow.lon ?? rawRow.long ?? rawRow.longitude);
+  if (lat != null && lng != null) {
+    const ll = toLngLat(lng, lat);
+    if (ll) return ll;
+  }
+
+  return undefined;
+}
+
 interface PlannerState {
   /** Raw itinerary data from AI */
   itineraryData: ItineraryData | null;
@@ -61,23 +114,8 @@ function normalizeDay(day: RawItineraryDay, index: number): ItineraryDay {
     theme: day.theme ?? "",
     dailyCost: day.dailyCost ?? "",
     rows: (day.rows ?? []).map((row) => {
-      // Extract coordinates from LLM-provided lat/lng if present
       const rawRow = row as any;
-      let coordinates: [number, number] | undefined = row.coordinates;
-      if (!coordinates && rawRow.lat != null && rawRow.lng != null) {
-        let lat = Number(rawRow.lat);
-        let lng = Number(rawRow.lng);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          // Detect swapped lat/lng — if lat looks like an Indian longitude and vice versa, swap them
-          if (lat > 60 && lat <= 100 && lng >= 6 && lng <= 40) {
-            [lat, lng] = [lng, lat];
-          }
-          // Accept valid global coordinates (lat ±90, lng ±180)
-          if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-            coordinates = [lng, lat]; // Mapbox uses [lng, lat]
-          }
-        }
-      }
+      const coordinates = parseRowCoordinates(rawRow);
 
       return {
         ...row,
@@ -198,6 +236,13 @@ export const usePlannerStore = create<PlannerState>()(
         totalBudget: state.totalBudget,
         spentBudget: state.spentBudget,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state?.itineraryData) return;
+        const normalized = (state.itineraryData.itineraryTable ?? []).map(normalizeDay);
+        const enriched = enrichItineraryWithFatigue(normalized);
+        state.itinerary = enriched;
+        state.spentBudget = recalcSpent(enriched);
+      },
     }
   )
 );

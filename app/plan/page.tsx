@@ -229,6 +229,24 @@ export default function PlanIntroPage() {
 
                   <motion.button
                     type="button"
+                    onClick={() => router.push("/saved-trips")}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="group inline-flex items-center justify-center gap-2.5 rounded-full px-7 sm:px-9 py-3 sm:py-3.5 text-[13.5px] sm:text-[14px] font-semibold border"
+                    style={{
+                      background: "rgba(255,255,255,0.82)",
+                      color: C.navy,
+                      borderColor: "rgba(47,111,115,0.35)",
+                      boxShadow: "0 12px 28px -12px rgba(11,31,42,0.22)",
+                    }}
+                  >
+                    Want to visit your saved trips?
+                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  </motion.button>
+
+                  {/*
+                  <motion.button
+                    type="button"
                     onClick={() => goToPlanner("manual")}
                     whileHover={{ y: -2 }}
                     whileTap={{ scale: 0.97 }}
@@ -244,6 +262,7 @@ export default function PlanIntroPage() {
                     Build your own customised itinerary with the help of Velosta AI
                     <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                   </motion.button>
+                  */}
                 </div>
 
                 {/* Trust line */}

@@ -204,6 +204,7 @@ export default function ExploreMapView() {
   const [selectedDest, setSelectedDest] = useState<ExploreDestination | null>(null);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [discoverRequestKey, setDiscoverRequestKey] = useState(0);
+  const [hasLoadedDiscoverResults, setHasLoadedDiscoverResults] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationDone, setGenerationDone] = useState(false);
   const [craftingPlace, setCraftingPlace] = useState<string>("");
@@ -268,11 +269,28 @@ export default function ExploreMapView() {
   // ── AI discovery (signed-in): preferences + travel profile → map pins ──
   const discoverDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    // Never run destination discovery while itinerary generation/ready overlay is active.
+    // Otherwise the full-page discover loader can replace the generation experience.
+    if (isGenerating || generationDone) return;
+
+    // For explicit custom destinations from intent-capture, skip personalized
+    // discovery entirely and let auto-build generate the itinerary directly.
+    if (customDestination) {
+      setLoadingDestinations(false);
+      setDiscoverError(null);
+      setHasLoadedDiscoverResults(true);
+      return;
+    }
+
     if (!accessToken) {
       setDiscoverError(null);
       setLoadingDestinations(false);
+      setHasLoadedDiscoverResults(true);
       return;
     }
+    // Always fetch a fresh response for current preferences before showing results.
+    setHasLoadedDiscoverResults(false);
+    setDiscoveredDestinations([]);
     // Cover debounce window so the explore UI does not mount before the first request starts.
     setLoadingDestinations(true);
     setDiscoverError(null);
@@ -307,6 +325,7 @@ export default function ExploreMapView() {
           setDiscoverError("Personalized picks unavailable right now. Please retry.");
         } finally {
           setLoadingDestinations(false);
+          setHasLoadedDiscoverResults(true);
         }
       })();
     }, 650);
@@ -327,19 +346,24 @@ export default function ExploreMapView() {
     travelProfile,
     customDestination?.name,
     discoverRequestKey,
+    isGenerating,
+    generationDone,
+    setHasLoadedDiscoverResults,
     setDiscoveredDestinations,
     setLoadingDestinations,
   ]);
 
-  /** Full-screen loader only until the first AI batch arrives (not on filter refetch). */
+  /** Full-screen loader until fresh AI response for current preferences arrives. */
   const waitingForAiPlaces =
     !!accessToken &&
-    discoveredDestinations.length === 0 &&
-    !discoverError &&
-    isLoadingDestinations;
+    !customDestination &&
+    !isGenerating &&
+    !generationDone &&
+    !hasLoadedDiscoverResults;
 
   const discoverErrorFullPage =
     !!accessToken &&
+    !customDestination &&
     !isLoadingDestinations &&
     discoveredDestinations.length === 0 &&
     !!discoverError;

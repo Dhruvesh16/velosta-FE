@@ -402,8 +402,21 @@ export async function enrichItineraryWithCoordinates(
   // still being part of the same trip — 60 km would discard valid results.
   const isMultiStop = /\b(?:to|via|and|&|\+|-|–|—)\b/i.test(destination);
   const isIslandOrRegion = /\b(islands?|archipelago|atolls?|lakshadweep|andaman|maldives|nicobar)\b/i.test(destination);
-  const hardRadiusKm = (isMultiStop || isIslandOrRegion) ? 500 : 250;
-  const softRadiusKm = (isMultiStop || isIslandOrRegion) ? 500 : 250;
+  // Country-scale / broad-region destinations (e.g. "USA", "United States",
+  // "India", "Europe") should not use tight centroid filtering, otherwise
+  // valid city POIs get dropped as "out of range".
+  const isCountryScaleDestination =
+    /\b(?:usa|u\.s\.a\.?|us|united states|india|australia|canada|uk|u\.k\.|united kingdom|france|germany|italy|spain|japan|thailand|singapore|malaysia|indonesia|vietnam|uae|europe)\b/i.test(
+      destination
+    ) ||
+    /\b(?:country|nation|statewide|nationwide)\b/i.test(destination);
+
+  const hardRadiusKm = isCountryScaleDestination
+    ? 6000
+    : (isMultiStop || isIslandOrRegion) ? 500 : 250;
+  const softRadiusKm = isCountryScaleDestination
+    ? 6000
+    : (isMultiStop || isIslandOrRegion) ? 500 : 250;
 
   const enriched = [...days];
 
@@ -428,19 +441,23 @@ export async function enrichItineraryWithCoordinates(
           // should never be biased by an Indian-coords-leak from the LLM).
           const llmInRange =
             row.coordinates &&
-            isWithinRange(row.coordinates, destCenter, softRadiusKm);
+            (isCountryScaleDestination || isWithinRange(row.coordinates, destCenter, softRadiusKm));
           const proximity: [number, number] = llmInRange
             ? (row.coordinates as [number, number])
             : destCenter;
 
           // 1. Google Places (precise POIs, biased by proximity)
           const gp = await googlePlacesLookup(venue, proximity, destination);
-          if (gp && isWithinRange(gp, destCenter, hardRadiusKm)) return gp;
+          if (gp && (isCountryScaleDestination || isWithinRange(gp, destCenter, hardRadiusKm))) {
+            return gp;
+          }
 
           // 2. Mapbox with the cleaned venue, proximity bias AND the
           //    resolved destination country code.
           const mb = await geocodePlace(venue, destination, proximity, destCountry);
-          if (mb && isWithinRange(mb, destCenter, hardRadiusKm)) return mb;
+          if (mb && (isCountryScaleDestination || isWithinRange(mb, destCenter, hardRadiusKm))) {
+            return mb;
+          }
 
           // 3. LLM coord if it survived the soft filter
           if (llmInRange) return row.coordinates as [number, number];

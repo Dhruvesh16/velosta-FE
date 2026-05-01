@@ -75,6 +75,8 @@ const INTERESTS = [
 ];
 
 const DURATION_OPTIONS = [2, 3, 5, 7, 10, 14];
+const CUSTOM_DURATION_MIN = 1;
+const CUSTOM_DURATION_MAX = 30;
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80&auto=format&fit=crop";
@@ -100,6 +102,7 @@ export default function IntentCapture() {
   const [travelerCount, setTravelerCount] = useState(1);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [duration, setDuration] = useState(3);
+  const [isCustomDuration, setIsCustomDuration] = useState(false);
   // Origin ("Starting from")
   const [locationText, setLocationText] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<{
@@ -717,12 +720,15 @@ export default function IntentCapture() {
             <Field label="How many days?">
               <div className="flex flex-wrap gap-2">
                 {DURATION_OPTIONS.map((d) => {
-                  const active = duration === d;
+                  const active = !isCustomDuration && duration === d;
                   return (
                     <button
                       key={d}
                       type="button"
-                      onClick={() => setDuration(d)}
+                      onClick={() => {
+                        setIsCustomDuration(false);
+                        setDuration(d);
+                      }}
                       className="rounded-full px-4 py-2 text-[13px] font-medium transition-all"
                       style={{
                         backgroundColor: active ? C.navy : "transparent",
@@ -736,7 +742,51 @@ export default function IntentCapture() {
                     </button>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomDuration(true);
+                    if (duration < CUSTOM_DURATION_MIN || duration > CUSTOM_DURATION_MAX) {
+                      setDuration(4);
+                    }
+                  }}
+                  className="rounded-full px-4 py-2 text-[13px] font-medium transition-all"
+                  style={{
+                    backgroundColor: isCustomDuration ? C.navy : "transparent",
+                    color: isCustomDuration ? C.sandLight : C.navy,
+                    border: `1px solid ${
+                      isCustomDuration ? C.navy : "rgba(11,31,42,0.14)"
+                    }`,
+                  }}
+                >
+                  Custom
+                </button>
               </div>
+              {isCustomDuration && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={CUSTOM_DURATION_MIN}
+                    max={CUSTOM_DURATION_MAX}
+                    value={duration}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      if (!Number.isFinite(val)) return;
+                      setDuration(Math.min(CUSTOM_DURATION_MAX, Math.max(CUSTOM_DURATION_MIN, val)));
+                    }}
+                    className="w-24 rounded-xl px-3 py-2 text-[13px] font-medium"
+                    style={{
+                      border: "1px solid rgba(11,31,42,0.14)",
+                      color: C.navy,
+                      backgroundColor: "#fff",
+                    }}
+                    aria-label="Custom trip duration in days"
+                  />
+                  <span className="text-[12px]" style={{ color: "rgba(11,31,42,0.55)" }}>
+                    days (1–30)
+                  </span>
+                </div>
+              )}
             </Field>
 
             {/* ── Travelers ──────────────────────────────────── */}

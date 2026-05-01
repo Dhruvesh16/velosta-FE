@@ -136,7 +136,9 @@ function isValidLngLat([lng, lat]: [number, number]): boolean {
 }
 
 function isTransportLabel(label: string): boolean {
-  return /\b(flight|in-?flight|airport|train|rail|metro|bus|taxi|cab|ferry|transfer|depart|departure|arrival|arrive|travel to|travel from|return journey)\b/i.test(
+  // Airport rows are real POIs and should remain marker-visible.
+  if (/\bairport\b/i.test(label)) return false;
+  return /\b(flight|in-?flight|train|rail|metro|bus|taxi|cab|ferry|transfer|depart|departure|arrival|arrive|travel to|travel from|return journey)\b/i.test(
     label
   );
 }
@@ -153,6 +155,13 @@ function dedupeNearbyMarkers<T extends { coordinates: [number, number] }>(
     if (!tooClose) kept.push(marker);
   }
   return kept;
+}
+
+function toMapMarkerType(activity: string): "activity" | "stay" | "meal" {
+  const a = activity.toLowerCase();
+  if (/\b(breakfast|lunch|dinner|brunch|cafe|restaurant|market)\b/.test(a)) return "meal";
+  if (/\b(check[- ]?in|check[- ]?out|hotel|stay|resort|hostel)\b/.test(a)) return "stay";
+  return "activity";
 }
 
 // Map styles — Mapbox Standard v3 brings Apple-Maps-grade 3D vector
@@ -258,13 +267,36 @@ export default function MapPanel() {
     if (isPreviewPlaying) return mapSafeMarkers;
     const activeDayMarkers = mapSafeMarkers.filter((m) => m.dayIndex === activeDay);
     if (activeDayMarkers.length > 0) return activeDayMarkers;
+
+    // Permanent safety-net: if filtering removed all pins for the active day
+    // (common with transport-heavy or broad-country itineraries), fall back to
+    // raw itinerary coordinates so the map never appears empty.
+    const day = itinerary[activeDay];
+    if (day?.rows?.length) {
+      const fallback = day.rows
+        .filter((r) => Array.isArray(r.coordinates) && isValidLngLat(r.coordinates))
+        .map((r, idx) => ({
+          id: r.id ?? `fallback-${activeDay}-${idx}`,
+          coordinates: r.coordinates as [number, number],
+          label: r.activity || "Stop",
+          dayIndex: activeDay,
+          activityIndex: idx,
+          pricing: r.pricing,
+          time: r.time,
+          type: toMapMarkerType(r.activity || "Stop"),
+        }));
+      if (fallback.length > 0) {
+        return dedupeNearbyMarkers(fallback, 0.03);
+      }
+    }
+
     // Outbound day can contain mostly transport/origin-country rows.
     // Fall back to the first day that has destination-side points so
     // the map never appears blank for international journeys.
     const fallbackDay = mapSafeMarkers[0]?.dayIndex;
     if (fallbackDay === undefined) return [];
     return mapSafeMarkers.filter((m) => m.dayIndex === fallbackDay);
-  }, [mapSafeMarkers, activeDay, isPreviewPlaying, markers]);
+  }, [mapSafeMarkers, activeDay, isPreviewPlaying, markers, itinerary]);
 
   // Current day's markers for navigation
   const currentDayMarkers = useMemo(() => {

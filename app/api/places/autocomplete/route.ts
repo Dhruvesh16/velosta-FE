@@ -1,30 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// Server-side only — do NOT use NEXT_PUBLIC_ prefix here
-const GOOGLE_KEY = process.env.GOOGLE_MAPS_KEY ?? "";
+import { getGoogleMapsServerKey } from "@/lib/google-maps-server-key";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const input = searchParams.get("input");
   const limit = parseInt(searchParams.get("limit") || "5", 10);
 
-  if (!input || !GOOGLE_KEY) {
-    return NextResponse.json([], { status: 400 });
+  const GOOGLE_KEY = getGoogleMapsServerKey();
+
+  if (!input?.trim() || !GOOGLE_KEY) {
+    console.error(
+      "[api/places/autocomplete] GOOGLE_MAPS_KEY is empty — check Cloud Run secret binding google-maps-key → GOOGLE_MAPS_KEY (production) or .env.local (dev)."
+    );
+    return NextResponse.json([], { status: 200 });
   }
 
   try {
-    // Step 1: Get autocomplete predictions
-    const acUrl = new URL(
-      "https://maps.googleapis.com/maps/api/place/autocomplete/json"
-    );
-    acUrl.searchParams.set("input", input);
-    acUrl.searchParams.set("types", "(regions)");
-    acUrl.searchParams.set("key", GOOGLE_KEY);
+    const base = "https://maps.googleapis.com/maps/api/place/autocomplete/json";
 
-    const acRes = await fetch(acUrl.toString());
-    const acData = await acRes.json();
+    const runAutocomplete = async (types?: string) => {
+      const acUrl = new URL(base);
+      acUrl.searchParams.set("input", input.trim());
+      acUrl.searchParams.set("key", GOOGLE_KEY);
+      if (types) acUrl.searchParams.set("types", types);
+      const acRes = await fetch(acUrl.toString());
+      return acRes.json() as Promise<{
+        status: string;
+        error_message?: string;
+        predictions?: Array<{
+          place_id: string;
+          structured_formatting: {
+            main_text: string;
+            secondary_text?: string;
+          };
+          description: string;
+        }>;
+      }>;
+    };
+
+    // Prefer regions/countries/localities — if Google returns none, widen search.
+    let acData = await runAutocomplete("(regions)");
+    if (acData.status !== "OK" || !acData.predictions?.length) {
+      acData = await runAutocomplete();
+    }
 
     if (acData.status !== "OK" || !acData.predictions?.length) {
+      console.warn(
+        "[api/places/autocomplete] Google Places autocomplete:",
+        acData.status,
+        acData.error_message ?? "(no error_message)"
+      );
       return NextResponse.json([]);
     }
 

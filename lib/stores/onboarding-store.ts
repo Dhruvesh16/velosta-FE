@@ -1,6 +1,13 @@
 // ── Onboarding Store — Zustand ────────────────────────────────────────────────
 // Controls the entry flow: landing → budget → trip-inputs → explore → planner
 
+import {
+  addDays,
+  differenceInCalendarDays,
+  format,
+  parseISO,
+  startOfDay,
+} from "date-fns";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
@@ -357,7 +364,10 @@ interface OnboardingState {
   selectedDestination: string | null;
   customDestination: CustomDestination | null;
   userLocation: UserLocation | null;
-  duration: number; // trip days
+  /** Inclusive trip window (YYYY-MM-DD). When null, intent step seeds defaults. */
+  tripStartDate: string | null;
+  tripEndDate: string | null;
+  duration: number; // trip days (inclusive calendar days; kept in sync with trip range)
   budgetAmount: number; // ALWAYS per-person (normalized) — downstream planner expects per-person semantics
   budgetMode: "per_person" | "total"; // user's input mode for display only
   travelerType: string;
@@ -379,6 +389,7 @@ interface OnboardingState {
   startManualBuild: (destination: string) => void;
   setCustomDestination: (dest: CustomDestination | null) => void;
   setUserLocation: (location: UserLocation) => void;
+  setTripDates: (startIso: string, endIso: string) => void;
   setDuration: (days: number) => void;
   setBudgetAmount: (amount: number) => void;
   setBudgetMode: (mode: "per_person" | "total") => void;
@@ -404,6 +415,8 @@ export const useOnboardingStore = create<OnboardingState>()(
   selectedDestination: null,
   customDestination: null,
   userLocation: null,
+  tripStartDate: null,
+  tripEndDate: null,
   duration: 3,
   budgetAmount: 5000,
   budgetMode: "per_person",
@@ -432,13 +445,18 @@ export const useOnboardingStore = create<OnboardingState>()(
   selectTier: (tier) =>
     set({ selectedTier: tier, flowStep: "packages" }),
 
-  selectPackage: (pkg) =>
+  selectPackage: (pkg) => {
+    const from = startOfDay(new Date());
+    const to = addDays(from, Math.max(0, pkg.days - 1));
     set({
       selectedPackage: pkg,
       selectedDestination: pkg.destination,
       duration: pkg.days,
+      tripStartDate: format(from, "yyyy-MM-dd"),
+      tripEndDate: format(to, "yyyy-MM-dd"),
       flowStep: "explore",
-    }),
+    });
+  },
 
   selectDestination: (destination) =>
     set({ selectedDestination: destination, flowStep: "planner" }),
@@ -450,7 +468,39 @@ export const useOnboardingStore = create<OnboardingState>()(
 
   setUserLocation: (location) => set({ userLocation: location }),
 
-  setDuration: (days) => set({ duration: days }),
+  setTripDates: (startIso, endIso) =>
+    set(() => {
+      let from = startOfDay(parseISO(startIso));
+      let to = startOfDay(parseISO(endIso));
+      if (to < from) [from, to] = [to, from];
+      let days = differenceInCalendarDays(to, from) + 1;
+      if (days > 30) {
+        to = addDays(from, 29);
+        days = 30;
+      }
+      days = Math.max(1, days);
+      return {
+        tripStartDate: format(from, "yyyy-MM-dd"),
+        tripEndDate: format(to, "yyyy-MM-dd"),
+        duration: days,
+      };
+    }),
+
+  setDuration: (days) =>
+    set((state) => {
+      const d = Math.min(30, Math.max(1, days));
+      let startIso = state.tripStartDate;
+      if (!startIso) {
+        startIso = format(startOfDay(new Date()), "yyyy-MM-dd");
+      }
+      const from = startOfDay(parseISO(startIso));
+      const end = addDays(from, d - 1);
+      return {
+        duration: d,
+        tripStartDate: startIso,
+        tripEndDate: format(end, "yyyy-MM-dd"),
+      };
+    }),
 
   setBudgetAmount: (amount) => set({ budgetAmount: amount }),
   setBudgetMode: (mode) => set({ budgetMode: mode }),
@@ -479,6 +529,8 @@ export const useOnboardingStore = create<OnboardingState>()(
       selectedDestination: null,
       customDestination: null,
       userLocation: null,
+      tripStartDate: null,
+      tripEndDate: null,
       duration: 3,
       budgetAmount: 5000,
       budgetMode: "per_person",
@@ -503,6 +555,8 @@ export const useOnboardingStore = create<OnboardingState>()(
       selectedPackage: state.selectedPackage,
       selectedDestination: state.selectedDestination,
       userLocation: state.userLocation,
+      tripStartDate: state.tripStartDate,
+      tripEndDate: state.tripEndDate,
       duration: state.duration,
       budgetAmount: state.budgetAmount,
       budgetMode: state.budgetMode,

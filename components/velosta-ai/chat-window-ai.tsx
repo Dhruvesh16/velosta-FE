@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useUser } from "@/app/utils/context";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { generatePlannerResponse } from "@/lib/services/planner-service";
+import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import { ItineraryPDFExport } from "./itinerary-pdf-export";
@@ -19,6 +20,8 @@ import {
 
 interface ChatWindowProps {
   onItinerary?: (itinerary: any, tripData: TripData) => void;
+  /** Smaller footer when embedded (e.g. map tab sheet). */
+  hideSessionHint?: boolean;
 }
 
 function extractRequestedBudget(text: string): number | null {
@@ -149,14 +152,14 @@ function ItineraryCard({ data, tripData }: { data: any; tripData: TripData }) {
   );
 }
 
-export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
+export function ChatWindow({ onItinerary, hideSessionHint = false }: ChatWindowProps = {}) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSignInGate, setShowSignInGate] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { accessToken, user } = useUser();
-  const { selectedDestination, generatedItinerary, setGeneratedItinerary, duration, budgetAmount } =
+  const { selectedDestination, generatedItinerary, setGeneratedItinerary, duration, budgetAmount, travelProfile } =
     useOnboardingStore();
   const { itineraryData: plannerItineraryData, tripData: plannerTripData } = usePlannerStore();
   const {
@@ -276,6 +279,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
         (currentItinerary as any).itineraryTable.length > 0
           ? (currentItinerary as any).itineraryTable.length
           : duration;
+      const travelProfileContext = buildTravelProfilePrompt(travelProfile);
 
       try {
         const data = await generatePlannerResponse({
@@ -286,6 +290,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
           destinationHint: selectedDestination ?? undefined,
           desiredDays,
           desiredBudget,
+          travelProfileContext,
         });
 
         if (data.isTextResponse) {
@@ -347,6 +352,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
       setPlannerChatTripData,
       duration,
       budgetAmount,
+      travelProfile,
       tripData.budget,
     ]
   );
@@ -443,9 +449,11 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
       </div>
 
       <div className="shrink-0 border-t border-[#0B1F2A]/8 bg-[#FBF8F3] px-4 py-3 pb-[max(12px,calc(0.75rem+env(safe-area-inset-bottom,0px)))]">
-        <p className="text-[10px] text-[#0B1F2A]/45 text-center mb-2 tracking-wide">
-          History stays in this session when you switch tabs.
-        </p>
+        {!hideSessionHint && (
+          <p className="text-[10px] text-[#0B1F2A]/45 text-center mb-2 tracking-wide">
+            History stays in this session when you switch tabs.
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
             ref={inputRef}

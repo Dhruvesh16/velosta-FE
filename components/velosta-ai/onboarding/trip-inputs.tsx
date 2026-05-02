@@ -20,7 +20,9 @@ import {
   enrichItineraryInBackground,
 } from "@/lib/services/itinerary-hydrator";
 import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
+import { buildBudgetRealityMessage } from "@/lib/services/budget-feasibility";
 import { ApiError } from "@/lib/api";
+import { useBatchedStreamTokens } from "@/lib/hooks/use-batched-stream-tokens";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import CloudOverlay from "./cloud-overlay";
 
@@ -75,6 +77,7 @@ export default function TripInputs() {
   const [isLocating, setIsLocating] = useState(false);
   const [showSignInGate, setShowSignInGate] = useState(false);
   const [streamBuffer, setStreamBuffer] = useState<string | undefined>(undefined);
+  const { appendToken, flushPending, resetQueue } = useBatchedStreamTokens(setStreamBuffer);
   const [craftingPlace, setCraftingPlace] = useState("");
   const [generationDone, setGenerationDone] = useState(false);
   const pendingDestNameRef = useRef<string>("");
@@ -86,13 +89,14 @@ export default function TripInputs() {
     const safetyTimer = window.setTimeout(() => {
       setGeneratingItinerary(false);
       setLoadingDestinations(false);
+      resetQueue();
       setStreamBuffer(undefined);
       setCraftingPlace("");
       setGenerationDone(false);
       setError("Generation timed out. Please try again.");
     }, timeoutMs);
     return () => window.clearTimeout(safetyTimer);
-  }, [duration, isLoadingDestinations, setGeneratingItinerary, setLoadingDestinations]);
+  }, [duration, isLoadingDestinations, resetQueue, setGeneratingItinerary, setLoadingDestinations]);
 
   const handleViewItinerary = useCallback(() => {
     setLoadingDestinations(false);
@@ -241,6 +245,7 @@ export default function TripInputs() {
     setLoadingDestinations(true);
     setGeneratingItinerary(true);
     setCraftingPlace(destination.name);
+    resetQueue();
     setStreamBuffer("");
 
     const days = duration ?? 3;
@@ -253,6 +258,17 @@ export default function TripInputs() {
     if (budget) autoMsg += ` with a budget of ${budget}`;
     autoMsg += ` for ${travelerCount} ${travelerType} traveler(s).${originStr} Generate the full itinerary now.`;
     const profilePrompt = buildTravelProfilePrompt(travelProfile);
+    const budgetReality = buildBudgetRealityMessage({
+      destination: destination.name,
+      days,
+      currentBudgetPerPerson: selectedTier.max,
+    });
+    if (budgetReality) {
+      setError(budgetReality.message);
+      setLoadingDestinations(false);
+      setGeneratingItinerary(false);
+      return;
+    }
     const fullPrompt = `${autoMsg}${profilePrompt}`;
 
     let didSucceed = false;
@@ -266,8 +282,9 @@ export default function TripInputs() {
           destinationHint: destination.name,
           desiredDays: days,
           desiredBudget: selectedTier.max,
+          travelProfileContext: profilePrompt,
         },
-        (token) => setStreamBuffer((prev) => (prev ?? "") + token)
+        appendToken
       );
 
       if (!response.isTextResponse && response.itineraryTable) {
@@ -300,6 +317,7 @@ export default function TripInputs() {
       );
     } finally {
       setGeneratingItinerary(false);
+      flushPending();
       setStreamBuffer(undefined);
       setCraftingPlace("");
       if (!didSucceed) {
@@ -341,6 +359,9 @@ export default function TripInputs() {
       }
     }
   }, [
+    appendToken,
+    flushPending,
+    resetQueue,
     selectedTier,
     selectedPlace,
     locationText,

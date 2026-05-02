@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// Server-side only — do NOT use NEXT_PUBLIC_ prefix here
-const GOOGLE_KEY = process.env.GOOGLE_MAPS_KEY ?? "";
+import { getGoogleMapsServerKey } from "@/lib/google-maps-server-key";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -10,6 +8,7 @@ export async function GET(req: NextRequest) {
   const lat = searchParams.get("lat");
   const destination = searchParams.get("destination") || "";
 
+  const GOOGLE_KEY = getGoogleMapsServerKey();
   const cleanedName = (name || "").trim();
   if (!cleanedName || !lng || !lat || !GOOGLE_KEY) {
     return NextResponse.json(null, { status: 400 });

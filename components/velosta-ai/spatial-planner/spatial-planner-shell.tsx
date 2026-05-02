@@ -16,6 +16,7 @@ import { useUIStore, type MobileTab } from "@/lib/stores/ui-store";
 import ChatPanel from "./chat-panel/chat-panel";
 import ItineraryPanel from "./itinerary-panel/itinerary-panel";
 import OnboardingHints from "../onboarding/onboarding-hints";
+import MobileMapChatOverlay from "./mobile-map-chat-overlay";
 
 // Mapbox must be client-only (no SSR)
 const MapPanel = dynamic(() => import("./map-panel/map-panel"), { ssr: false });
@@ -123,6 +124,7 @@ export default function SpatialPlannerShell() {
                 transition={{ duration: 0.28 }}
               >
                 <MapPanel />
+                <MobileMapChatOverlay />
               </motion.div>
             )}
 

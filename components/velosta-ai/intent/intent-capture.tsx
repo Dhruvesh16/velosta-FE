@@ -6,17 +6,28 @@
  * Replaces the modal-on-map "Start Your Journey" experience with a
  * landing-page-consistent split layout:
  *   • Left aside: editorial photograph + Playfair italic narrative + value props
- *   • Right: refined form (budget · duration · travelers · interests · origin)
+ *   • Right: refined form (budget · trip dates · travelers · interests · origin)
  *
  * Reads/writes onboarding store. Advances flow to "explore" on submit.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Playfair_Display } from "next/font/google";
 import {
   ArrowRight,
+  CalendarDays,
+  ChevronDown,
   LocateFixed,
   Loader2,
   MapPin,
@@ -35,6 +46,35 @@ import {
   searchPlaces,
   type PlaceSuggestion,
 } from "@/lib/services/geocoding";
+import {
+  clampTripDatesForOpenMeteoForecast,
+  fetchTripWindowForecast,
+  summarizeTripWindowForecast,
+} from "@/lib/services/trip-window-forecast";
+import { buildBudgetRealityMessage } from "@/lib/services/budget-feasibility";
+import { useNarrowViewport } from "@/lib/hooks/use-narrow-viewport";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
+import {
+  addDays,
+  differenceInCalendarDays,
+  format,
+  parseISO,
+  startOfDay,
+} from "date-fns";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -74,10 +114,6 @@ const INTERESTS = [
   { id: "wellness", label: "Wellness" },
 ];
 
-const DURATION_OPTIONS = [2, 3, 5, 7, 10, 14];
-const CUSTOM_DURATION_MIN = 1;
-const CUSTOM_DURATION_MAX = 30;
-
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80&auto=format&fit=crop";
 
@@ -85,7 +121,10 @@ export default function IntentCapture() {
   const {
     setFlowStep,
     setUserLocation,
-    setDuration: setStoreDuration,
+    duration,
+    tripStartDate,
+    tripEndDate,
+    setTripDates,
     setBudgetAmount: setStoreBudget,
     setBudgetMode: setStoreBudgetMode,
     setTravelerType: setStoreTravelerType,
@@ -94,6 +133,8 @@ export default function IntentCapture() {
     setCustomDestination,
   } = useOnboardingStore();
 
+  const narrowViewport = useNarrowViewport();
+
   /* ── Form state ───────────────────────────────── */
   const [budget, setBudget] = useState(5000);
   const [budgetText, setBudgetText] = useState("5,000");
@@ -101,8 +142,11 @@ export default function IntentCapture() {
   const [travelerType, setTravelerType] = useState("solo");
   const [travelerCount, setTravelerCount] = useState(1);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [duration, setDuration] = useState(3);
-  const [isCustomDuration, setIsCustomDuration] = useState(false);
+  const [forecastLine, setForecastLine] = useState<string | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastError, setForecastError] = useState<string | null>(null);
+  const [forecastHorizonNote, setForecastHorizonNote] = useState<string | null>(null);
+  const [tripDatesOpen, setTripDatesOpen] = useState(false);
   // Origin ("Starting from")
   const [locationText, setLocationText] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<{
@@ -151,6 +195,139 @@ export default function IntentCapture() {
     else if (travelerType === "couple") setTravelerCount((c) => (c < 2 ? 2 : c));
     else setTravelerCount((c) => (c < 2 ? 3 : c));
   }, [travelerType]);
+
+  /* ── Default trip window when store has no dates (e.g. legacy persist) ─ */
+  useLayoutEffect(() => {
+    const st = useOnboardingStore.getState();
+    if (st.tripStartDate && st.tripEndDate) return;
+    const from = startOfDay(new Date());
+    const to = addDays(from, 2);
+    st.setTripDates(format(from, "yyyy-MM-dd"), format(to, "yyyy-MM-dd"));
+  }, [setTripDates]);
+
+  const selectedRange: DateRange = useMemo(() => {
+    if (tripStartDate && tripEndDate) {
+      return { from: parseISO(tripStartDate), to: parseISO(tripEndDate) };
+    }
+    const from = startOfDay(new Date());
+    return { from, to: addDays(from, 2) };
+  }, [tripStartDate, tripEndDate]);
+
+  const handleTripRangeSelect = useCallback(
+    (range: DateRange | undefined, autoClose: boolean) => {
+      if (!range?.from) return;
+      startTransition(() => {
+        const rawTo = range.to ?? range.from;
+        let from = startOfDay(range.from);
+        let to = startOfDay(rawTo);
+        if (to < from) [from, to] = [to, from];
+        const span = differenceInCalendarDays(to, from) + 1;
+        if (span > 30) {
+          to = addDays(from, 29);
+        }
+        setTripDates(format(from, "yyyy-MM-dd"), format(to, "yyyy-MM-dd"));
+        if (autoClose && range.to) setTripDatesOpen(false);
+      });
+    },
+    [setTripDates]
+  );
+
+  const tripDateChipLabel = useMemo(
+    () =>
+      tripStartDate && tripEndDate
+        ? `${format(parseISO(tripStartDate), "EEE, d MMM")} · ${format(parseISO(tripEndDate), "EEE, d MMM yyyy")}`
+        : null,
+    [tripStartDate, tripEndDate]
+  );
+
+  const tripRangeCalendar = useMemo(
+    () => (
+      <Calendar
+        mode="range"
+        captionLayout={narrowViewport ? "dropdown" : "label"}
+        startMonth={new Date(new Date().getFullYear(), 0)}
+        endMonth={new Date(new Date().getFullYear() + 2, 11)}
+        numberOfMonths={narrowViewport ? 1 : 2}
+        selected={selectedRange}
+        onSelect={(r) => handleTripRangeSelect(r, true)}
+        disabled={{ before: startOfDay(new Date()) }}
+        defaultMonth={selectedRange.from}
+        className={cn(
+          "rounded-xl border-0 bg-transparent p-0 shadow-none touch-manipulation",
+          narrowViewport
+            ? "[--cell-size:clamp(2.75rem,12vw,3rem)]"
+            : "[--cell-size:2.5rem] sm:[--cell-size:2.625rem]"
+        )}
+      />
+    ),
+    [handleTripRangeSelect, narrowViewport, selectedRange]
+  );
+
+  const forecastCoords = selectedDest?.coordinates ?? selectedPlace?.coordinates;
+
+  const deferredTripStart = useDeferredValue(tripStartDate);
+  const deferredTripEnd = useDeferredValue(tripEndDate);
+
+  useEffect(() => {
+    if (!forecastCoords || !deferredTripStart || !deferredTripEnd) {
+      setForecastLine(null);
+      setForecastError(null);
+      setForecastHorizonNote(null);
+      setForecastLoading(false);
+      return;
+    }
+    const clamped = clampTripDatesForOpenMeteoForecast(
+      deferredTripStart,
+      deferredTripEnd
+    );
+    if (!clamped) {
+      setForecastLine(null);
+      setForecastHorizonNote(null);
+      setForecastError(
+        "Weather preview only covers roughly the next 16 days — choose earlier trip dates."
+      );
+      setForecastLoading(false);
+      return;
+    }
+    const horizonNote =
+      deferredTripEnd > clamped.end
+        ? `Open-Meteo outlook is capped at about 16 days; summary uses through ${format(
+            parseISO(clamped.end),
+            "MMM d"
+          )}.`
+        : null;
+
+    const [lng, lat] = forecastCoords;
+    let cancelled = false;
+    setForecastLoading(true);
+    setForecastError(null);
+    setForecastHorizonNote(null);
+    fetchTripWindowForecast(lat, lng, deferredTripStart, deferredTripEnd)
+      .then((rows) => {
+        if (cancelled) return;
+        if (!rows?.length) {
+          setForecastLine(null);
+          setForecastHorizonNote(null);
+          setForecastError("Weather preview unavailable for this window.");
+          return;
+        }
+        setForecastLine(summarizeTripWindowForecast(rows));
+        setForecastHorizonNote(horizonNote);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setForecastLine(null);
+          setForecastHorizonNote(null);
+          setForecastError("Could not load weather for these dates.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setForecastLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [forecastCoords, deferredTripStart, deferredTripEnd]);
 
   /* ── Budget helpers ─────────────────────────────────────────────── */
   // Slider is capped at 50k for ergonomic dragging — beyond that the slider
@@ -297,6 +474,11 @@ export default function IntentCapture() {
       }
     }
 
+    const tripWindowLabel =
+      tripStartDate && tripEndDate
+        ? `${format(parseISO(tripStartDate), "d MMM")} – ${format(parseISO(tripEndDate), "d MMM yyyy")} · ${duration} ${duration === 1 ? "day" : "days"}`
+        : `${duration} ${duration === 1 ? "day" : "days"}`;
+
     const customTier: BudgetTier = {
       id: "custom",
       label: "Custom Budget",
@@ -306,16 +488,29 @@ export default function IntentCapture() {
       emoji: "🎯",
       tagline: "Your budget",
       examples: [],
-      duration: `${duration} days`,
+      duration: tripWindowLabel,
     };
     useOnboardingStore.setState({ selectedTier: customTier });
 
     if (destination) setUserLocation(destination);
-    setStoreDuration(duration);
     // Normalize to per-person before persisting (planner expects per-person semantics).
     const perPerson = budgetMode === "total" && travelerCount > 0
       ? Math.round(budget / travelerCount)
       : budget;
+    const selectedDestinationName =
+      selectedDest?.name ?? destination?.name ?? locationText.trim();
+    if (selectedDestinationName) {
+      const budgetReality = buildBudgetRealityMessage({
+        destination: selectedDestinationName,
+        days: duration,
+        currentBudgetPerPerson: perPerson,
+      });
+      if (budgetReality) {
+        setError(budgetReality.message);
+        setSubmitting(false);
+        return;
+      }
+    }
     setStoreBudget(perPerson);
     setStoreBudgetMode(budgetMode);
     setStoreTravelerType(travelerType);
@@ -340,12 +535,13 @@ export default function IntentCapture() {
     selectedDest,
     budget,
     duration,
+    tripStartDate,
+    tripEndDate,
     travelerType,
     travelerCount,
     selectedInterests,
     budgetMode,
     setUserLocation,
-    setStoreDuration,
     setStoreBudget,
     setStoreBudgetMode,
     setStoreTravelerType,
@@ -356,6 +552,18 @@ export default function IntentCapture() {
   ]);
 
   const isReady = duration > 0 && budget >= 1000;
+
+  const perPersonBudget =
+    budgetMode === "total" && travelerCount > 0
+      ? Math.round(budget / travelerCount)
+      : budget;
+  const dailyBudgetGuide =
+    duration > 0 ? Math.round(perPersonBudget / duration) : 0;
+
+  const tripSketchDates =
+    tripStartDate && tripEndDate
+      ? `${format(parseISO(tripStartDate), "MMM d")} – ${format(parseISO(tripEndDate), "MMM d")}`
+      : `${duration} ${duration === 1 ? "day" : "days"}`;
 
   /* ── Render ─────────────────────────────────────────────────────── */
   return (
@@ -496,8 +704,7 @@ export default function IntentCapture() {
                   className={`${playfair.className} mt-0.5 text-[15px]`}
                   style={{ color: C.navy, fontWeight: 500 }}
                 >
-                  ₹{budgetText} · {duration}{" "}
-                  {duration === 1 ? "day" : "days"} ·{" "}
+                  ₹{budgetText} · {tripSketchDates} ·{" "}
                   {TRAVELER_TYPES.find((t) => t.id === travelerType)?.label ?? "Travelers"}
                   {selectedInterests.length > 0
                     ? ` · ${selectedInterests
@@ -716,77 +923,194 @@ export default function IntentCapture() {
               </div>
             </Field>
 
-            {/* ── Duration ───────────────────────────────────── */}
-            <Field label="How many days?">
-              <div className="flex flex-wrap gap-2">
-                {DURATION_OPTIONS.map((d) => {
-                  const active = !isCustomDuration && duration === d;
-                  return (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => {
-                        setIsCustomDuration(false);
-                        setDuration(d);
-                      }}
-                      className="rounded-full px-4 py-2 text-[13px] font-medium transition-all"
-                      style={{
-                        backgroundColor: active ? C.navy : "transparent",
-                        color: active ? C.sandLight : C.navy,
-                        border: `1px solid ${
-                          active ? C.navy : "rgba(11,31,42,0.14)"
-                        }`,
-                      }}
+            {/* ── Trip dates (range) ─────────────────────────── */}
+            <Field
+              label="When are you going?"
+              hint={
+                narrowViewport
+                  ? "Open the date picker, tap start date then end date. Max 30 days — we use these for weather and planning."
+                  : "Open below, choose start then end (max 30 days). Dates power weather hints and pacing."
+              }
+            >
+              {narrowViewport ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setTripDatesOpen(true)}
+                    className={cn(
+                      "flex w-full touch-manipulation items-center justify-between gap-3 rounded-2xl border bg-white px-4 py-3.5 text-left shadow-sm outline-none transition-[box-shadow,border-color]",
+                      "min-h-[52px] hover:border-[rgba(217,119,87,0.28)] focus-visible:border-[rgba(217,119,87,0.45)] focus-visible:ring-[3px] focus-visible:ring-[rgba(217,119,87,0.15)]"
+                    )}
+                    style={{ borderColor: "rgba(11,31,42,0.12)" }}
+                    aria-expanded={tripDatesOpen}
+                    aria-haspopup="dialog"
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-3">
+                      <span
+                        className="flex size-11 shrink-0 items-center justify-center rounded-xl"
+                        style={{ background: "rgba(47,111,115,0.09)" }}
+                        aria-hidden
+                      >
+                        <CalendarDays className="size-[22px] text-[#2F6F73]" strokeWidth={1.75} />
+                      </span>
+                      <span className="min-w-0">
+                        <span
+                          className="block text-[10px] font-semibold uppercase tracking-[0.16em]"
+                          style={{ color: "rgba(11,31,42,0.45)" }}
+                        >
+                          Travel dates
+                        </span>
+                        <span className="block truncate font-serif text-[15px] font-semibold leading-snug text-[#0B1F2A]">
+                          {tripDateChipLabel ?? "Tap to choose dates"}
+                        </span>
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "size-[18px] shrink-0 text-[#0B1F2A]/35 transition-transform duration-200",
+                        tripDatesOpen && "rotate-180"
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                  <Dialog open={tripDatesOpen} onOpenChange={setTripDatesOpen}>
+                    <DialogContent
+                      showCloseButton
+                      className={cn(
+                        "gap-0 overflow-hidden border-x-0 border-b-0 p-0 sm:max-w-lg",
+                        "fixed top-auto right-0 bottom-0 left-0 max-h-[min(88dvh,560px)] w-full max-w-none translate-x-0 translate-y-0 rounded-t-3xl rounded-b-none sm:rounded-t-3xl",
+                        "shadow-[0_-16px_48px_-20px_rgba(11,31,42,0.28)]"
+                      )}
                     >
-                      {d} {d === 1 ? "day" : "days"}
+                      <DialogHeader className="border-b border-[#0B1F2A]/8 px-5 py-4 text-left">
+                        <DialogTitle className="font-serif text-lg text-[#0B1F2A]">
+                          Choose your dates
+                        </DialogTitle>
+                        <DialogDescription className="text-[12px] text-[#0B1F2A]/55">
+                          Tap the first day and the last day. Long trips stay within 30 days.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div
+                        className="flex max-h-[min(68dvh,440px)] justify-center overflow-y-auto overscroll-contain px-2 py-3 pb-[max(12px,calc(env(safe-area-inset-bottom,0px)+12px))]"
+                      >
+                        {tripRangeCalendar}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              ) : (
+                <Popover open={tripDatesOpen} onOpenChange={setTripDatesOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full touch-manipulation items-center justify-between gap-3 rounded-2xl border bg-white px-4 py-3.5 text-left shadow-sm outline-none transition-[box-shadow,border-color]",
+                        "min-h-[52px] hover:border-[rgba(217,119,87,0.28)] focus-visible:border-[rgba(217,119,87,0.45)] focus-visible:ring-[3px] focus-visible:ring-[rgba(217,119,87,0.15)]"
+                      )}
+                      style={{ borderColor: "rgba(11,31,42,0.12)" }}
+                      aria-expanded={tripDatesOpen}
+                      aria-haspopup="dialog"
+                    >
+                      <span className="flex min-w-0 flex-1 items-center gap-3">
+                        <span
+                          className="flex size-11 shrink-0 items-center justify-center rounded-xl"
+                          style={{ background: "rgba(47,111,115,0.09)" }}
+                          aria-hidden
+                        >
+                          <CalendarDays className="size-[22px] text-[#2F6F73]" strokeWidth={1.75} />
+                        </span>
+                        <span className="min-w-0">
+                          <span
+                            className="block text-[10px] font-semibold uppercase tracking-[0.16em]"
+                            style={{ color: "rgba(11,31,42,0.45)" }}
+                          >
+                            Travel dates
+                          </span>
+                          <span className="block truncate font-serif text-[15px] font-semibold leading-snug text-[#0B1F2A]">
+                            {tripDateChipLabel ?? "Choose dates"}
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-[18px] shrink-0 text-[#0B1F2A]/35 transition-transform duration-200",
+                          tripDatesOpen && "rotate-180"
+                        )}
+                        aria-hidden
+                      />
                     </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCustomDuration(true);
-                    if (duration < CUSTOM_DURATION_MIN || duration > CUSTOM_DURATION_MAX) {
-                      setDuration(4);
-                    }
-                  }}
-                  className="rounded-full px-4 py-2 text-[13px] font-medium transition-all"
-                  style={{
-                    backgroundColor: isCustomDuration ? C.navy : "transparent",
-                    color: isCustomDuration ? C.sandLight : C.navy,
-                    border: `1px solid ${
-                      isCustomDuration ? C.navy : "rgba(11,31,42,0.14)"
-                    }`,
-                  }}
-                >
-                  Custom
-                </button>
-              </div>
-              {isCustomDuration && (
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={CUSTOM_DURATION_MIN}
-                    max={CUSTOM_DURATION_MAX}
-                    value={duration}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      if (!Number.isFinite(val)) return;
-                      setDuration(Math.min(CUSTOM_DURATION_MAX, Math.max(CUSTOM_DURATION_MIN, val)));
-                    }}
-                    className="w-24 rounded-xl px-3 py-2 text-[13px] font-medium"
-                    style={{
-                      border: "1px solid rgba(11,31,42,0.14)",
-                      color: C.navy,
-                      backgroundColor: "#fff",
-                    }}
-                    aria-label="Custom trip duration in days"
-                  />
-                  <span className="text-[12px]" style={{ color: "rgba(11,31,42,0.55)" }}>
-                    days (1–30)
-                  </span>
-                </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    collisionPadding={16}
+                    className="z-[60] w-auto max-w-[min(100vw-1.5rem,720px)] rounded-2xl border border-[#0B1F2A]/10 bg-[#FFFCF8] p-2 shadow-xl"
+                  >
+                    <p className="mb-1.5 px-2 text-[11px] font-medium text-[#0B1F2A]/50">
+                      Select start, then end — max 30 days
+                    </p>
+                    <div className="flex justify-center">{tripRangeCalendar}</div>
+                  </PopoverContent>
+                </Popover>
               )}
+              <p
+                className="mt-2 text-center text-[12px] font-medium"
+                style={{ color: C.teal }}
+              >
+                {tripStartDate && tripEndDate
+                  ? `${format(parseISO(tripStartDate), "EEE, d MMM")} → ${format(parseISO(tripEndDate), "EEE, d MMM yyyy")} · ${duration} calendar ${duration === 1 ? "day" : "days"}`
+                  : null}
+              </p>
+              <div
+                className="mt-4 space-y-2 rounded-2xl border px-4 py-3"
+                style={{
+                  borderColor: "rgba(11,31,42,0.1)",
+                  backgroundColor: "rgba(47,111,115,0.04)",
+                }}
+              >
+                {!forecastCoords ? (
+                  <p className="text-[12px] leading-relaxed" style={{ color: "rgba(11,31,42,0.6)" }}>
+                    Add a destination or starting point to preview weather for your
+                    dates.
+                  </p>
+                ) : forecastLoading ? (
+                  <p className="flex items-center justify-center gap-2 text-[12px]" style={{ color: C.teal }}>
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    Loading weather for this window…
+                  </p>
+                ) : forecastError ? (
+                  <p className="text-[12px]" style={{ color: C.coralDark }}>
+                    {forecastError}
+                  </p>
+                ) : forecastLine ? (
+                  <>
+                    <p className="text-[12px] leading-relaxed" style={{ color: "rgba(11,31,42,0.75)" }}>
+                      <span className="font-semibold" style={{ color: C.navy }}>
+                        Weather:{" "}
+                      </span>
+                      {forecastLine}
+                    </p>
+                    {forecastHorizonNote ? (
+                      <p className="text-[11px] leading-relaxed" style={{ color: "rgba(11,31,42,0.5)" }}>
+                        {forecastHorizonNote}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+                {duration > 0 && (
+                  <p className="text-[12px] leading-relaxed" style={{ color: "rgba(11,31,42,0.65)" }}>
+                    <span className="font-semibold" style={{ color: C.navy }}>
+                      Budget guide:{" "}
+                    </span>
+                    With your numbers, about{" "}
+                    <span className="font-semibold" style={{ color: C.coral }}>
+                      ₹{dailyBudgetGuide.toLocaleString("en-IN")}
+                    </span>{" "}
+                    per person per day over this trip (stays and transport move with
+                    dates; this is a planning anchor from your budget).
+                  </p>
+                )}
+              </div>
             </Field>
 
             {/* ── Travelers ──────────────────────────────────── */}
@@ -937,7 +1261,7 @@ export default function IntentCapture() {
                 </div>
                 {showDestSuggestions && destSuggestions.length > 0 && (
                   <div
-                    className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-xl"
+                    className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-64 overflow-y-auto rounded-xl"
                     style={{
                       backgroundColor: "#FFFFFF",
                       border: "1px solid rgba(11,31,42,0.08)",
@@ -1021,7 +1345,7 @@ export default function IntentCapture() {
                 {/* Suggestions */}
                 {showSuggestions && suggestions.length > 0 && (
                   <div
-                    className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-xl"
+                    className="absolute left-0 right-0 top-full z-[60] mt-2 max-h-64 overflow-y-auto rounded-xl"
                     style={{
                       backgroundColor: "#FFFFFF",
                       border: "1px solid rgba(11,31,42,0.08)",

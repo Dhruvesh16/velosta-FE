@@ -23,6 +23,7 @@ import SuggestionsPanel from "./suggestions-panel";
 import { exportItineraryPDF } from "@/lib/services/index";
 import type { ActivityRow } from "@/lib/types/planner.types";
 import { createSharedTrip, saveTripSnapshot } from "@/lib/services/trips-service";
+import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
 
 // ── Google Maps navigation helper ────────────────────────────────────────
 function buildGoogleMapsUrl(rows: ActivityRow[], destination: string): string {
@@ -178,9 +179,14 @@ export type ItineraryPanelVariant = "default" | "refineOnly";
 interface ItineraryPanelProps {
   /** `refineOnly`: mobile full-screen streaming refine (same engine as desktop itinerary footer). */
   variant?: ItineraryPanelVariant;
+  /** Strip extra header chrome when nested in map bottom sheet (`refineOnly` only). */
+  mapOverlay?: boolean;
 }
 
-export default function ItineraryPanel({ variant = "default" }: ItineraryPanelProps) {
+export default function ItineraryPanel({
+  variant = "default",
+  mapOverlay = false,
+}: ItineraryPanelProps) {
   const {
     itinerary,
     itineraryData,
@@ -196,6 +202,8 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
   const [aiLoading, setAiLoading] = useState(false);
   const [aiStreamText, setAiStreamText] = useState("");
   const streamAccRef = useRef("");
+  const streamUiAccRef = useRef("");
+  const streamUiRafRef = useRef<number | null>(null);
   // Toast for export/share actions
   const [actionToast, setActionToast] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -211,7 +219,7 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
     setPlannerRefineMessages: setAiMessages,
     appendPlannerRefineMessage,
   } = useUIStore();
-  const { selectedPackage } = useOnboardingStore();
+  const { selectedPackage, travelProfile } = useOnboardingStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const currentDay = itinerary[activeDay];
@@ -226,6 +234,14 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
     () => currentDay ? groupByTimeOfDay(currentDay.rows) : [],
     [currentDay]
   );
+
+  useEffect(() => {
+    return () => {
+      if (streamUiRafRef.current != null) {
+        cancelAnimationFrame(streamUiRafRef.current);
+      }
+    };
+  }, []);
 
   // Scroll to active card when marker is clicked on map
   useEffect(() => {
@@ -324,6 +340,11 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
       setAiLoading(true);
       setAiStreamText("");
       streamAccRef.current = "";
+      streamUiAccRef.current = "";
+      if (streamUiRafRef.current != null) {
+        cancelAnimationFrame(streamUiRafRef.current);
+        streamUiRafRef.current = null;
+      }
       const userMsg = {
         id: `u-${Date.now()}`,
         role: "user",
@@ -352,12 +373,19 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
               const n = Number(String(raw).replace(/[^0-9.]/g, ""));
               return Number.isFinite(n) && n > 0 ? n : undefined;
             })(),
+            travelProfileContext: buildTravelProfilePrompt(travelProfile),
           },
           (token) => {
             streamAccRef.current += token;
             // Show tokens only when they look like natural-language text, not raw JSON
             if (!streamAccRef.current.trimStart().startsWith("{")) {
-              setAiStreamText(streamAccRef.current);
+              streamUiAccRef.current = streamAccRef.current;
+              if (streamUiRafRef.current == null) {
+                streamUiRafRef.current = requestAnimationFrame(() => {
+                  streamUiRafRef.current = null;
+                  setAiStreamText(streamUiAccRef.current);
+                });
+              }
             }
           }
         );
@@ -426,10 +454,14 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
               : "Something went wrong. Please try again.",
         });
       } finally {
+        if (streamUiRafRef.current != null) {
+          cancelAnimationFrame(streamUiRafRef.current);
+          streamUiRafRef.current = null;
+        }
         setAiLoading(false);
       }
     },
-    [aiLoading, itineraryData, flyTo, setMarkers, aiMessages, appendPlannerRefineMessage, setAiMessages]
+    [aiLoading, itineraryData, flyTo, setMarkers, aiMessages, appendPlannerRefineMessage, setAiMessages, travelProfile]
   );
 
   const handleAiSubmit = useCallback(
@@ -467,26 +499,28 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
           }}
         />
 
-        <div className="relative shrink-0 px-4 pt-4 pb-3 border-b border-[#0B1F2A]/8">
-          <button
-            type="button"
-            onClick={() => setMobileTab("itinerary")}
-            className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0B1F2A]/55 hover:text-[#0B1F2A] transition-colors mb-3"
-            aria-label="Back to itinerary"
-          >
-            <ArrowLeft size={12} strokeWidth={2} />
-            <span>Itinerary</span>
-          </button>
-          <p className="text-[9.5px] font-semibold uppercase tracking-[0.32em] text-[#2F6F73] mb-1">
-            Ask Velosta
-          </p>
-          <h1 className="font-serif text-[22px] font-semibold text-[#0B1F2A] leading-tight truncate">
-            {destination}
-          </h1>
-          <p className="text-[11px] text-[#0B1F2A]/50 mt-1.5">
-            Streaming refine · updates your map when you change the plan
-          </p>
-        </div>
+        {!mapOverlay && (
+          <div className="relative shrink-0 px-4 pt-4 pb-3 border-b border-[#0B1F2A]/8">
+            <button
+              type="button"
+              onClick={() => setMobileTab("itinerary")}
+              className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0B1F2A]/55 hover:text-[#0B1F2A] transition-colors mb-3"
+              aria-label="Back to itinerary"
+            >
+              <ArrowLeft size={12} strokeWidth={2} />
+              <span>Itinerary</span>
+            </button>
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.32em] text-[#2F6F73] mb-1">
+              Ask Velosta
+            </p>
+            <h1 className="font-serif text-[22px] font-semibold text-[#0B1F2A] leading-tight truncate">
+              {destination}
+            </h1>
+            <p className="text-[11px] text-[#0B1F2A]/50 mt-1.5">
+              Streaming refine · updates your map when you change the plan
+            </p>
+          </div>
+        )}
 
         <div className="relative flex-1 flex flex-col min-h-0">
           {(aiMessages.length > 0 || aiLoading) && (

@@ -109,6 +109,7 @@ export interface PlannerRequest {
   destinationHint?: string;
   desiredDays?: number;
   desiredBudget?: number;
+  travelProfileContext?: string;
 }
 
 interface RawPlannerEnvelope {
@@ -133,6 +134,7 @@ export async function generatePlannerResponse(
     destinationHint: req.destinationHint,
     desiredDays: req.desiredDays,
     desiredBudget: req.desiredBudget,
+    travelProfileContext: req.travelProfileContext,
   });
 
   const inner = data.itinerary as PlannerResponse;
@@ -172,10 +174,11 @@ export function generatePlannerStream(
   }
 ): AbortController {
   const ac = new AbortController();
-  // Long itineraries (e.g. 21-30 day plans) can stream for several minutes.
-  // Keep the connection alive longer before treating it as a hard timeout.
-  const STREAM_IDLE_TIMEOUT_MS = 45_000;
-  const STREAM_MAX_DURATION_MS = 12 * 60 * 1000;
+  // Long itineraries can stream for many minutes; scale limits with trip length.
+  const tripDays = req.desiredDays ?? 12;
+  const STREAM_IDLE_TIMEOUT_MS = tripDays > 21 ? 120_000 : 90_000;
+  const STREAM_MAX_DURATION_MS =
+    tripDays > 28 ? 22 * 60 * 1000 : tripDays > 21 ? 18 * 60 * 1000 : 12 * 60 * 1000;
 
   (async () => {
     // Always refresh token before starting a long-running stream
@@ -196,6 +199,7 @@ export function generatePlannerStream(
           destinationHint: req.destinationHint,
           desiredDays: req.desiredDays,
           desiredBudget: req.desiredBudget,
+          travelProfileContext: req.travelProfileContext,
         }),
         signal: ac.signal,
       });
@@ -324,6 +328,7 @@ export function generatePlannerStreamAsync(
 ): Promise<PlannerResponse> {
   return new Promise((resolve, reject) => {
     let settled = false;
+    let sawAnyToken = false;
 
     const resolveOnce = (result: PlannerResponse) => {
       if (settled) return;
@@ -338,9 +343,24 @@ export function generatePlannerStreamAsync(
     };
 
     generatePlannerStream(req, {
-      onToken,
+      onToken: (token) => {
+        sawAnyToken = true;
+        onToken(token);
+      },
       onDone: (result) => resolveOnce(result),
       onError: (err) => {
+        const code = err?.message || "";
+        const isMidStreamFailure =
+          sawAnyToken &&
+          (code === "stream_idle_timeout" ||
+            code === "stream_incomplete" ||
+            code === "stream_error");
+        if (isMidStreamFailure) {
+          // Avoid a second full generation after partial stream output.
+          // That retry can add very long waits and feels like a freeze.
+          rejectOnce(err);
+          return;
+        }
         // SSE closed early or any stream-level error → fall back to REST endpoint.
         // We refresh the token again here in case expiry was the cause.
         _ensureFreshToken()

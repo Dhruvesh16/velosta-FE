@@ -108,6 +108,11 @@ export default function LocationCard({
   const rating = details?.rating;
   const reviewCount = details?.userRatingsTotal;
   const category = formatPlaceType(details?.types);
+  const isMealActivity = /\b(breakfast|lunch|dinner|brunch|cafe|café|eatery|restaurant|food)\b/i.test(
+    row.activity
+  );
+  const pricingLabel =
+    isMealActivity || row.pricing === "—" ? null : row.pricing;
 
   function handleClick() {
     setActiveMarker(row.id);
@@ -202,10 +207,10 @@ export default function LocationCard({
           {category !== "Place" && (
             <span className="text-[#0B1F2A]/55 truncate">{category}</span>
           )}
-          {row.pricing && (
+          {pricingLabel && (
             <>
               <span className="text-[#0B1F2A]/20">·</span>
-              <span className="font-semibold text-[#2F6F73] tabular-nums">{row.pricing}</span>
+              <span className="font-semibold text-[#2F6F73] tabular-nums">{pricingLabel}</span>
             </>
           )}
         </div>

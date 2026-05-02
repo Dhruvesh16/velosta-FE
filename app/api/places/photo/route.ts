@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// Server-side only — do NOT use NEXT_PUBLIC_ prefix here
-const GOOGLE_KEY = process.env.GOOGLE_MAPS_KEY ?? "";
+import { getGoogleMapsServerKey } from "@/lib/google-maps-server-key";
 
 /**
  * Proxies Google Places photo requests to avoid CORS/referrer issues.
@@ -13,6 +11,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const ref = searchParams.get("ref");
   const maxwidth = searchParams.get("maxwidth") || "400";
+  const GOOGLE_KEY = getGoogleMapsServerKey();
 
   if (!ref || !GOOGLE_KEY) {
     return new NextResponse("Missing params", { status: 400 });

@@ -21,6 +21,7 @@ import {
   ChevronUp,
   IndianRupee,
   SlidersHorizontal,
+  Minus,
 } from "lucide-react";
 import { useOnboardingStore, type DiscoveredDestination } from "@/lib/stores/onboarding-store";
 import { useUser } from "@/app/utils/context";
@@ -32,7 +33,9 @@ import {
   enrichItineraryInBackground,
 } from "@/lib/services/itinerary-hydrator";
 import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
+import { buildBudgetRealityMessage } from "@/lib/services/budget-feasibility";
 import { ApiError } from "@/lib/api";
+import { useBatchedStreamTokens } from "@/lib/hooks/use-batched-stream-tokens";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import CloudOverlay from "./cloud-overlay";
 
@@ -216,6 +219,7 @@ export default function ExploreMapView() {
   const [generationDone, setGenerationDone] = useState(false);
   const [craftingPlace, setCraftingPlace] = useState<string>("");
   const [streamBuffer, setStreamBuffer] = useState<string | undefined>(undefined);
+  const { appendToken, flushPending, resetQueue } = useBatchedStreamTokens(setStreamBuffer);
   // Ref holds the destination needed when user clicks "Open itinerary"
   const pendingDestRef = useRef<{ dest: ReturnType<typeof useOnboardingStore.getState>["selectDestination"] extends (d: infer D) => void ? D : string } | null>(null);
 
@@ -227,12 +231,13 @@ export default function ExploreMapView() {
       setIsGenerating(false);
       setGenerationDone(false);
       setGeneratingItinerary(false);
+      resetQueue();
       setStreamBuffer(undefined);
       setCraftingPlace("");
       setGenerationError("Generation timed out. Please try again.");
     }, timeoutMs);
     return () => window.clearTimeout(safetyTimer);
-  }, [duration, isGenerating, setGeneratingItinerary]);
+  }, [duration, isGenerating, resetQueue, setGeneratingItinerary]);
 
   const handleViewItinerary = useCallback(() => {
     const destName = (pendingDestRef.current as any)?.name as string | undefined;
@@ -626,6 +631,17 @@ export default function ExploreMapView() {
         "en-IN"
       )} for ${travelerCount} ${tripType} traveler(s)${interestStr}.${originStr} Generate the full itinerary now.`;
       const profilePrompt = buildTravelProfilePrompt(travelProfile);
+      const budgetReality = buildBudgetRealityMessage({
+        destination: dest.name,
+        days: duration,
+        currentBudgetPerPerson: budget,
+      });
+      if (budgetReality) {
+        setGenerationError(budgetReality.message);
+        setIsGenerating(false);
+        setGeneratingItinerary(false);
+        return;
+      }
       const fullPrompt = `${autoMsg}${profilePrompt}`;
 
       // Stash for any downstream consumer (e.g. mobile chat panel)
@@ -664,6 +680,7 @@ export default function ExploreMapView() {
       setIsGenerating(true);
       setGeneratingItinerary(true);
       setGeneratedItinerary(null);
+      resetQueue();
       setStreamBuffer("");
 
       let didSucceed = false;
@@ -677,8 +694,9 @@ export default function ExploreMapView() {
             destinationHint: dest.name,
             desiredDays: duration,
             desiredBudget: budget,
+            travelProfileContext: profilePrompt,
           },
-          (token) => setStreamBuffer((prev) => (prev ?? "") + token)
+          appendToken
         );
 
         if (!response.isTextResponse && response.itineraryTable) {
@@ -709,6 +727,7 @@ export default function ExploreMapView() {
         );
       } finally {
         setGeneratingItinerary(false);
+        flushPending();
         setStreamBuffer(undefined);
         setCraftingPlace("");
         if (!didSucceed) {
@@ -751,6 +770,9 @@ export default function ExploreMapView() {
       }
     },
     [
+      appendToken,
+      flushPending,
+      resetQueue,
       budget,
       duration,
       tripType,
@@ -1254,10 +1276,10 @@ export default function ExploreMapView() {
                     </button>
                     <button
                       onClick={() => setMobileListHidden(true)}
-                      className="rounded-full p-1.5 text-[#0B1F2A]/45 hover:bg-[#0B1F2A]/5"
+                      className="rounded-full p-2 text-[#0B1F2A]/40 hover:bg-[#0B1F2A]/5 min-w-[44px] min-h-[44px] flex items-center justify-center"
                       aria-label="Close curated places"
                     >
-                      <X size={12} />
+                      <Minus size={22} strokeWidth={2.5} className="opacity-70" aria-hidden />
                     </button>
                   </div>
                 </div>

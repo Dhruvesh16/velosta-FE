@@ -25,6 +25,8 @@ interface UIState {
   activeMobileTab: MobileTab;
   isItineraryOpen: boolean;
   isChatOpen: boolean;
+  /** Mobile map tab: Velosta sheet collapsed (peek bar only). */
+  mobileMapChatCollapsed: boolean;
   isReducedMotion: boolean;
   isHighContrast: boolean;
   plannerRefineMessages: PlannerRefineChatMessage[];
@@ -37,6 +39,7 @@ interface UIState {
   setMobileTab: (tab: MobileTab) => void;
   toggleItinerary: () => void;
   toggleChat: () => void;
+  setMobileMapChatCollapsed: (collapsed: boolean) => void;
   setReducedMotion: (v: boolean) => void;
   setHighContrast: (v: boolean) => void;
   setPlannerRefineMessages: (messages: PlannerRefineChatMessage[]) => void;
@@ -57,6 +60,7 @@ export const useUIStore = create<UIState>((set) => ({
   activeMobileTab: "chat",
   isItineraryOpen: true,
   isChatOpen: true,
+  mobileMapChatCollapsed: true,
   isReducedMotion: false,
   isHighContrast: false,
   plannerRefineMessages: [],
@@ -69,6 +73,7 @@ export const useUIStore = create<UIState>((set) => ({
   setMobileTab: (tab) => set({ activeMobileTab: tab }),
   toggleItinerary: () => set((s) => ({ isItineraryOpen: !s.isItineraryOpen })),
   toggleChat: () => set((s) => ({ isChatOpen: !s.isChatOpen })),
+  setMobileMapChatCollapsed: (collapsed) => set({ mobileMapChatCollapsed: collapsed }),
   setReducedMotion: (v) => set({ isReducedMotion: v }),
   setHighContrast: (v) => set({ isHighContrast: v }),
   setPlannerRefineMessages: (messages) => set({ plannerRefineMessages: messages }),

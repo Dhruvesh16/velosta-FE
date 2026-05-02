@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNarrowViewport } from "@/lib/hooks/use-narrow-viewport";
 import { Sparkles, Compass, MapPin, X } from "lucide-react";
 import { Playfair_Display } from "next/font/google";
 
@@ -57,6 +58,7 @@ function Cloud({
   driftY = [0, 0, 0],
   duration,
   blur,
+  freeze,
 }: {
   width: number;
   height: number;
@@ -69,18 +71,28 @@ function Cloud({
   driftY?: number[];
   duration: number;
   blur: string;
+  freeze?: boolean;
 }) {
+  const wrapperStyle = {
+    width,
+    height,
+    background: color,
+    top,
+    left,
+    right,
+    bottom,
+  };
+  const baseClass = `absolute rounded-full ${blur}`;
+  if (freeze) {
+    return (
+      <div className={baseClass} style={{ ...wrapperStyle, willChange: "auto" }} />
+    );
+  }
   return (
     <motion.div
-      className={`absolute rounded-full ${blur}`}
+      className={baseClass}
       style={{
-        width,
-        height,
-        background: color,
-        top,
-        left,
-        right,
-        bottom,
+        ...wrapperStyle,
         willChange: "transform",
       }}
       animate={{ x: driftX, y: driftY }}
@@ -89,7 +101,7 @@ function Cloud({
   );
 }
 
-function CloudLayers() {
+function CloudLayers({ freezeMotion }: { freezeMotion?: boolean }) {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
       <Cloud
@@ -98,6 +110,7 @@ function CloudLayers() {
         top="2%" left="-8%"
         driftX={[0, 100, 0]} driftY={[0, -10, 0]}
         duration={22} blur="blur-3xl"
+        freeze={freezeMotion}
       />
       <Cloud
         width={700} height={280}
@@ -105,6 +118,7 @@ function CloudLayers() {
         top="0%" right="-10%"
         driftX={[0, -80, 0]} driftY={[0, 15, 0]}
         duration={26} blur="blur-3xl"
+        freeze={freezeMotion}
       />
       <Cloud
         width={450} height={180}
@@ -112,6 +126,7 @@ function CloudLayers() {
         top="18%" left="10%"
         driftX={[0, 60, 0]} driftY={[0, -8, 0]}
         duration={18} blur="blur-2xl"
+        freeze={freezeMotion}
       />
       <Cloud
         width={400} height={160}
@@ -119,6 +134,7 @@ function CloudLayers() {
         top="28%" right="5%"
         driftX={[0, -55, 0]} driftY={[0, 12, 0]}
         duration={20} blur="blur-2xl"
+        freeze={freezeMotion}
       />
       <Cloud
         width={350} height={140}
@@ -126,6 +142,7 @@ function CloudLayers() {
         top="40%" left="25%"
         driftX={[0, 45, 0]}
         duration={17} blur="blur-2xl"
+        freeze={freezeMotion}
       />
       <Cloud
         width={320} height={130}
@@ -133,6 +150,7 @@ function CloudLayers() {
         bottom="30%" left="0%"
         driftX={[0, 80, 0]}
         duration={13} blur="blur-xl"
+        freeze={freezeMotion}
       />
       <Cloud
         width={380} height={150}
@@ -140,6 +158,7 @@ function CloudLayers() {
         bottom="22%" right="-5%"
         driftX={[0, -60, 0]} driftY={[0, 8, 0]}
         duration={15} blur="blur-xl"
+        freeze={freezeMotion}
       />
       <Cloud
         width={250} height={100}
@@ -147,6 +166,7 @@ function CloudLayers() {
         bottom="45%" left="40%"
         driftX={[0, 50, 0]}
         duration={12} blur="blur-xl"
+        freeze={freezeMotion}
       />
     </div>
   );
@@ -253,19 +273,16 @@ function _StreamDayCard({
   day,
   dayIdx,
   isCurrent,
+  freezeMotion,
 }: {
   day: _ParsedDay;
   dayIdx: number;
   isCurrent: boolean;
+  freezeMotion?: boolean;
 }) {
   const color = _dayColor(dayIdx);
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28 }}
-      className="mb-4"
-    >
+  const cardBody = (
+    <>
       {/* Day pill */}
       <div className="flex items-center gap-2 mb-2">
         <span
@@ -302,21 +319,48 @@ function _StreamDayCard({
           {day.activities.map((act, ai) => {
             const isLastAct = ai === day.activities.length - 1;
             const showCursor = isCurrent && isLastAct && !act.complete;
+            const rowStyle = {
+              background: isLastAct && isCurrent
+                ? `${color}08`
+                : "rgba(11,31,42,0.025)",
+              border: isLastAct && isCurrent
+                ? `1px solid ${color}20`
+                : "1px solid transparent",
+            };
+            const rowClass =
+              "flex items-start gap-2.5 px-2.5 py-1.5 rounded-lg";
+            if (freezeMotion) {
+              return (
+                <div key={ai} className={rowClass} style={rowStyle}>
+                  <span
+                    className="mt-[3px] w-1 h-1 rounded-full shrink-0"
+                    style={{ background: color + "80" }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    {act.time && (
+                      <span
+                        className="text-[9px] font-semibold uppercase tracking-[0.18em] mr-1.5 tabular-nums"
+                        style={{ color: color + "90" }}
+                      >
+                        {act.time}
+                      </span>
+                    )}
+                    <span className="text-[11.5px] text-[#0B1F2A]/75 leading-snug">
+                      {act.name}
+                      {showCursor && <_Cursor />}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
             return (
               <motion.div
                 key={ai}
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.2, delay: ai * 0.04 }}
-                className="flex items-start gap-2.5 px-2.5 py-1.5 rounded-lg"
-                style={{
-                  background: isLastAct && isCurrent
-                    ? `${color}08`
-                    : "rgba(11,31,42,0.025)",
-                  border: isLastAct && isCurrent
-                    ? `1px solid ${color}20`
-                    : "1px solid transparent",
-                }}
+                className={rowClass}
+                style={rowStyle}
               >
                 <span
                   className="mt-[3px] w-1 h-1 rounded-full shrink-0"
@@ -341,14 +385,37 @@ function _StreamDayCard({
           })}
         </div>
       )}
+    </>
+  );
+  if (freezeMotion) {
+    return <div className="mb-4">{cardBody}</div>;
+  }
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28 }}
+      className="mb-4"
+    >
+      {cardBody}
     </motion.div>
   );
 }
 
 /* ── Live-stream panel (real OpenAI tokens) ──────────────────────── */
-function LiveStreamDays({ buffer }: { buffer: string }) {
+function LiveStreamDays({
+  buffer,
+  freezeMotion,
+}: {
+  buffer: string;
+  freezeMotion?: boolean;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const days = _parseStreamBuffer(buffer);
+  const deferredBuffer = useDeferredValue(buffer);
+  const days = useMemo(
+    () => _parseStreamBuffer(deferredBuffer),
+    [deferredBuffer]
+  );
 
   useEffect(() => {
     if (scrollRef.current)
@@ -358,14 +425,22 @@ function LiveStreamDays({ buffer }: { buffer: string }) {
   if (days.length === 0) {
     return (
       <div className="flex items-center gap-2 py-4 px-2">
-        {[0, 1, 2].map((i) => (
-          <motion.span
-            key={i}
-            className="block w-1.5 h-1.5 rounded-full bg-[#D97757]/50"
-            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
-            transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18 }}
-          />
-        ))}
+        {freezeMotion
+          ? [0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="block w-1.5 h-1.5 rounded-full bg-[#D97757]/50 animate-pulse"
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
+            ))
+          : [0, 1, 2].map((i) => (
+              <motion.span
+                key={i}
+                className="block w-1.5 h-1.5 rounded-full bg-[#D97757]/50"
+                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
+                transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18 }}
+              />
+            ))}
         <span className="text-[11px] text-[#0B1F2A]/40">Connecting to Velosta AI…</span>
       </div>
     );
@@ -386,6 +461,7 @@ function LiveStreamDays({ buffer }: { buffer: string }) {
           day={day}
           dayIdx={di}
           isCurrent={di === days.length - 1}
+          freezeMotion={freezeMotion}
         />
       ))}
     </div>
@@ -540,12 +616,16 @@ function DummyStreamDays({ active }: { active: boolean }) {
 function StreamingDays({
   active,
   liveTokenBuffer,
+  freezeMotion,
 }: {
   active: boolean;
   liveTokenBuffer?: string;
+  freezeMotion?: boolean;
 }) {
   if (liveTokenBuffer !== undefined) {
-    return <LiveStreamDays buffer={liveTokenBuffer} />;
+    return (
+      <LiveStreamDays buffer={liveTokenBuffer} freezeMotion={freezeMotion} />
+    );
   }
   return <DummyStreamDays active={active} />;
 }
@@ -876,6 +956,7 @@ export default function CloudOverlay({
   generationComplete = false,
   onViewItinerary,
 }: CloudOverlayProps) {
+  const narrow = useNarrowViewport();
   // Rotate sublines every 2.4s (only in crafting mode)
   const [sublineIdx, setSublineIdx] = useState(0);
   useEffect(() => {
@@ -913,7 +994,8 @@ export default function CloudOverlay({
             <motion.div
               className="relative flex flex-col h-full shrink-0 overflow-hidden"
               style={{
-                width: "340px",
+                width: narrow ? "min(100vw, 100%)" : "340px",
+                maxWidth: narrow ? "380px" : undefined,
                 background: "#FBF8F3",
                 borderRight: "1px solid rgba(11,31,42,0.08)",
                 boxShadow: "4px 0 40px -8px rgba(11,31,42,0.18)",
@@ -928,15 +1010,25 @@ export default function CloudOverlay({
                 className="absolute top-0 left-0 right-0 h-[2.5px] overflow-hidden"
                 style={{ zIndex: 2 }}
               >
-                <motion.div
-                  className="absolute inset-y-0 w-[55%]"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, transparent, #D97757, #B85F44, transparent)",
-                  }}
-                  animate={{ x: ["-55%", "210%"] }}
-                  transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                />
+                {narrow ? (
+                  <div
+                    className="absolute inset-y-0 w-full opacity-75"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, transparent, rgba(217,119,87,0.35), transparent)",
+                    }}
+                  />
+                ) : (
+                  <motion.div
+                    className="absolute inset-y-0 w-[55%]"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, transparent, #D97757, #B85F44, transparent)",
+                    }}
+                    animate={{ x: ["-55%", "210%"] }}
+                    transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
               </div>
 
               {/* Panel header */}
@@ -954,18 +1046,28 @@ export default function CloudOverlay({
 
               {/* Streaming day cards — fills remaining height */}
               <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-40 sm:pb-4 pt-3" style={{ scrollbarWidth: "none" }}>
-                <StreamingDays active={visible} liveTokenBuffer={liveTokenBuffer} />
+                <StreamingDays
+                  active={visible}
+                  liveTokenBuffer={liveTokenBuffer}
+                  freezeMotion={narrow}
+                />
               </div>
 
               {/* Footer */}
               <div className="shrink-0 px-5 pb-5 pt-2 flex items-center justify-center">
-                <motion.p
-                  className="text-[9px] uppercase tracking-[0.2em] text-[#0B1F2A]/28"
-                  animate={{ opacity: [0.35, 0.75, 0.35] }}
-                  transition={{ duration: 2.4, repeat: Infinity }}
-                >
-                  Please don't close this tab
-                </motion.p>
+                {narrow ? (
+                  <p className="text-[9px] uppercase tracking-[0.2em] text-[#0B1F2A]/38">
+                    Please don&apos;t close this tab
+                  </p>
+                ) : (
+                  <motion.p
+                    className="text-[9px] uppercase tracking-[0.2em] text-[#0B1F2A]/28"
+                    animate={{ opacity: [0.35, 0.75, 0.35] }}
+                    transition={{ duration: 2.4, repeat: Infinity }}
+                  >
+                    Please don't close this tab
+                  </motion.p>
+                )}
               </div>
             </motion.div>
 
@@ -973,40 +1075,55 @@ export default function CloudOverlay({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-0 px-8 pointer-events-none">
               {/* Compass */}
               <div className="relative mb-6">
-                <motion.div
-                  className="w-20 h-20 rounded-full flex items-center justify-center"
-                  style={{
-                    background:
-                      "radial-gradient(circle at 32% 28%, rgba(251,248,243,0.18) 0%, rgba(217,119,87,0.14) 60%, transparent 100%)",
-                    border: "1.5px solid rgba(251,248,243,0.30)",
-                    boxShadow:
-                      "0 16px 48px -12px rgba(217,119,87,0.35), 0 0 0 8px rgba(251,248,243,0.06)",
-                  }}
-                  animate={{ rotate: [0, 360] }}
-                  transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
-                >
-                  <Compass size={32} strokeWidth={1.4} className="text-[#FBF8F3]" />
-                </motion.div>
+                {narrow ? (
+                  <div
+                    className="w-20 h-20 rounded-full flex items-center justify-center"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 32% 28%, rgba(251,248,243,0.18) 0%, rgba(217,119,87,0.14) 60%, transparent 100%)",
+                      border: "1.5px solid rgba(251,248,243,0.30)",
+                      boxShadow:
+                        "0 16px 48px -12px rgba(217,119,87,0.35), 0 0 0 8px rgba(251,248,243,0.06)",
+                    }}
+                  >
+                    <Compass size={32} strokeWidth={1.4} className="text-[#FBF8F3]" />
+                  </div>
+                ) : (
+                  <>
+                    <motion.div
+                      className="w-20 h-20 rounded-full flex items-center justify-center"
+                      style={{
+                        background:
+                          "radial-gradient(circle at 32% 28%, rgba(251,248,243,0.18) 0%, rgba(217,119,87,0.14) 60%, transparent 100%)",
+                        border: "1.5px solid rgba(251,248,243,0.30)",
+                        boxShadow:
+                          "0 16px 48px -12px rgba(217,119,87,0.35), 0 0 0 8px rgba(251,248,243,0.06)",
+                      }}
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Compass size={32} strokeWidth={1.4} className="text-[#FBF8F3]" />
+                    </motion.div>
 
-                {/* Pulse ring */}
-                <motion.div
-                  className="absolute inset-0 rounded-full pointer-events-none"
-                  style={{ border: "1.5px solid rgba(251,248,243,0.22)" }}
-                  animate={{ scale: [1, 1.75, 1], opacity: [0.5, 0, 0.5] }}
-                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut" }}
-                />
+                    <motion.div
+                      className="absolute inset-0 rounded-full pointer-events-none"
+                      style={{ border: "1.5px solid rgba(251,248,243,0.22)" }}
+                      animate={{ scale: [1, 1.75, 1], opacity: [0.5, 0, 0.5] }}
+                      transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut" }}
+                    />
 
-                {/* Orbiting dot */}
-                <motion.span
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full"
-                  style={{
-                    marginTop: -4,
-                    background: "#D97757",
-                    boxShadow: "0 0 10px rgba(217,119,87,0.8)",
-                  }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                />
+                    <motion.span
+                      className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full"
+                      style={{
+                        marginTop: -4,
+                        background: "#D97757",
+                        boxShadow: "0 0 10px rgba(217,119,87,0.8)",
+                      }}
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                    />
+                  </>
+                )}
               </div>
 
               {/* Kicker */}

@@ -246,6 +246,7 @@ export default function ExploreMapView() {
   // Mobile-only UI state
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileListExpanded, setMobileListExpanded] = useState(false);
+  const [mobileListHidden, setMobileListHidden] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
 
   // ── Refs ──
@@ -257,7 +258,14 @@ export default function ExploreMapView() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const media = window.matchMedia("(max-width: 1023px)");
-    const sync = () => setIsMobileView(media.matches);
+    const sync = () => {
+      const mobile = media.matches;
+      setIsMobileView(mobile);
+      if (!mobile) {
+        setMobileListHidden(false);
+        setMobileListExpanded(false);
+      }
+    };
     sync();
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
@@ -1212,74 +1220,110 @@ export default function ExploreMapView() {
           </button>
         </div>
 
-        {/* Mobile bottom destination sheet — collapsed by default, swipe up to expand */}
-        <motion.div
-          className="lg:hidden absolute inset-x-0 bottom-0 z-20 bg-[#FBF8F3] rounded-t-3xl border-t border-[#0B1F2A]/10 shadow-[0_-12px_40px_-12px_rgba(11,31,42,0.18)] overflow-hidden flex flex-col"
-          animate={{ height: mobileListExpanded ? "78vh" : "38vh" }}
-          transition={{ type: "spring", stiffness: 240, damping: 28 }}
-        >
-          {/* Drag handle */}
-          <button
-            onClick={() => setMobileListExpanded((v) => !v)}
-            className="w-full pt-3 pb-2 flex flex-col items-center shrink-0"
-            aria-label={mobileListExpanded ? "Collapse list" : "Expand list"}
-          >
-            <span className="block w-10 h-1 rounded-full bg-[#0B1F2A]/15" />
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-[10px] tracking-[0.24em] text-[#2F6F73] font-semibold uppercase">
-                Curated for you
-              </span>
-              <ChevronUp
-                size={12}
-                className={`text-[#0B1F2A]/45 transition-transform ${mobileListExpanded ? "rotate-180" : ""}`}
-              />
-            </div>
-          </button>
-
-          <div className="flex-1 overflow-y-auto pb-4">
-            {displayPlaces.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-[13px] font-medium text-[#0B1F2A]">No matches yet</p>
-                <p className="text-[11.5px] text-[#0B1F2A]/50 mt-1">
-                  Try widening your budget or removing a category.
-                </p>
-              </div>
-            ) : (
-              displayPlaces.map((dest) => {
-                const fit = getBudgetFit(dest, budget);
-                const color = getBudgetColor(fit);
-                return (
-                  <button
-                    key={`m-${dest.id}`}
-                    onClick={() => setSelectedDest(dest)}
-                    className="w-full text-left px-5 py-3 border-b border-[#0B1F2A]/5 active:bg-[#F5EFE6]/60 flex items-center gap-3"
-                  >
-                    <span
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-base shrink-0"
-                      style={{
-                        background: `${color}14`,
-                        border: `1.5px solid ${color}38`,
-                      }}
+        <AnimatePresence initial={false}>
+          {!mobileListHidden ? (
+            <motion.div
+              key="mobile-destination-sheet"
+              className="lg:hidden absolute inset-x-0 bottom-0 z-20 bg-[#FBF8F3] rounded-t-3xl border-t border-[#0B1F2A]/10 shadow-[0_-12px_40px_-12px_rgba(11,31,42,0.18)] overflow-hidden flex flex-col"
+              initial={{ y: "100%" }}
+              animate={{ y: 0, height: mobileListExpanded ? "78vh" : "38vh" }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 240, damping: 28 }}
+            >
+              {/* Sheet controls */}
+              <div className="w-full pt-3 pb-2 flex flex-col items-center shrink-0">
+                <button
+                  onClick={() => setMobileListHidden(true)}
+                  className="block w-10 h-1 rounded-full bg-[#0B1F2A]/15"
+                  aria-label="Hide curated places"
+                />
+                <div className="mt-2 flex w-full items-center justify-between px-4">
+                  <span className="text-[10px] tracking-[0.24em] text-[#2F6F73] font-semibold uppercase">
+                    Curated for you
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setMobileListExpanded((v) => !v)}
+                      className="rounded-full p-1.5 text-[#0B1F2A]/45 hover:bg-[#0B1F2A]/5"
+                      aria-label={mobileListExpanded ? "Collapse list" : "Expand list"}
                     >
-                      {dest.emoji}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13.5px] font-semibold text-[#0B1F2A] truncate">
-                        {dest.name}
-                      </p>
-                      <p className="text-[11px] text-[#0B1F2A]/50 truncate">
-                        {dest.state} · ₹{(dest.costMin / 1000).toFixed(0)}K–
-                        {(dest.costMax / 1000).toFixed(0)}K · {dest.durationMin}–
-                        {dest.durationMax}d
-                      </p>
-                    </div>
-                    <ChevronRight size={14} className="text-[#0B1F2A]/30 shrink-0" />
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </motion.div>
+                      <ChevronUp
+                        size={12}
+                        className={`transition-transform ${mobileListExpanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    <button
+                      onClick={() => setMobileListHidden(true)}
+                      className="rounded-full p-1.5 text-[#0B1F2A]/45 hover:bg-[#0B1F2A]/5"
+                      aria-label="Close curated places"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pb-4">
+                {displayPlaces.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-[13px] font-medium text-[#0B1F2A]">No matches yet</p>
+                    <p className="text-[11.5px] text-[#0B1F2A]/50 mt-1">
+                      Try widening your budget or removing a category.
+                    </p>
+                  </div>
+                ) : (
+                  displayPlaces.map((dest) => {
+                    const fit = getBudgetFit(dest, budget);
+                    const color = getBudgetColor(fit);
+                    return (
+                      <button
+                        key={`m-${dest.id}`}
+                        onClick={() => setSelectedDest(dest)}
+                        className="w-full text-left px-5 py-3 border-b border-[#0B1F2A]/5 active:bg-[#F5EFE6]/60 flex items-center gap-3"
+                      >
+                        <span
+                          className="w-10 h-10 rounded-2xl flex items-center justify-center text-base shrink-0"
+                          style={{
+                            background: `${color}14`,
+                            border: `1.5px solid ${color}38`,
+                          }}
+                        >
+                          {dest.emoji}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13.5px] font-semibold text-[#0B1F2A] truncate">
+                            {dest.name}
+                          </p>
+                          <p className="text-[11px] text-[#0B1F2A]/50 truncate">
+                            {dest.state} · ₹{(dest.costMin / 1000).toFixed(0)}K–
+                            {(dest.costMax / 1000).toFixed(0)}K · {dest.durationMin}–
+                            {dest.durationMax}d
+                          </p>
+                        </div>
+                        <ChevronRight size={14} className="text-[#0B1F2A]/30 shrink-0" />
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.button
+              key="mobile-destination-sheet-reopen"
+              initial={{ y: 22, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 22, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setMobileListHidden(false)}
+              className="lg:hidden absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-[#0B1F2A]/10 bg-[#FBF8F3]/95 px-4 py-2 shadow-[0_10px_26px_-14px_rgba(11,31,42,0.35)] backdrop-blur-sm"
+              aria-label="Show curated places"
+            >
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#2F6F73]">
+                Show curated places
+              </span>
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         {/* Mobile filters drawer */}
         <AnimatePresence>

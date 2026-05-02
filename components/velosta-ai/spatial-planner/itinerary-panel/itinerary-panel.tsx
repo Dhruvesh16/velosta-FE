@@ -1029,16 +1029,19 @@ export default function ItineraryPanel({ variant = "default" }: ItineraryPanelPr
       <div className="shrink-0 border-t border-[#0B1F2A]/8 bg-[#FBF8F3]">
         <button
           onClick={() => {
-            setAiExpanded((v) => !v);
+            const nextExpanded = !aiExpanded;
+            setAiExpanded(nextExpanded);
             if (!aiExpanded) setTimeout(() => aiInputRef.current?.focus(), 100);
           }}
+          aria-expanded={aiExpanded}
+          aria-label={aiExpanded ? "Collapse refine panel" : "Expand refine panel"}
           className="w-full flex items-center justify-between px-4 py-2.5 text-[11px] font-semibold tracking-wide text-[#0B1F2A]/70 hover:bg-[#0B1F2A]/[0.03] transition-colors"
         >
           <span className="flex items-center gap-2">
             <Sparkles size={12} className="text-[#D97757]" strokeWidth={1.8} />
             <span className="uppercase tracking-[0.18em]">Ask Velosta to refine</span>
           </span>
-          {aiExpanded ? <ChevronDown size={13} className="text-[#0B1F2A]/40" /> : <ChevronUp size={13} className="text-[#0B1F2A]/40" />}
+          {aiExpanded ? <ChevronUp size={13} className="text-[#0B1F2A]/40" /> : <ChevronDown size={13} className="text-[#0B1F2A]/40" />}
         </button>
 
         <AnimatePresence>

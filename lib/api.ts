@@ -211,9 +211,10 @@ export const authApi = {
     name?: string;
     accepted_terms: boolean;
     marketing_opt_in: boolean;
+    keep_signed_in?: boolean;
   }) => api.post<TokenBundle>("/api/auth/signup", input, { auth: false }),
 
-  login: (input: { email: string; password: string }) =>
+  login: (input: { email: string; password: string; keep_signed_in?: boolean }) =>
     api.post<OtpChallenge>("/api/auth/login", input, { auth: false }),
 
   verifyOtp: (input: { otp_token: string; otp: string }) =>
@@ -228,12 +229,8 @@ export const authApi = {
   resendVerificationEmail: (email: string) =>
     api.post<{ message: string }>("/api/auth/resend-verification-email", { email }, { auth: false }),
 
-  google: (idToken: string) =>
-    api.post<TokenBundle>(
-      "/api/auth/google",
-      { id_token: idToken },
-      { auth: false }
-    ),
+  google: (input: { id_token: string; keep_signed_in?: boolean }) =>
+    api.post<TokenBundle>("/api/auth/google", input, { auth: false }),
 
   refresh: (refreshToken: string) =>
     api.post<TokenBundle>(
@@ -332,6 +329,7 @@ export const authApi = {
   passkeyLoginComplete: (input: {
     session_id: string;
     credential: Record<string, unknown>;
+    keep_signed_in?: boolean;
   }) =>
     api.post<TokenBundle>("/api/auth/passkey/login/complete", input, { auth: false }),
 };

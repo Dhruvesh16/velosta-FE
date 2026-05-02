@@ -7,7 +7,6 @@ import {
   ArrowUpRight,
   MapPin,
   Sparkles,
-  Star,
   Play,
   Compass,
   Wallet,
@@ -683,40 +682,6 @@ export default function Page() {
                   className="h-full w-full object-cover"
                 />
               </div>
-
-              {/* Stat chip */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.7, delay: 0.4 }}
-                className="absolute bottom-[8%] left-[-6%] flex items-center gap-3 rounded-2xl bg-white p-3.5 pr-5"
-                style={{
-                  boxShadow:
-                    "0 18px 40px -16px rgba(11,31,42,0.25), 0 4px 10px -4px rgba(11,31,42,0.08)",
-                }}
-              >
-                <span
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: "rgba(217,119,87,0.12)" }}
-                >
-                  <Star className="h-4 w-4 fill-current" style={{ color: c.coral }} />
-                </span>
-                <div>
-                  <p
-                    className={`${playfair.className} text-[18px] leading-none tracking-tight`}
-                    style={{ color: c.navy }}
-                  >
-                    4.9 / 5
-                  </p>
-                  <p
-                    className="mt-0.5 text-[10.5px] font-medium uppercase tracking-[0.18em]"
-                    style={{ color: "rgba(11,31,42,0.5)" }}
-                  >
-                    From 12k travelers
-                  </p>
-                </div>
-              </motion.div>
             </motion.div>
 
             {/* ── Right — Value props ── */}

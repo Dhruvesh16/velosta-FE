@@ -17,6 +17,7 @@ export function OtpForm() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(30);
+  const [keepSignedInPasskey, setKeepSignedInPasskey] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const webauthnAnchorRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
@@ -128,7 +129,10 @@ export function OtpForm() {
   const handlePasskeySignIn = async () => {
     setLoading(true);
     try {
-      const bundle = await completePasskeySignIn();
+      const bundle = await completePasskeySignIn({
+        webauthnFieldRef: isTotp && hasPasskey ? webauthnAnchorRef : undefined,
+        keepSignedIn: keepSignedInPasskey,
+      });
       persistSession(bundle);
       setAccessToken(bundle.access_token);
       setUser(bundle.user);
@@ -235,6 +239,17 @@ export function OtpForm() {
         )}
         {isTotp && hasPasskey && (
           <div className="pt-1">
+            <label className="mb-3 flex cursor-pointer items-start justify-center gap-3 px-1">
+              <input
+                type="checkbox"
+                checked={keepSignedInPasskey}
+                onChange={(e) => setKeepSignedInPasskey(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border accent-[#D97757]"
+              />
+              <span className="text-left text-[13px] leading-snug" style={{ color: "rgba(11,31,42,0.7)" }}>
+                Keep me signed in on this device (passkey sign-in)
+              </span>
+            </label>
             <p className="mb-2 text-center text-[12px]" style={{ color: "rgba(11,31,42,0.5)" }}>
               Or sign in instantly with your passkey.
             </p>

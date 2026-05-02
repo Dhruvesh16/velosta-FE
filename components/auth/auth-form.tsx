@@ -20,9 +20,11 @@ import Link from "next/link";
 function PasskeySignInButton({
   nextPath,
   webauthnFieldRef,
+  keepSignedIn,
 }: {
   nextPath: string;
   webauthnFieldRef: React.RefObject<HTMLInputElement | null>;
+  keepSignedIn: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const { setUser, setAccessToken } = useUser();
@@ -31,7 +33,7 @@ function PasskeySignInButton({
   const handlePasskeySignIn = async () => {
     setLoading(true);
     try {
-      const bundle = await completePasskeySignIn({ webauthnFieldRef });
+      const bundle = await completePasskeySignIn({ webauthnFieldRef, keepSignedIn });
       persistSession(bundle);
       setAccessToken(bundle.access_token);
       setUser(bundle.user);
@@ -96,6 +98,7 @@ export function AuthForm({ type }: AuthFormProps) {
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
   const [resendingVerification, setResendingVerification] = useState(false);
 
@@ -206,6 +209,7 @@ export function AuthForm({ type }: AuthFormProps) {
           password: formData.password,
           accepted_terms: acceptedTerms,
           marketing_opt_in: marketingOptIn,
+          keep_signed_in: keepSignedIn,
         });
         toast.success("Welcome aboard! We sent a single email with your verification link.");
         router.push("/sign-in");
@@ -237,6 +241,7 @@ export function AuthForm({ type }: AuthFormProps) {
           const challenge = await authApi.login({
             email: formData.email,
             password: formData.password,
+            keep_signed_in: keepSignedIn,
           });
           const method = challenge.twoFaMethod || "email_otp";
           const params = new URLSearchParams({ token: challenge.otpToken, method });
@@ -280,7 +285,7 @@ export function AuthForm({ type }: AuthFormProps) {
       const token = credentialResponse.credential;
       if (!token) throw new Error("No Google token found");
 
-      const bundle = await authApi.google(token);
+      const bundle = await authApi.google({ id_token: token, keep_signed_in: keepSignedIn });
 
       persistSession(bundle);
       setAccessToken(bundle.access_token);
@@ -542,6 +547,18 @@ export function AuthForm({ type }: AuthFormProps) {
           </div>
         )}
 
+        <label className="flex cursor-pointer items-start gap-3 pt-0.5">
+          <input
+            type="checkbox"
+            checked={keepSignedIn}
+            onChange={(e) => setKeepSignedIn(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border accent-[#D97757]"
+          />
+          <span className="text-[13px] leading-snug" style={{ color: "rgba(11,31,42,0.7)" }}>
+            Keep me signed in on this device
+          </span>
+        </label>
+
         <Button
           type="submit"
           disabled={loading}
@@ -604,7 +621,11 @@ export function AuthForm({ type }: AuthFormProps) {
 
         {/* PASSKEY LOGIN — only on sign-in, only if browser supports WebAuthn */}
         {type === "signin" && typeof window !== "undefined" && (window as any).PublicKeyCredential && (
-          <PasskeySignInButton nextPath={nextPath} webauthnFieldRef={emailPasskeyAnchorRef} />
+          <PasskeySignInButton
+            nextPath={nextPath}
+            webauthnFieldRef={emailPasskeyAnchorRef}
+            keepSignedIn={keepSignedIn}
+          />
         )}
 
         <p

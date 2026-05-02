@@ -11,6 +11,8 @@ type CompletePasskeySignInOpts = {
   webauthnFieldRef?: RefObject<HTMLElement | null>;
   /** Default true whenever `webauthnFieldRef` is set */
   preferConditionalUi?: boolean;
+  /** Matches "Keep me signed in" — long-lived refresh token on the auth service. */
+  keepSignedIn?: boolean;
 };
 
 async function conditionalMediationSupported(): Promise<boolean> {
@@ -70,6 +72,7 @@ export async function completePasskeySignIn(opts?: CompletePasskeySignInOpts): P
     authApi.passkeyLoginComplete({
       session_id: sessionId,
       credential: credential as Record<string, unknown>,
+      keep_signed_in: Boolean(opts?.keepSignedIn),
     });
 
   const anchor = opts?.webauthnFieldRef;

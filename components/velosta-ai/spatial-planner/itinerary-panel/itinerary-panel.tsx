@@ -173,7 +173,14 @@ function hasMaterialItineraryChange(current: any, next: any): boolean {
   return currTable !== nextTable;
 }
 
-export default function ItineraryPanel() {
+export type ItineraryPanelVariant = "default" | "refineOnly";
+
+interface ItineraryPanelProps {
+  /** `refineOnly`: mobile full-screen streaming refine (same engine as desktop itinerary footer). */
+  variant?: ItineraryPanelVariant;
+}
+
+export default function ItineraryPanel({ variant = "default" }: ItineraryPanelProps) {
   const {
     itinerary,
     itineraryData,
@@ -432,6 +439,144 @@ export default function ItineraryPanel() {
     },
     [aiInput, submitAi]
   );
+
+  // ── Mobile: full-screen refine (desktop parity — not legacy ChatWindow) ───
+  if (variant === "refineOnly") {
+    if (!itineraryData) {
+      return (
+        <div className="flex flex-col h-full min-h-0 items-center justify-center bg-[#FBF8F3] px-6 text-center">
+          <p className="text-sm text-[#0B1F2A]/60">Open your itinerary to start refining.</p>
+          <button
+            type="button"
+            onClick={() => setMobileTab("itinerary")}
+            className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-[#B85F44]"
+          >
+            Go to itinerary →
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col h-full min-h-0 bg-[#FBF8F3] relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(120% 80% at 50% 0%, rgba(217,119,87,0.08) 0%, transparent 55%), radial-gradient(100% 70% at 50% 100%, rgba(47,111,115,0.08) 0%, transparent 55%)",
+          }}
+        />
+
+        <div className="relative shrink-0 px-4 pt-4 pb-3 border-b border-[#0B1F2A]/8">
+          <button
+            type="button"
+            onClick={() => setMobileTab("itinerary")}
+            className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0B1F2A]/55 hover:text-[#0B1F2A] transition-colors mb-3"
+            aria-label="Back to itinerary"
+          >
+            <ArrowLeft size={12} strokeWidth={2} />
+            <span>Itinerary</span>
+          </button>
+          <p className="text-[9.5px] font-semibold uppercase tracking-[0.32em] text-[#2F6F73] mb-1">
+            Ask Velosta
+          </p>
+          <h1 className="font-serif text-[22px] font-semibold text-[#0B1F2A] leading-tight truncate">
+            {destination}
+          </h1>
+          <p className="text-[11px] text-[#0B1F2A]/50 mt-1.5">
+            Streaming refine · updates your map when you change the plan
+          </p>
+        </div>
+
+        <div className="relative flex-1 flex flex-col min-h-0">
+          {(aiMessages.length > 0 || aiLoading) && (
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+              <div className="space-y-2 rounded-xl border border-[#D97757]/20 bg-[#F5EFE6]/45 px-3 py-3 min-h-[120px]">
+                {aiMessages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`text-[12px] leading-relaxed whitespace-pre-line rounded-xl px-3 py-2.5 ${
+                      m.role === "user"
+                        ? "ml-6 bg-[#0B1F2A] text-white"
+                        : "mr-6 bg-white text-[#0B1F2A]/85 border border-[#0B1F2A]/8"
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                ))}
+                {aiLoading && (
+                  <div className="mr-6 rounded-xl border border-[#0B1F2A]/8 bg-white px-3 py-2.5 text-[12px] text-[#0B1F2A]/75">
+                    {aiStreamText ? (
+                      <>
+                        {aiStreamText}
+                        <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-[#D97757] animate-pulse rounded-sm align-middle" />
+                      </>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[#0B1F2A]/40">
+                        <span className="animate-bounce" style={{ animationDelay: "0ms" }}>●</span>
+                        <span className="animate-bounce" style={{ animationDelay: "120ms" }}>●</span>
+                        <span className="animate-bounce" style={{ animationDelay: "240ms" }}>●</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="relative shrink-0 border-t border-[#0B1F2A]/8 bg-[#FBF8F3] pb-[max(12px,env(safe-area-inset-bottom))]">
+            {aiMessages.length === 0 && !aiLoading && (
+              <p className="text-center text-[11px] text-[#0B1F2A]/45 px-4 pt-3 pb-1">
+                Try a quick prompt below, or type your own change.
+              </p>
+            )}
+            <div className="px-4 pt-2 pb-2 flex flex-wrap gap-2">
+              {["Add a sunset viewpoint", "Swap restaurants", "Optimize my budget", "Suggest hidden gems"].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => submitAi(s)}
+                  className="text-[11px] px-3 py-2 min-h-[44px] rounded-full border border-[#0B1F2A]/12 bg-white/80 text-[#0B1F2A]/70 hover:border-[#D97757] hover:text-[#B85F44] hover:bg-white transition-all"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={handleAiSubmit} className="px-4 pb-3 flex items-center gap-2">
+              <input
+                ref={aiInputRef}
+                type="text"
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAiSubmit(e);
+                  }
+                }}
+                placeholder={`e.g. Add a sunset viewpoint on Day ${(activeDay || 0) + 1}…`}
+                className="flex-1 min-w-0 min-h-[48px] bg-white/90 border border-[#0B1F2A]/10 rounded-full px-4 py-3 text-[15px] text-[#0B1F2A] placeholder-[#0B1F2A]/35 outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#D97757]/15 focus:bg-white transition-all"
+                disabled={aiLoading}
+                aria-label="Refine itinerary with Velosta"
+              />
+              <button
+                type="submit"
+                disabled={aiLoading || !aiInput.trim()}
+                className="shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] rounded-full disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-[0_4px_14px_-4px_rgba(217,119,87,0.55)]"
+                style={{
+                  background: "linear-gradient(135deg, #D97757 0%, #B85F44 100%)",
+                }}
+                aria-label="Send refine request"
+              >
+                {aiLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Empty state ──────────────────────────────────────────────────────────
   if (!itineraryData) {
@@ -952,7 +1097,10 @@ export default function ItineraryPanel() {
                 ))}
               </div>
 
-              <form onSubmit={handleAiSubmit} className="px-4 pb-3 flex items-center gap-2">
+              <form
+                onSubmit={handleAiSubmit}
+                className="px-4 flex items-center gap-2 pb-[max(12px,calc(0.5rem+env(safe-area-inset-bottom,0px)))] md:pb-3"
+              >
                 <input
                   ref={aiInputRef}
                   type="text"
@@ -965,19 +1113,24 @@ export default function ItineraryPanel() {
                     }
                   }}
                   placeholder={`e.g. Add a sunset viewpoint on Day ${(activeDay || 0) + 1}…`}
-                  className="flex-1 min-w-0 bg-white/80 border border-[#0B1F2A]/10 rounded-full px-3.5 py-2 text-[11.5px] text-[#0B1F2A] placeholder-[#0B1F2A]/35 outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#D97757]/15 focus:bg-white transition-all"
+                  className="flex-1 min-w-0 min-h-[44px] md:min-h-0 bg-white/80 border border-[#0B1F2A]/10 rounded-full px-3.5 py-2.5 md:py-2 text-[15px] md:text-[11.5px] text-[#0B1F2A] placeholder-[#0B1F2A]/35 outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#D97757]/15 focus:bg-white transition-all"
                   disabled={aiLoading}
                 />
                 <button
                   type="submit"
                   disabled={aiLoading || !aiInput.trim()}
-                  className="shrink-0 w-8 h-8 rounded-full disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-[0_4px_10px_-3px_rgba(217,119,87,0.55)]"
+                  className="shrink-0 w-12 h-12 md:w-8 md:h-8 min-w-[48px] min-h-[48px] md:min-w-0 md:min-h-0 rounded-full disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-[0_4px_10px_-3px_rgba(217,119,87,0.55)]"
                   style={{
                     background:
                       "linear-gradient(135deg, #D97757 0%, #B85F44 100%)",
                   }}
+                  aria-label="Send refine request"
                 >
-                  {aiLoading ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                  {aiLoading ? (
+                    <Loader2 className="w-[18px] h-[18px] md:w-[13px] md:h-[13px] animate-spin" strokeWidth={2} />
+                  ) : (
+                    <Send className="w-[18px] h-[18px] md:w-[13px] md:h-[13px]" strokeWidth={2} />
+                  )}
                 </button>
               </form>
             </motion.div>

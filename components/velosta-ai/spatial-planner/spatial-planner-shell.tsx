@@ -21,10 +21,10 @@ import OnboardingHints from "../onboarding/onboarding-hints";
 const MapPanel = dynamic(() => import("./map-panel/map-panel"), { ssr: false });
 
 // ── Mobile tab bar config ─────────────────────────────────────────────────────
-const TABS: { id: MobileTab; label: string; Icon: typeof Map }[] = [
-  { id: "chat", label: "Chat", Icon: MessageCircle },
-  { id: "map", label: "Map", Icon: Map },
-  { id: "itinerary", label: "Itinerary", Icon: ListChecks },
+const TABS: { id: MobileTab; label: string; labelWithItinerary: string; Icon: typeof Map }[] = [
+  { id: "chat", label: "Chat", labelWithItinerary: "Refine", Icon: MessageCircle },
+  { id: "map", label: "Map", labelWithItinerary: "Map", Icon: Map },
+  { id: "itinerary", label: "Itinerary", labelWithItinerary: "Itinerary", Icon: ListChecks },
 ];
 
 const PANEL_VARIANTS = {
@@ -104,7 +104,11 @@ export default function SpatialPlannerShell() {
                 exit="exit"
                 transition={{ duration: 0.28 }}
               >
-                <ChatPanel />
+                {hasItinerary ? (
+                  <ItineraryPanel variant="refineOnly" />
+                ) : (
+                  <ChatPanel />
+                )}
               </motion.div>
             )}
 
@@ -149,16 +153,17 @@ export default function SpatialPlannerShell() {
           }}
           aria-label="Main navigation"
         >
-          {TABS.map(({ id, label, Icon }) => {
+          {TABS.map(({ id, label, labelWithItinerary, Icon }) => {
             const active = activeMobileTab === id;
             const showBadge = id === "itinerary" && hasItinerary && !active;
+            const tabLabel = hasItinerary ? labelWithItinerary : label;
 
             return (
               <button
                 key={id}
                 onClick={() => setMobileTab(id)}
-                className="flex-1 flex flex-col items-center gap-1 py-3 relative transition-colors"
-                aria-label={label}
+                className="flex-1 flex flex-col items-center gap-1 py-3 relative transition-colors min-h-[52px]"
+                aria-label={tabLabel}
                 aria-current={active ? "page" : undefined}
               >
                 <div className="relative">
@@ -184,7 +189,7 @@ export default function SpatialPlannerShell() {
                     transition: "color 0.2s",
                   }}
                 >
-                  {label}
+                  {tabLabel}
                 </span>
                 {active && (
                   <motion.div

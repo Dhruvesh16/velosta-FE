@@ -378,7 +378,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
   );
 
   return (
-    <section className="flex flex-col h-full bg-[#FFF9F3]">
+    <section className="flex flex-col h-full bg-[#FBF8F3] min-h-0">
       <SignInGate
         open={showSignInGate}
         onClose={() => setShowSignInGate(false)}
@@ -387,7 +387,7 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
         message="Velosta AI saved your draft itinerary — sign in to refine it in real time."
       />
 
-      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
         <AnimatePresence initial={false}>
           {messages.map((m) => (
             <motion.div
@@ -442,9 +442,9 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
         )}
       </div>
 
-      <div className="shrink-0 border-t border-[#D97757]/20 bg-[#FFF9F3] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
-        <p className="text-[10px] text-gray-400 text-center mb-2">
-          Chat history stays in this session while you switch tabs.
+      <div className="shrink-0 border-t border-[#0B1F2A]/8 bg-[#FBF8F3] px-4 py-3 pb-[max(12px,calc(0.75rem+env(safe-area-inset-bottom,0px)))]">
+        <p className="text-[10px] text-[#0B1F2A]/45 text-center mb-2 tracking-wide">
+          History stays in this session when you switch tabs.
         </p>
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
@@ -459,17 +459,17 @@ export function ChatWindow({ onItinerary }: ChatWindowProps = {}) {
               }
             }}
             placeholder="Tell me where you want to go..."
-            className="flex-1 min-w-0 bg-white border border-[#D97757]/30 rounded-full px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#D97757]/15 transition-all"
+            className="flex-1 min-w-0 min-h-[48px] bg-white/95 border border-[#0B1F2A]/10 rounded-full px-4 py-3 text-[15px] text-[#0B1F2A] placeholder-[#0B1F2A]/35 outline-none focus:border-[#D97757] focus:ring-2 focus:ring-[#D97757]/15 transition-all"
             disabled={isLoading}
             aria-label="Chat with Velosta AI"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="shrink-0 w-10 h-10 rounded-full bg-[#D97757] hover:bg-[#B85F44] disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-sm"
+            className="shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-gradient-to-br from-[#D97757] to-[#B85F44] hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all active:scale-95 shadow-[0_4px_14px_-4px_rgba(217,119,87,0.55)]"
             aria-label="Send message"
           >
-            <Send size={16} />
+            <Send size={18} />
           </button>
         </form>
       </div>

@@ -176,9 +176,16 @@ export function generatePlannerStream(
   const ac = new AbortController();
   // Long itineraries can stream for many minutes; scale limits with trip length.
   const tripDays = req.desiredDays ?? 12;
-  const STREAM_IDLE_TIMEOUT_MS = tripDays > 21 ? 120_000 : 90_000;
-  const STREAM_MAX_DURATION_MS =
-    tripDays > 28 ? 22 * 60 * 1000 : tripDays > 21 ? 18 * 60 * 1000 : 12 * 60 * 1000;
+  // Reasoning/long JSON gaps can stall SSE for minutes on multi-week trips —
+  // do not abort just because chunks pause between sections.
+  const STREAM_IDLE_TIMEOUT_MS = Math.min(
+    420_000,
+    tripDays > 21 ? 150_000 + tripDays * 7_500 : tripDays > 14 ? 150_000 : 90_000
+  );
+  const STREAM_MAX_DURATION_MS = Math.min(
+    40 * 60 * 1000,
+    Math.max(14 * 60 * 1000, tripDays * 55 * 1000)
+  );
 
   (async () => {
     // Always refresh token before starting a long-running stream
@@ -318,7 +325,8 @@ export function generatePlannerStream(
 /**
  * Promise wrapper around generatePlannerStream for use with async/await.
  * - onToken is called for each raw chunk (for live UI updates).
- * - Automatically falls back to the non-stream endpoint when SSE drops.
+ * - Automatically falls back to the non-stream `/generate` endpoint when SSE drops
+ *   or times out (so multi-week itineraries still complete after a long stall).
  * - Refreshes the JWT access token before starting if it is about to expire.
  * - Resolves with the final PlannerResponse or rejects on error.
  */
@@ -328,8 +336,6 @@ export function generatePlannerStreamAsync(
 ): Promise<PlannerResponse> {
   return new Promise((resolve, reject) => {
     let settled = false;
-    let sawAnyToken = false;
-
     const resolveOnce = (result: PlannerResponse) => {
       if (settled) return;
       settled = true;
@@ -344,29 +350,12 @@ export function generatePlannerStreamAsync(
 
     generatePlannerStream(req, {
       onToken: (token) => {
-        sawAnyToken = true;
         onToken(token);
       },
       onDone: (result) => resolveOnce(result),
-      onError: (err) => {
-        const code = err?.message || "";
-        const isMidStreamFailure =
-          sawAnyToken &&
-          (code === "stream_idle_timeout" ||
-            code === "stream_incomplete" ||
-            code === "stream_error");
-        if (isMidStreamFailure) {
-          // Avoid a second full generation after partial stream output.
-          // That retry can add very long waits and feels like a freeze.
-          rejectOnce(err);
-          return;
-        }
-        // SSE closed early or any stream-level error → fall back to REST endpoint.
-        // We refresh the token again here in case expiry was the cause.
+      onError: () => {
         _ensureFreshToken()
           .then((freshToken) => {
-            // Build a one-off request with the fresh token (api.post reads token
-            // from localStorage, so persist it first if we got a new one).
             if (freshToken) {
               window.localStorage.setItem("accessToken", freshToken);
             }

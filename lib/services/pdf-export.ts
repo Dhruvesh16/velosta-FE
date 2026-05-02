@@ -5,6 +5,22 @@
 
 import type { ItineraryData, TripData } from "@/lib/types/planner.types";
 
+/** Readable travelers line for PDF / print: total headcount only (neutral wording). */
+export function formatTripTravelersLine(td: TripData): string {
+  let n = 0;
+  const t = td.travelers;
+  if (t) {
+    n =
+      Math.max(0, Math.floor(Number(t.adults) || 0)) +
+      Math.max(0, Math.floor(Number(t.children) || 0));
+  }
+  if (n <= 0 && td.travelerCount != null && Number.isFinite(td.travelerCount)) {
+    n = Math.max(1, Math.floor(td.travelerCount));
+  }
+  if (n <= 0) n = 1;
+  return `${n} traveler${n !== 1 ? "s" : ""}`;
+}
+
 /** Generate a clean, minimal itinerary PDF. Returns the jsPDF document and a filename. */
 export async function buildItineraryPDF(
   itineraryData: ItineraryData,
@@ -97,12 +113,7 @@ export async function buildItineraryPDF(
   // Meta grid — 2 columns, label on top, value below
   const meta: [string, string][] = [
     ["Dates", tripData.dateRange ? `${tripData.dateRange.start} → ${tripData.dateRange.end}` : "Flexible"],
-    [
-      "Travelers",
-      tripData.travelers
-        ? `${tripData.travelers.adults} adult${tripData.travelers.adults !== 1 ? "s" : ""}${tripData.travelers.children ? `, ${tripData.travelers.children} child${tripData.travelers.children !== 1 ? "ren" : ""}` : ""}`
-        : "1 adult",
-    ],
+    ["Travelers", formatTripTravelersLine(tripData)],
     ["Budget", tripData.budget ?? itineraryData.totalBudget ?? "—"],
     ["Total estimate", itineraryData.totalEstimatedCost ?? "—"],
   ];

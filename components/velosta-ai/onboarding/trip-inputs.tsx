@@ -19,6 +19,7 @@ import {
   commitItineraryToStores,
   enrichItineraryInBackground,
 } from "@/lib/services/itinerary-hydrator";
+import { tripPartyMeta } from "@/lib/utils/trip-party";
 import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
 import { buildBudgetRealityMessage } from "@/lib/services/budget-feasibility";
 import { ApiError } from "@/lib/api";
@@ -38,13 +39,18 @@ const DURATION_OPTIONS = [
   { value: 7, label: "7 days" },
   { value: 10, label: "10 days" },
   { value: 14, label: "14 days" },
+  { value: 21, label: "21 days" },
+  { value: 27, label: "27 days" },
+  { value: 30, label: "30 days" },
+  { value: 45, label: "45 days" },
 ];
 
 function generationTimeoutMs(days: number): number {
-  if (days >= 30) return 12 * 60 * 1000;
-  if (days >= 21) return 10 * 60 * 1000;
-  if (days >= 14) return 8 * 60 * 1000;
-  return 5 * 60 * 1000;
+  if (days >= 40) return 24 * 60 * 1000;
+  if (days >= 28) return 20 * 60 * 1000;
+  if (days >= 21) return 14 * 60 * 1000;
+  if (days >= 14) return 10 * 60 * 1000;
+  return 6 * 60 * 1000;
 }
 
 export default function TripInputs() {
@@ -246,7 +252,7 @@ export default function TripInputs() {
     setGeneratingItinerary(true);
     setCraftingPlace(destination.name);
     resetQueue();
-    setStreamBuffer("");
+    setStreamBuffer(undefined);
 
     const days = duration ?? 3;
     const budget = selectedTier.range ?? "";
@@ -293,6 +299,7 @@ export default function TripInputs() {
         commitItineraryToStores(response, {
           destination: response.destination ?? destination.name,
           budget: response.totalEstimatedCost || response.totalBudget,
+          ...tripPartyMeta(travelerType || undefined, travelerCount),
         });
         setGeneratedItinerary(response);
         didSucceed = true;
@@ -397,7 +404,7 @@ export default function TripInputs() {
         mode="crafting"
         message="Your itinerary is being crafted"
         contextPlace={craftingPlace}
-        liveTokenBuffer={streamBuffer}
+        liveTokenBuffer={isLoadingDestinations ? (streamBuffer ?? "") : undefined}
         generationComplete={generationDone}
         onViewItinerary={handleViewItinerary}
         sublines={[

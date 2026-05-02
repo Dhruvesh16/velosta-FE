@@ -32,6 +32,7 @@ import {
   commitItineraryToStores,
   enrichItineraryInBackground,
 } from "@/lib/services/itinerary-hydrator";
+import { tripPartyMeta } from "@/lib/utils/trip-party";
 import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
 import { buildBudgetRealityMessage } from "@/lib/services/budget-feasibility";
 import { ApiError } from "@/lib/api";
@@ -60,13 +61,14 @@ const TRAVELER_TYPES = [
   { id: "family", label: "Family", Icon: Home },
 ] as const;
 
-const DURATION_OPTIONS = [2, 3, 5, 7, 10, 14];
+const DURATION_OPTIONS = [2, 3, 5, 7, 10, 14, 21, 27, 30, 45];
 
 function generationTimeoutMs(days: number): number {
-  if (days >= 30) return 12 * 60 * 1000;
-  if (days >= 21) return 10 * 60 * 1000;
-  if (days >= 14) return 8 * 60 * 1000;
-  return 5 * 60 * 1000;
+  if (days >= 40) return 24 * 60 * 1000;
+  if (days >= 28) return 20 * 60 * 1000;
+  if (days >= 21) return 14 * 60 * 1000;
+  if (days >= 14) return 10 * 60 * 1000;
+  return 6 * 60 * 1000;
 }
 
 /** Map pin row: static catalog entry or AI-discovered place (same shape as Destination). */
@@ -681,7 +683,7 @@ export default function ExploreMapView() {
       setGeneratingItinerary(true);
       setGeneratedItinerary(null);
       resetQueue();
-      setStreamBuffer("");
+      setStreamBuffer(undefined);
 
       let didSucceed = false;
       try {
@@ -704,6 +706,7 @@ export default function ExploreMapView() {
           commitItineraryToStores(response, {
             destination: response.destination ?? dest.name,
             budget: response.totalEstimatedCost || response.totalBudget,
+            ...tripPartyMeta(tripType || undefined, travelerCount),
           });
           setGeneratedItinerary(response);
           didSucceed = true;
@@ -803,8 +806,8 @@ export default function ExploreMapView() {
       country: parts[2],
       coordinates: customDestination.coordinates,
       emoji: "📍",
-      durationMin: 1,
-      durationMax: 30,
+            durationMin: 1,
+            durationMax: 45,
       costMin: 0,
       costMax: 10_000_000,
       highlights: [],
@@ -901,7 +904,7 @@ export default function ExploreMapView() {
         mode="crafting"
         message="Your itinerary is being crafted"
         contextPlace={craftingPlace}
-        liveTokenBuffer={streamBuffer}
+        liveTokenBuffer={isGenerating ? (streamBuffer ?? "") : undefined}
         generationComplete={generationDone}
         onViewItinerary={handleViewItinerary}
         sublines={[

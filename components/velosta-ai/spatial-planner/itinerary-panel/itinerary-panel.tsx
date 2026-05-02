@@ -21,7 +21,8 @@ import { generatePlannerStreamAsync } from "@/lib/services/planner-service";
 import LocationCard from "./location-card";
 import SuggestionsPanel from "./suggestions-panel";
 import { exportItineraryPDF } from "@/lib/services/index";
-import type { ActivityRow } from "@/lib/types/planner.types";
+import { mergeTripDataForExport } from "@/lib/utils/trip-party";
+import type { ActivityRow, TripData } from "@/lib/types/planner.types";
 import { createSharedTrip, saveTripSnapshot } from "@/lib/services/trips-service";
 import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
 
@@ -219,7 +220,8 @@ export default function ItineraryPanel({
     setPlannerRefineMessages: setAiMessages,
     appendPlannerRefineMessage,
   } = useUIStore();
-  const { selectedPackage, travelProfile } = useOnboardingStore();
+  const { selectedPackage, travelProfile, travelerCount: onboardingTravelerCount } =
+    useOnboardingStore();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const currentDay = itinerary[activeDay];
@@ -228,6 +230,11 @@ export default function ItineraryPanel({
   const destination = useMemo(
     () => itineraryData?.destination || selectedPackage?.destination || "",
     [itineraryData, selectedPackage]
+  );
+
+  const tripDataForExport = useMemo(
+    () => mergeTripDataForExport(tripData, onboardingTravelerCount),
+    [tripData, onboardingTravelerCount]
   );
 
   const sections = useMemo(
@@ -256,7 +263,7 @@ export default function ItineraryPanel({
     if (!itineraryData || isExporting) return;
     setIsExporting(true);
     try {
-      await exportItineraryPDF(itineraryData, tripData);
+      await exportItineraryPDF(itineraryData, tripDataForExport);
       setActionToast("Downloaded");
     } catch (err) {
       console.error("[itinerary] export pdf failed", err);
@@ -288,7 +295,7 @@ export default function ItineraryPanel({
       const title =
         window.prompt("Name this shared trip", itineraryData.destination || "My Velosta trip")?.trim();
       if (!title) return;
-      const payload = { itineraryData, tripData } as Record<string, unknown>;
+      const payload = { itineraryData, tripData: tripDataForExport } as Record<string, unknown>;
       const data = await createSharedTrip(title, payload);
       const token = data.sharedTrip.shareToken;
       const url = `${window.location.origin}/saved-trips/shared/${token}`;
@@ -319,7 +326,10 @@ export default function ItineraryPanel({
       const title =
         window.prompt("Save trip as", itineraryData.destination || "My Velosta trip")?.trim();
       if (!title) return;
-      await saveTripSnapshot(title, { itineraryData, tripData } as Record<string, unknown>);
+      await saveTripSnapshot(title, {
+        itineraryData,
+        tripData: tripDataForExport,
+      } as Record<string, unknown>);
       setActionToast("Trip saved");
     } catch (err) {
       console.error("[itinerary] save failed", err);
@@ -411,9 +421,14 @@ export default function ItineraryPanel({
             return;
           }
 
-          const extractedTripData = {
-            destination: data.destination,
-            budget: data.totalEstimatedCost || data.totalBudget,
+          const prevTrip = usePlannerStore.getState().tripData;
+          const extractedTripData: TripData = {
+            ...prevTrip,
+            destination: data.destination ?? prevTrip.destination,
+            budget:
+              data.totalEstimatedCost ||
+              data.totalBudget ||
+              prevTrip.budget,
           };
           usePlannerStore.getState().setItineraryData(data, extractedTripData);
 

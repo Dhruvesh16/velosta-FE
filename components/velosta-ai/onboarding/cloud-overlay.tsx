@@ -423,25 +423,39 @@ function LiveStreamDays({
   }, [days.length, days[days.length - 1]?.activities.length]);
 
   if (days.length === 0) {
+    const destPeek = /"destination"\s*:\s*"([^"]{2,80})"/.exec(deferredBuffer);
+    const preamble =
+      deferredBuffer.trim().length > 48
+        ? destPeek
+          ? `Structuring your trip to ${destPeek[1]}…`
+          : "Receiving itinerary structure from the model…"
+        : "Connecting to Velosta AI…";
     return (
-      <div className="flex items-center gap-2 py-4 px-2">
-        {freezeMotion
-          ? [0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="block w-1.5 h-1.5 rounded-full bg-[#D97757]/50 animate-pulse"
-                style={{ animationDelay: `${i * 0.15}s` }}
-              />
-            ))
-          : [0, 1, 2].map((i) => (
-              <motion.span
-                key={i}
-                className="block w-1.5 h-1.5 rounded-full bg-[#D97757]/50"
-                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
-                transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18 }}
-              />
-            ))}
-        <span className="text-[11px] text-[#0B1F2A]/40">Connecting to Velosta AI…</span>
+      <div className="flex flex-col gap-2 py-4 px-2">
+        <div className="flex items-center gap-2">
+          {freezeMotion
+            ? [0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="block w-1.5 h-1.5 rounded-full bg-[#D97757]/50 animate-pulse"
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                />
+              ))
+            : [0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="block w-1.5 h-1.5 rounded-full bg-[#D97757]/50"
+                  animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
+                  transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.18 }}
+                />
+              ))}
+          <span className="text-[11px] text-[#0B1F2A]/55 leading-snug">{preamble}</span>
+        </div>
+        {deferredBuffer.trim().length > 80 && (
+          <p className="text-[10px] text-[#0B1F2A]/38 pl-6">
+            First day cards appear as soon as the planner lists them in JSON — long trips can take a short moment.
+          </p>
+        )}
       </div>
     );
   }

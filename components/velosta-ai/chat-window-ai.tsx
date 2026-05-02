@@ -8,18 +8,53 @@ import { useUser } from "@/app/utils/context";
 import { useOnboardingStore } from "@/lib/stores/onboarding-store";
 import { generatePlannerResponse } from "@/lib/services/planner-service";
 import { buildTravelProfilePrompt } from "@/lib/services/travel-profile-prompt";
+import type { TripData as PlannerTripData } from "@/lib/types/planner.types";
+import { tripPartyMeta, tripTravelerHeadcount } from "@/lib/utils/trip-party";
 import { ApiError } from "@/lib/api";
 import SignInGate from "@/components/velosta-ai/sign-in-gate";
 import { ItineraryPDFExport } from "./itinerary-pdf-export";
 import { usePlannerStore } from "@/lib/stores/planner-store";
-import {
-  useUIStore,
-  type PlannerChatMessage as Message,
-  type PlannerChatTripData as TripData,
-} from "@/lib/stores/ui-store";
+import { useUIStore, type PlannerChatMessage as Message } from "@/lib/stores/ui-store";
+
+/** Chat trip excerpt — reuses planner party when present (post-commit flows), else onboarding counts */
+function mergeTripExtractParty(
+  plannerTrip: PlannerTripData,
+  args: {
+    itineraryDest?: string;
+    itineraryBudgetPrimary?: string;
+    itineraryBudgetFallback?: string;
+    travelerType?: string | null;
+    travelerCount: number;
+  }
+): PlannerTripData {
+  const budget =
+    args.itineraryBudgetPrimary ||
+    args.itineraryBudgetFallback ||
+    plannerTrip.budget;
+  const destination = args.itineraryDest ?? plannerTrip.destination;
+  const hPlanner = tripTravelerHeadcount(plannerTrip);
+  let partyFields: Pick<PlannerTripData, "travelers" | "travelType" | "travelerCount">;
+  if (hPlanner !== undefined) {
+    const kids = plannerTrip.travelers?.children ?? 0;
+    const looksLikeStaleSolo =
+      kids === 0 && hPlanner === 1 && args.travelerCount > 1;
+    if (looksLikeStaleSolo) {
+      partyFields = tripPartyMeta(args.travelerType || undefined, args.travelerCount);
+    } else {
+      partyFields = {
+        travelers: plannerTrip.travelers!,
+        ...(plannerTrip.travelType ? { travelType: plannerTrip.travelType } : {}),
+        travelerCount: plannerTrip.travelerCount ?? hPlanner,
+      };
+    }
+  } else {
+    partyFields = tripPartyMeta(args.travelerType || undefined, args.travelerCount);
+  }
+  return { destination, budget, ...partyFields };
+}
 
 interface ChatWindowProps {
-  onItinerary?: (itinerary: any, tripData: TripData) => void;
+  onItinerary?: (itinerary: any, tripData: PlannerTripData) => void;
   /** Smaller footer when embedded (e.g. map tab sheet). */
   hideSessionHint?: boolean;
 }
@@ -89,7 +124,7 @@ function buildStrictPlanIntentPrompt(rawIntent: string): string {
   ].join("\n");
 }
 
-function ItineraryCard({ data, tripData }: { data: any; tripData: TripData }) {
+function ItineraryCard({ data, tripData }: { data: any; tripData: PlannerTripData }) {
   if (!data?.itineraryTable) return null;
 
   return (
@@ -159,8 +194,16 @@ export function ChatWindow({ onItinerary, hideSessionHint = false }: ChatWindowP
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { accessToken, user } = useUser();
-  const { selectedDestination, generatedItinerary, setGeneratedItinerary, duration, budgetAmount, travelProfile } =
-    useOnboardingStore();
+  const {
+    selectedDestination,
+    generatedItinerary,
+    setGeneratedItinerary,
+    duration,
+    budgetAmount,
+    travelProfile,
+    travelerCount,
+    travelerType,
+  } = useOnboardingStore();
   const { itineraryData: plannerItineraryData, tripData: plannerTripData } = usePlannerStore();
   const {
     plannerChatMessages: messages,
@@ -200,16 +243,34 @@ export function ChatWindow({ onItinerary, hideSessionHint = false }: ChatWindowP
   useEffect(() => {
     if (!plannerItineraryData) return;
     setPlannerChatCurrentItinerary(plannerItineraryData);
-    if (plannerTripData.destination || plannerTripData.budget) {
+    if (
+      plannerTripData.destination ||
+      plannerTripData.budget ||
+      plannerTripData.travelers ||
+      plannerTripData.travelerCount != null ||
+      plannerTripData.travelType
+    ) {
+      const prev = useUIStore.getState().plannerChatTripData;
       setPlannerChatTripData({
-        destination: plannerTripData.destination,
-        budget: plannerTripData.budget,
+        ...prev,
+        destination: plannerTripData.destination ?? prev.destination,
+        budget: plannerTripData.budget ?? prev.budget,
+        ...(plannerTripData.travelers ? { travelers: plannerTripData.travelers } : {}),
+        ...(plannerTripData.travelType != null && plannerTripData.travelType !== ""
+          ? { travelType: plannerTripData.travelType }
+          : {}),
+        ...(plannerTripData.travelerCount != null
+          ? { travelerCount: plannerTripData.travelerCount }
+          : {}),
       });
     }
   }, [
     plannerItineraryData,
     plannerTripData.destination,
     plannerTripData.budget,
+    plannerTripData.travelers,
+    plannerTripData.travelType,
+    plannerTripData.travelerCount,
     setPlannerChatCurrentItinerary,
     setPlannerChatTripData,
   ]);
@@ -219,10 +280,13 @@ export function ChatWindow({ onItinerary, hideSessionHint = false }: ChatWindowP
     autoSentRef.current = true;
     const data = generatedItinerary;
     setPlannerChatCurrentItinerary(data);
-    const extractedTripData: TripData = {
-      destination: data.destination,
-      budget: data.totalEstimatedCost || data.totalBudget,
-    };
+    const extractedTripData = mergeTripExtractParty(usePlannerStore.getState().tripData, {
+      itineraryDest: data.destination,
+      itineraryBudgetPrimary: data.totalEstimatedCost,
+      itineraryBudgetFallback: data.totalBudget,
+      travelerType,
+      travelerCount,
+    });
     setPlannerChatTripData(extractedTripData);
     onItinerary?.(data, extractedTripData);
     appendPlannerChatMessage({
@@ -241,6 +305,8 @@ export function ChatWindow({ onItinerary, hideSessionHint = false }: ChatWindowP
     appendPlannerChatMessage,
     setPlannerChatCurrentItinerary,
     setPlannerChatTripData,
+    travelerCount,
+    travelerType,
   ]);
 
   const sendText = useCallback(
@@ -306,10 +372,13 @@ export function ChatWindow({ onItinerary, hideSessionHint = false }: ChatWindowP
           ]);
         } else if (data.itineraryTable) {
           setPlannerChatCurrentItinerary(data);
-          const extractedTripData: TripData = {
-            destination: data.destination,
-            budget: data.totalEstimatedCost || data.totalBudget,
-          };
+          const extractedTripData = mergeTripExtractParty(usePlannerStore.getState().tripData, {
+            itineraryDest: data.destination,
+            itineraryBudgetPrimary: data.totalEstimatedCost,
+            itineraryBudgetFallback: data.totalBudget,
+            travelerType,
+            travelerCount,
+          });
           setPlannerChatTripData(extractedTripData);
           onItinerary?.(data, extractedTripData);
           appendPlannerChatMessage({
@@ -354,6 +423,8 @@ export function ChatWindow({ onItinerary, hideSessionHint = false }: ChatWindowP
       budgetAmount,
       travelProfile,
       tripData.budget,
+      travelerCount,
+      travelerType,
     ]
   );
 

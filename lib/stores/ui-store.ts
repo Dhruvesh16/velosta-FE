@@ -2,6 +2,7 @@
 // Controls panel visibility and mobile tab navigation
 
 import { create } from "zustand";
+import type { TripData } from "@/lib/types/planner.types";
 
 export type MobileTab = "chat" | "map" | "itinerary";
 export type PlannerRefineChatMessage = {
@@ -16,10 +17,11 @@ export type PlannerChatMessage = {
   isItinerary?: boolean;
   itineraryData?: unknown;
 };
-export type PlannerChatTripData = {
-  destination?: string;
-  budget?: string;
-};
+/** Subset synced from planner/onboarding — enough for itinerary card + PDF preview. */
+export type PlannerChatTripData = Pick<
+  TripData,
+  "destination" | "budget" | "travelers" | "travelType" | "travelerCount"
+>;
 
 interface UIState {
   activeMobileTab: MobileTab;

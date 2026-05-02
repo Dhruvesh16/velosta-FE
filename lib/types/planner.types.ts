@@ -88,6 +88,8 @@ export interface TripData {
   travelType?: string;
   dateRange?: { start: string; end: string };
   travelers?: { adults: number; children: number };
+  /** Cached headcount when party was chosen in onboarding — used if `travelers` is missing */
+  travelerCount?: number;
   budget?: string;
   travelVibe?: string[];
   mustVisitPlaces?: string[];

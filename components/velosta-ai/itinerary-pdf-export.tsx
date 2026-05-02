@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { formatTripTravelersLine } from "@/lib/services/pdf-export";
 
 interface ItineraryPDFExportProps {
   itineraryData: any;
@@ -383,11 +384,7 @@ export function ItineraryPDFExport({
               ? `<div><strong>Duration:</strong> ${itineraryData.duration}</div>`
               : ""
           }
-          ${
-            tripData.travelers
-              ? `<div><strong>Travelers:</strong> ${tripData.travelers.adults} Adult(s), ${tripData.travelers.children} Child(ren)</div>`
-              : ""
-          }
+          <div><strong>Travelers:</strong> ${formatTripTravelersLine(tripData)}</div>
           ${
             tripData.budget
               ? `<div><strong>Budget:</strong> ${tripData.budget}</div>`

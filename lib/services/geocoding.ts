@@ -44,8 +44,8 @@ function haversineKm(
 
 // ── Activities that should NOT be geocoded ───────────────────────────────────
 const SKIP_PATTERNS = [
-  /check[\s-]?in/i,
-  /check[\s-]?out/i,
+  // Bare meta lines only — named venues ("Check-in at Olympic Lodge") are geocoded.
+  /^check[\s-]?(?:in|out)$/i,
   /travel\s+(to|from|back)/i,
   /depart/i,
   /arrival|arrive/i,
@@ -63,7 +63,38 @@ const SKIP_PATTERNS = [
 const GENERIC_VENUE_RE = /^(resort|hotel|lodge|inn|homestay|guesthouse|guest\s+house|hostel|(local\s+)?(restaurant|cafe|cafeteria|dhaba|shack|bar|pub|eatery|diner|canteen|caterer)|beach\s+(shack|cafe|bar|restaurant|hut)|local\s+village|village|market)$/i;
 
 function shouldSkipGeocoding(name: string): boolean {
+  const t = name.trim();
+  // Explicit venue after check-in/out → keep (handled by SKIP only matching bare "^check...")
+  const checkNamed = t.match(/^check[\s-]?(?:in|out)\s+(.+)/i);
+  if (
+    checkNamed?.[1] &&
+    checkNamed[1].replace(/^(?:at|@)\s+/i, "").trim().length >= 6
+  ) {
+    return false;
+  }
+
   return SKIP_PATTERNS.some((p) => p.test(name));
+}
+
+/** Normalize trip titles Mapbox tends to confuse (e.g. "Pacific Northwest" → "Pacific, CA"). */
+function rewriteDestinationForGeocoding(dest: string): string {
+  const s = dest.trim();
+  if (!s) return s;
+  const lower = s.toLowerCase();
+
+  const hasPNW =
+    /\b(pnw|pacific\s+north\s*west|cascadia)\b/i.test(s) ||
+    (/\bpacific\b/i.test(lower) && /\bnorth\s*west(ern)?\b/i.test(lower));
+  const hasOlympic =
+    /\bolympic\b/i.test(lower) && /\b(peninsula|national\s+park|np)\b/i.test(lower);
+
+  if (hasOlympic) return "Olympic Peninsula, Washington, United States";
+
+  if (hasPNW && /\b(california|cali|,?\s+ca\b)$/i.test(s)) return s;
+
+  if (hasPNW) return "Pacific Northwest, Washington, United States";
+
+  return s;
 }
 
 function isGenericVenue(venue: string): boolean {
@@ -305,31 +336,50 @@ export async function resolveDestination(
 ): Promise<{ coords: [number, number]; country: string | null } | null> {
   const raw = destination.trim();
   if (!raw) return null;
+  const rewritten = rewriteDestinationForGeocoding(raw);
   const inferredCountryBias = inferDestinationCountryBias(raw);
+
+  const SEPARATOR = /\s*(?:&|\+|,|\bto\b|\bvia\b|\band\b|–|—|\/)\s*/i;
+
+  // 0a. Compound titles (e.g. "PNW & California"): geocode each segment first so
+  //     we never accept a tiny "Pacific, CA" locality for a whole multi-region trip.
+  const segmentsEarly = rewritten
+    .split(SEPARATOR)
+    .map((s) => rewriteDestinationForGeocoding(s.trim()))
+    .filter((s) => s.length >= 2);
+  if (segmentsEarly.length >= 2) {
+    for (const seg of segmentsEarly) {
+      const segHit = await geocodePlaceWithCountry(seg);
+      if (segHit) {
+        destCountryCache.set(raw, segHit.country);
+        return segHit;
+      }
+    }
+  }
 
   // 0. If destination text strongly hints India, try India-biased lookup first
   // to avoid ambiguous global matches for names that exist in multiple countries.
   if (inferredCountryBias) {
-    const biased = await geocodePlaceWithCountry(raw, inferredCountryBias);
+    const biased = await geocodePlaceWithCountry(rewritten, inferredCountryBias);
     if (biased) {
       destCountryCache.set(raw, biased.country ?? inferredCountryBias);
       return biased;
     }
   }
 
-  // 1. Worldwide first
-  const worldwide = await geocodePlaceWithCountry(raw);
+  // 1. Worldwide first (rewritten disambiguation)
+  const worldwide = await geocodePlaceWithCountry(rewritten);
   if (worldwide) {
     destCountryCache.set(raw, worldwide.country);
     return worldwide;
   }
 
   // 2. Multi-stop split, worldwide each
-  const SEPARATOR = /\s*(?:&|\+|,|\bto\b|\bvia\b|\band\b|–|—|\/)\s*/i;
   const segments = raw.split(SEPARATOR).map((s) => s.trim()).filter((s) => s.length >= 2);
   for (const seg of segments) {
     if (seg.toLowerCase() === raw.toLowerCase()) continue;
-    const segHit = await geocodePlaceWithCountry(seg);
+    const segRew = rewriteDestinationForGeocoding(seg);
+    const segHit = await geocodePlaceWithCountry(segRew);
     if (segHit) {
       destCountryCache.set(raw, segHit.country);
       return segHit;
@@ -337,7 +387,7 @@ export async function resolveDestination(
   }
 
   // 3. India bias as last resort (legacy input that worldwide search missed)
-  const inHit = await geocodePlaceWithCountry(raw, "in");
+  const inHit = await geocodePlaceWithCountry(rewritten, "in");
   if (inHit) {
     destCountryCache.set(raw, inHit.country ?? "in");
     return inHit;
@@ -346,7 +396,7 @@ export async function resolveDestination(
   // 4. Try appending ", India" — island territories and lesser-known Indian
   //    destinations like "Andaman Islands" or "Lakshadweep" are sometimes
   //    found only when the country context is embedded in the query string.
-  const withIndia = await geocodePlaceWithCountry(`${raw}, India`, "in");
+  const withIndia = await geocodePlaceWithCountry(`${rewritten}, India`, "in");
   if (withIndia) {
     destCountryCache.set(raw, withIndia.country ?? "in");
     return withIndia;
@@ -457,12 +507,28 @@ export async function enrichItineraryWithCoordinates(
     ) ||
     /\b(?:country|nation|statewide|nationwide)\b/i.test(destination);
 
+  // West-coast mega-routes span 1500–2500+ km; a single centroid must not discard
+  // valid LLM pins in the "other" state.
+  const isBroadUSWestCorridor =
+    /\b(california|cali)\b/i.test(destination) &&
+    /\b(washington|oregon|pnw|pacific\s+north\s*west|northwest|olympic)\b/i.test(
+      destination
+    );
+
   const hardRadiusKm = isCountryScaleDestination
     ? 6000
-    : (isMultiStop || isIslandOrRegion) ? 500 : 250;
+    : isBroadUSWestCorridor
+      ? 3200
+      : (isMultiStop || isIslandOrRegion)
+        ? 500
+        : 250;
   const softRadiusKm = isCountryScaleDestination
     ? 6000
-    : (isMultiStop || isIslandOrRegion) ? 500 : 250;
+    : isBroadUSWestCorridor
+      ? 3200
+      : (isMultiStop || isIslandOrRegion)
+        ? 500
+        : 250;
 
   const enriched = [...days];
 
@@ -487,7 +553,10 @@ export async function enrichItineraryWithCoordinates(
           // should never be biased by an Indian-coords-leak from the LLM).
           const llmInRange =
             row.coordinates &&
-            (isCountryScaleDestination || isWithinRange(row.coordinates, destCenter, softRadiusKm));
+            (isCountryScaleDestination ||
+              (isBroadUSWestCorridor &&
+                (destCountry === "us" || destCountry === undefined)) ||
+              isWithinRange(row.coordinates, destCenter, softRadiusKm));
           const proximity: [number, number] = llmInRange
             ? (row.coordinates as [number, number])
             : destCenter;

@@ -2,7 +2,8 @@
 
 import { useCallback, useRef } from "react";
 
-const COALESCE_TICK_MS = 100;
+/** Tighter pacing so streamed JSON visibly advances during live Gemini SSE. */
+const COALESCE_TICK_MS = 36;
 /** One-shot SSE payloads from the planner (large JSON) skip interval pacing entirely. */
 const LARGE_SINGLE_CHUNK = 24_576;
 

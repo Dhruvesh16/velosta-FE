@@ -239,7 +239,7 @@ export default function Page() {
         >
           <img
             src="/images/hero.png"
-            alt="Indian travellers exploring the mountains"
+            alt="Travellers in the mountains — Velosta AI trip planner for personalized travel itineraries"
             className="h-full w-full object-cover object-center"
             loading="eager"
           />
@@ -289,6 +289,14 @@ export default function Page() {
               style={{ backgroundColor: c.coral }}
             />
 
+            <motion.p
+              variants={heroChild}
+              className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: c.teal }}
+            >
+              AI trip planner · Smart itineraries
+            </motion.p>
+
             {/* H1 */}
             <motion.h1
               variants={heroChild}
@@ -304,7 +312,7 @@ export default function Page() {
               className="mt-5 max-w-sm text-[16px] leading-[1.7]"
               style={{ color: "rgba(11,31,42,0.6)" }}
             >
-              Describe your dream trip in plain words. Our AI builds a complete, personalized itinerary in under 90 seconds.
+              Describe your dream trip in plain words. Velosta’s AI trip planner builds a complete, personalized itinerary in under 90 seconds.
             </motion.p>
 
             {/* Feature row */}

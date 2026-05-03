@@ -4,9 +4,38 @@ import { GeistMono } from "geist/font/mono";
 import Script from "next/script";
 import "./globals.css";
 import ClientLayout from "./clientLayout";
+import { SiteJsonLd } from "@/components/seo/site-json-ld";
+import { getSiteName, getSiteUrl } from "@/lib/site-config";
+
+const siteUrl = getSiteUrl();
+const siteName = getSiteName();
+
 export const metadata: Metadata = {
-  title: "Velosta",
-  description: "Built by Travelers, for Travelers Who Learn from the Road.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: `${siteName} | AI Trip Planner & Smart Travel Itineraries`,
+    template: `%s | ${siteName}`,
+  },
+  description:
+    "Velosta is an AI trip planner for India and beyond: map-based itineraries, budgets, and smart travel planning in minutes. Built by travelers, for travelers who learn from the road.",
+  applicationName: siteName,
+  authors: [{ name: siteName }],
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    url: siteUrl,
+    siteName,
+    title: `${siteName} | AI Trip Planner & Travel Itineraries`,
+    description:
+      "Plan your next trip with Velosta’s AI trip planner: personalized itineraries, spatial maps, and budgeting tools.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${siteName} | AI Trip Planner`,
+    description:
+      "AI-powered trip planner and spatial travel planner for personalized itineraries and smarter travel.",
+  },
+  robots: { index: true, follow: true },
   icons: {
     icon: "/favicon.ico",
   },
@@ -32,6 +61,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${GeistSans.variable} ${GeistMono.variable}`}>
+        <SiteJsonLd />
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-Q0RL3N9Q6K"
           strategy="afterInteractive"

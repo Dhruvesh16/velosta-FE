@@ -8,10 +8,11 @@
 #
 # Usage (from FE/ root):
 #   source .gcp-env          # optional: load pre-set GCP env vars
-#   ./deploy.sh [--skip-build]
+#   ./deploy.sh [--skip-build] [--traffic-profile <low|normal|peak>]
 #
 # Options:
 #   --skip-build   Skip docker build & push (re-deploy current image)
+#   --traffic-profile  Scaling preset for cost vs burst: low|normal|peak (default: normal)
 #
 # Build uses your machine (fast) instead of Google Cloud Build. Image is pushed
 # with `docker push` to Artifact Registry (same destination as before).
@@ -34,13 +35,60 @@ IMAGE_FULL="${AR_HOST}/${IMAGE_REPO}:${IMAGE_TAG}"
 CR_NAME="velosta-fe"
 APP_PORT=8080
 SKIP_BUILD=false
+TRAFFIC_PROFILE="${TRAFFIC_PROFILE:-normal}"
+
+profile_min_instances() {
+  local profile="$1"
+  case "$profile" in
+    low) echo 0 ;;
+    normal) echo 0 ;;
+    peak) echo 1 ;;
+    *) echo 0 ;;
+  esac
+}
+
+profile_max_instances() {
+  local profile="$1"
+  case "$profile" in
+    low) echo 8 ;;
+    normal) echo 20 ;;
+    peak) echo 50 ;;
+    *) echo 20 ;;
+  esac
+}
+
+profile_concurrency() {
+  local profile="$1"
+  case "$profile" in
+    low) echo 80 ;;
+    normal) echo 120 ;;
+    peak) echo 200 ;;
+    *) echo 120 ;;
+  esac
+}
+
+# Frontend autoscaling defaults (cost-first with burst headroom).
+FE_MIN_INSTANCES="${FE_MIN_INSTANCES:-$(profile_min_instances "$TRAFFIC_PROFILE")}"
+FE_MAX_INSTANCES="${FE_MAX_INSTANCES:-$(profile_max_instances "$TRAFFIC_PROFILE")}"
+FE_CONCURRENCY="${FE_CONCURRENCY:-$(profile_concurrency "$TRAFFIC_PROFILE")}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --skip-build) SKIP_BUILD=true; shift ;;
+    --traffic-profile) TRAFFIC_PROFILE="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
+
+case "$TRAFFIC_PROFILE" in
+  low|normal|peak) ;;
+  *) echo "Invalid --traffic-profile '$TRAFFIC_PROFILE' (expected: low|normal|peak)." >&2; exit 1 ;;
+esac
+
+# Recompute defaults if profile was passed as CLI arg.
+FE_MIN_INSTANCES="${FE_MIN_INSTANCES:-$(profile_min_instances "$TRAFFIC_PROFILE")}"
+FE_MAX_INSTANCES="${FE_MAX_INSTANCES:-$(profile_max_instances "$TRAFFIC_PROFILE")}"
+FE_CONCURRENCY="${FE_CONCURRENCY:-$(profile_concurrency "$TRAFFIC_PROFILE")}"
 
 log()  { echo -e "\033[1;36m[deploy-fe]\033[0m $*"; }
 ok()   { echo -e "\033[1;32m[  OK  ]\033[0m $*"; }
@@ -120,8 +168,9 @@ gcloud run deploy "$CR_NAME" \
   --project "$PROJECT" \
   --service-account "$SA_EMAIL" \
   --port "$APP_PORT" \
-  --min-instances 1 \
-  --max-instances 5 \
+  --min-instances "$FE_MIN_INSTANCES" \
+  --max-instances "$FE_MAX_INSTANCES" \
+  --concurrency "$FE_CONCURRENCY" \
   --ingress all \
   --allow-unauthenticated \
   --set-env-vars "NODE_ENV=production,NEXT_PUBLIC_API_BASE_URL=${GATEWAY_URL},NEXT_PUBLIC_SITE_NAME=Velosta" \

@@ -129,6 +129,7 @@ export default function Footer() {
                 Product
               </p>
               <ul className="mt-5 space-y-3.5">
+                <li><Link href="/bike-rental" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>Bike Rental</Link></li>
                 <li><Link href="/velosta-ai" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>Velosta AI</Link></li>
                 <li><Link href="/expense-tracker" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>Expense Tracker</Link></li>
                 <li><Link href="/how-not-travel" className="text-sm transition-colors duration-300" style={{ color: "rgba(245,239,230,0.6)" }}>How n̶o̶t̶ to Travel</Link></li>

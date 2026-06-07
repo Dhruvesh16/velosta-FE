@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" fill="none" role="img" aria-label="Premium bikes showcase">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1A2235"/>
+      <stop offset="100%" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF6B35"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="640" height="480" rx="24" fill="url(#bg)"/>
+  <rect x="24" y="24" width="592" height="432" rx="20" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="48" y="72" fill="#FF6B35" font-family="system-ui,sans-serif" font-size="14" font-weight="600" letter-spacing="0.2em">PREMIUM FLEET</text>
+  <text x="48" y="108" fill="#FFFFFF" font-family="system-ui,sans-serif" font-size="36" font-weight="800">Ride Anywhere</text>
+  <text x="48" y="140" fill="#94A3B8" font-family="system-ui,sans-serif" font-size="16">100+ models � 50+ cities</text>
+
+  <!-- Panel 1 - Cruiser -->
+  <g transform="translate(48,168)">
+    <rect width="160" height="220" rx="16" fill="#111827" stroke="rgba(255,255,255,0.06)"/>
+    <ellipse cx="80" cy="175" rx="70" ry="12" fill="rgba(0,0,0,0.35)"/>
+    <path d="M35 150 C45 110 75 95 105 100 C125 102 135 115 130 135 C125 155 95 165 65 160 C45 156 35 155 35 150Z" fill="#FF6B35" opacity="0.9"/>
+    <circle cx="55" cy="152" r="18" fill="#1A2235" stroke="#64748B" stroke-width="3"/>
+    <circle cx="115" cy="152" r="18" fill="#1A2235" stroke="#64748B" stroke-width="3"/>
+    <path d="M70 120 Q90 100 110 115" stroke="#FFFFFF" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <text x="16" y="28" fill="#94A3B8" font-size="11" font-weight="600">CRUISER</text>
+  </g>
+
+  <!-- Panel 2 - Scooter -->
+  <g transform="translate(240,148)">
+    <rect width="160" height="240" rx="16" fill="#111827" stroke="rgba(255,107,53,0.35)" stroke-width="2"/>
+    <ellipse cx="80" cy="195" rx="70" ry="12" fill="rgba(0,0,0,0.35)"/>
+    <rect x="55" y="95" width="50" height="70" rx="12" fill="#2563EB"/>
+    <circle cx="55" cy="175" r="16" fill="#1A2235" stroke="#64748B" stroke-width="3"/>
+    <circle cx="105" cy="175" r="16" fill="#1A2235" stroke="#64748B" stroke-width="3"/>
+    <path d="M65 95 L75 75 L95 75 L105 95" fill="#FFFFFF" opacity="0.9"/>
+    <text x="16" y="28" fill="#FF6B35" font-size="11" font-weight="700">POPULAR</text>
+    <text x="16" y="44" fill="#FFFFFF" font-size="11" font-weight="600">SCOOTER</text>
+  </g>
+
+  <!-- Panel 3 - Sport -->
+  <g transform="translate(432,168)">
+    <rect width="160" height="220" rx="16" fill="#111827" stroke="rgba(255,255,255,0.06)"/>
+    <ellipse cx="80" cy="175" rx="70" ry="12" fill="rgba(0,0,0,0.35)"/>
+    <path d="M30 145 C40 105 80 90 120 100 C140 105 135 130 115 145 C95 160 55 160 30 145Z" fill="#10B981" opacity="0.85"/>
+    <circle cx="50" cy="148" r="17" fill="#1A2235" stroke="#64748B" stroke-width="3"/>
+    <circle cx="110" cy="148" r="17" fill="#1A2235" stroke="#64748B" stroke-width="3"/>
+    <path d="M65 115 L95 105 L115 120" stroke="#FFFFFF" stroke-width="3" fill="none"/>
+    <text x="16" y="28" fill="#94A3B8" font-size="11" font-weight="600">SPORT</text>
+  </g>
+
+  <!-- Stats bar -->
+  <rect x="48" y="408" width="544" height="56" rx="12" fill="rgba(255,107,53,0.12)" stroke="rgba(255,107,53,0.25)"/>
+  <text x="80" y="442" fill="#FFFFFF" font-size="14" font-weight="700">4.8 Rating</text>
+  <text x="240" y="442" fill="#FFFFFF" font-size="14" font-weight="700">Instant Booking</text>
+  <text x="420" y="442" fill="#FFFFFF" font-size="14" font-weight="700">Helmet Free</text>
+</svg>
